@@ -1,0 +1,14 @@
+{
+  "name": "browser-rust-ide",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.15.0",
+  "scripts": {
+    "doctor": "bash scripts/doctor.sh",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "latest",
+    "typescript": "latest"
+  }
+}

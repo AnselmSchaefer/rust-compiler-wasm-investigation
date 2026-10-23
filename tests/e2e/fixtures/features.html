@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Wasm feature probe</title>
+<script type="module">
+  // Tiny hand-assembled modules; each validates only if the engine supports the feature.
+  const probe = (bytes) => { try { return WebAssembly.validate(new Uint8Array(bytes)); } catch { return false; } };
+  const header = [0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00];
+  window.features = {
+    crossOriginIsolated: self.crossOriginIsolated === true,
+    sharedArrayBuffer: typeof SharedArrayBuffer === 'function',
+    // memory section: 1 memory, flags 0x03 (shared, has max), min 1, max 1
+    sharedMemory: probe([...header, 0x05, 0x04, 0x01, 0x03, 0x01, 0x01]),
+    // memory section: flags 0x04 (memory64), min 1
+    memory64: probe([...header, 0x05, 0x03, 0x01, 0x04, 0x01]),
+    // type () -> (), func using try_table with no catches (exnref EH)
+    exceptions: probe([...header, 0x01, 0x04, 0x01, 0x60, 0x00, 0x00, 0x03, 0x02, 0x01, 0x00,
+      0x0a, 0x08, 0x01, 0x06, 0x00, 0x1f, 0x40, 0x00, 0x0b, 0x0b]),
+    jspi: typeof WebAssembly.Suspending === 'function' && typeof WebAssembly.promising === 'function',
+    opfs: typeof navigator.storage?.getDirectory === 'function',
+  };
+  document.body.textContent = JSON.stringify(window.features, null, 2);
+</script>
+<body></body>

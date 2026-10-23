@@ -1,0 +1,9 @@
+/build/
+/build-logs/
+/vendor/
+node_modules/
+target/
+test-results/
+playwright-report/
+*.wasm
+!tests/**/fixtures/*.wasm
