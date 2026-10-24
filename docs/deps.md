@@ -9,7 +9,7 @@
 | `index.crates.io` (sparse index) | **none**: no `Access-Control-Allow-Origin`, so `fetch` from a page fails | needs a same-origin reverse proxy or a CORS mirror |
 | `static.crates.io` (`.crate` files) | `Access-Control-Allow-Origin: *`, `Cache-Control: immutable` | download directly |
 
-In dev and in the tests, `scripts/serve.mjs` serves the pinned WP-15 snapshot at `/index/` (Playwright mounts it). For the deployed IDE, `SparseIndex` takes any base URL. The options, to be decided **[H]**:
+In dev and in the tests, `scripts/serve.mjs` serves the pinned WP-15 snapshot at `/index/` (Playwright mounts it). **For v1 (decided 2026-10-24), the local relay (WP-38) serves the app and proxies `/index/` to index.crates.io on the same origin**, so no hosting is needed. `SparseIndex` takes any base URL. Only an optional public deploy (WP-29) would need one of these:
 1. **A reverse proxy on the app's own origin** (`/index/*` → `https://index.crates.io/*`), set up with the WP-29 deploy. No CORS needed, and nothing else to run.
 2. **A CORS mirror Worker** (e.g. Cloudflare): a few lines that forward GETs and add `Access-Control-Allow-Origin`. Needs an account and deploy approval.
 

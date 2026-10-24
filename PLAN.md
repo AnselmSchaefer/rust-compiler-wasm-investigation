@@ -53,11 +53,11 @@ These are taken as defaults so work can start. Changing one later only affects t
 
 | Decision | Choice | Affects |
 |---|---|---|
-| Primary user (2026-10-24) | AI agents, through a tool API (WP-38). Human-only IDE features are in the Appendix. Where agents run (browser, headless, both) is the [H] decision at the start of WP-38 | WP-25–29, WP-38 |
+| Primary user (2026-10-24) | AI agents on this machine, through a tool API in the browser page, reached via a local Python relay (MCP on stdio ⇄ WebSocket). Human-only IDE features are in the Appendix | WP-25–27, WP-38 |
 | Editor | CodeMirror 6 | WP-14, WP-24 (Appendix) |
 | Compiler host ABI | `wasm32-wasip1-threads` (WASI) | WP-04–WP-10 |
 | User program target | `wasm32-wasip1` first (WP-13), `wasm32-wasip3` components later (WP-30) | WP-13, WP-30 |
-| Hosting | Static CDN (Cloudflare Pages + R2 or GitHub Pages). No server-side compiling, unless WP-38 chooses headless agents (then the same rustc.wasm runs under a Node/wasmtime host) | WP-16, WP-29, WP-38 |
+| Hosting | v1: local, the relay serves the app and proxies the index (WP-38). Optional public deploy later: static CDN (Cloudflare Pages + R2 or GitHub Pages), no server-side compiling | WP-16, WP-29, WP-38 |
 | Base rustc version | Latest stable at WP-03; rebased every 6 weeks (WP-37) | all toolchain WPs |
 | Language for host glue | TypeScript (workers, UI); Rust → Wasm for VFS, resolver, cache, planner | — |
 | Target browsers | **Chromium-based only** (user decision 2026-10-24). Firefox runs where it's free but is never a gate. Safari/WebKit are out of scope | all browser WPs |
@@ -88,11 +88,12 @@ These are taken as defaults so work can start. Changing one later only affects t
 | B. Own toolchain | 03–10 | Our own rustc.wasm + lld + sysroot, compile-server mode, packaged releases | 14–22 |
 | C. Browser runtime | 11–14 | VFS, workers, run sandbox, minimal UI → **Milestone M1a: offline single-file playground** | 7–10 |
 | D. Dependencies | 15–22 | crates.io, cache, proc macros, build scripts, ecosystem matrix → **M1: playground with crates** | 18–28 |
-| E. Agent-ready v1 | 25–27, 38, 29 | Workspaces, tests/Clippy/rustfmt, incremental check, **agent tool API**, deploy → **M2: v1 for agentic development** | 8–11 |
+| E. Agent-ready v1 | 25–27, 38 | Workspaces, tests/Clippy/rustfmt, incremental check, **agent tool API + local relay (MCP)** → **M2: v1 for agentic development** | 8–9 |
+| (optional) Public deploy | 29 | Only to share beyond this machine | 1–2 |
 | F. v2 features | 30, 32, 34 | wasip3 components, clang for `cc` build scripts, HTTP handler runs | 6–9 |
 | Appendix: some day later | 23, 24, 28, 31, 33, 35 + parts of 25–27 | Human-only browser IDE: rust-analyzer + editor UI, first-visit perf, web preview, debugger UI, collaboration | — |
 | G. Upstream & upkeep | 36–37 | Upstream proposals; recurring rebase | ongoing |
-| **Total to v1** | | | **~51–77 sessions** (was ~60–90 with the human IDE) |
+| **Total to v1** | | | **~51–75 sessions** (was ~60–90 with the human IDE) |
 
 ---
 
@@ -359,21 +360,26 @@ These are taken as defaults so work can start. Changing one later only affects t
   - Profile pass against the PROPOSAL §6 budgets. An agent iterates edit → check many times, so warm latency matters most.
 - **Done when:** a warm `check` of the user crate takes < 1 s and warm edit → run < 2 s on the 500-line benchmark, in Chromium.
 
-#### WP-38 Agent tool API
-- **Depends:** WP-26, WP-27 · **Est.:** 1–2 sessions
+#### WP-38 Agent tool API and local relay → **M2**
+*Decided 2026-10-24: the agent runs on this machine and reaches the browser through a local relay. Shape: agent ⇄ MCP (stdio) ⇄ Python relay ⇄ WebSocket ⇄ the IDE page in Chromium, which does the work with the toolchain it already has.*
+- **Depends:** WP-22, WP-26, WP-27 · **Est.:** 2 sessions
 - **Tasks**
-  - **[H]** At the start, the user decides where agents run first: in the user's browser (an in-page tool layer, e.g. an assistant panel), headless on a server or in CI (the same rustc.wasm, linker and resolver under a Node/wasmtime host), or both.
-  - A typed tool API over the orchestrator: list/read/write/delete files; resolve dependencies; check; build; run (stdin, timeout, exit code, output); test (all or one, structured results); Clippy; rustfmt. Every result is JSON, with rustc diagnostics in their JSON form.
-  - An MCP adapter for the chosen host(s).
+  - **Page side:** a tool layer over the orchestrator: list/read/write/delete files; resolve dependencies; check; build; run (stdin, timeout, exit code, output); test (all or one, structured results); Clippy; rustfmt. Every result is JSON, with rustc diagnostics in their JSON form. The IDE shows what the agent does (file changes, terminal output), so a human can watch.
+  - **Python relay** (`tools/relay/`, Python 3, as few dependencies as possible):
+    - an MCP server on stdio for the agent, with the tools above, forwarded over a WebSocket to the page
+    - serves the app itself with COOP/COEP (it replaces `pnpm demo` for agent use) and proxies `/index/` to index.crates.io (same origin, so no CORS problem and no deploy)
+    - opens the page, or starts Chromium through Playwright, headed (to watch) or headless (unattended)
+    - security: listens on 127.0.0.1 only; the page connects with a per-run token and the relay checks the `Origin`, because any website could otherwise talk to a localhost WebSocket
+  - Robustness: one request at a time per project, cancellation, reconnect after a page reload. Keep the page in its own window (Chromium throttles background tabs).
   - Guardrails: per-call time and memory limits; user programs run only in the sandbox (WP-13), without network.
-- **Done when:** a scripted agent session (a fixture of tool calls), through the API alone, creates a project with a `serde` dependency, fixes a seeded compile error from the diagnostics, makes a failing test pass, and passes Clippy and rustfmt.
+- **Done when:** Claude Code, connected to the relay's MCP server and through it alone, creates a project with a `serde` dependency, fixes a seeded compile error from the diagnostics, makes a failing test pass, and passes Clippy and rustfmt. Run once headed and once headless.
 
-#### WP-29 Deploy v1 → **M2**
-*Needed when agents run in the browser (and for the L2 CDN / prebuilt crates, which headless agents can use too).*
-- **Depends:** WP-22 (top-500 ≥ 95%), WP-38 · **Est.:** 1–2 sessions
+#### WP-29 Public deploy (optional, after M2)
+*With a local relay serving the app and proxying the index, v1 needs no public hosting. This WP is for sharing the environment beyond this machine.*
+- **Depends:** WP-38 · **Est.:** 1–2 sessions
 - **Tasks**
   - **[H]** The user approves hosting, domain and accounts.
-  - Static deploy with COOP/COEP headers and a CDN for L2.
+  - Static deploy with COOP/COEP headers, an index proxy or CORS mirror (`docs/deps.md`), and a CDN for L2.
   - Prebuild the top ~2,000 crates.
 - **Done when:** the public URL passes the e2e smoke suite in Chromium, and the user signs off.
 
@@ -381,7 +387,7 @@ These are taken as defaults so work can start. Changing one later only affects t
 
 | WP | Package | Depends | Est. | Done when |
 |---|---|---|---|---|
-| WP-30 | `wasm32-wasip3` component output. `wasm-component-ld` and jco run in the browser | WP-29 | 2–3 | async `wasip3` program runs in the sandbox via jco |
+| WP-30 | `wasm32-wasip3` component output. `wasm-component-ld` and jco run in the browser | WP-38 | 2–3 | async `wasip3` program runs in the sandbox via jco |
 | WP-32 | clang-in-Wasm (YoWASP/oligamiq builds) for `cc`-crate build scripts | WP-21 | 2–3 | Crates with small C parts (e.g. `zstd-sys` vendored) build |
 | WP-34 | HTTP handler apps: `wasi:http` incoming-handler apps (axum-style) run in the sandbox and take requests through the tool API (a browser preview pane for humans stays in the Appendix) | WP-30, WP-38 | 2–3 | `GET /hello` sent through the tool API hits the user's Rust handler |
 
@@ -453,7 +459,7 @@ WP-00 → 01 → 02
              11 → 15 → 16                12 ─┐
                    15 ───────────────────────┴→ 17 → 18 ─┐
                           06 → 19 ───────────────────────┴→ 20 → 21 → 22 (M1) ─┐
-                                 17 + 16 → 25 → 26 ┬→ 38 (agent API) ───────────┴→ 29 (M2)
+                                 17 + 16 → 25 → 26 ┬────────────────────────────┴→ 38 (agent API + relay, M2) → 29 (optional deploy)
                                             25 → 27 ┘
 ```
 

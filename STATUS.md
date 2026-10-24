@@ -87,14 +87,14 @@
 
 ## Human actions needed
 - [x] **Scope (2026-10-24):** v1 targets agentic development; human-only browser-IDE WPs moved to the PLAN.md Appendix.
-- [ ] **[H] at WP-38 start:** where agents run first: in the browser, headless (server/CI), or both.
+- [x] **Agent setup (2026-10-24):** the agent runs on this machine and reaches the browser page through a local Python relay (MCP ⇄ WebSocket). WP-38 updated; WP-29 deploy is optional now.
 - [x] **[H] WP-14 user trial:** done 2026-10-24, the user reports it works fine.
 - [x] **WP-09 decision (2026-10-24):** re-scope the target to 2.5× (option B). A cross-session metadata cache stays a possible human-written rustc change for later (WP-22).
 - [x] **WP-06:** resolved 2026-10-24: the user applied bjorn3's existing `get_linker` fix instead of writing a std change. A proper std `join_paths`/`split_paths` for WASI is still an optional upstream fix the user could write.
 - [x] **WP-05 decision (2026-10-24):** resolved: the user wrote A1/A2. the rust checkout's AGENTS.md forbids AI-authored rustc changes without a named reviewer, and bans them in codegen/metadata. The minimum changes (A1 driver `lib`, A2 dlopen guards) need to be written by the user or reviewed. B1/B2 can avoid rustc changes (VFS symlink, external wasm-ld). Details: `~/Projects/rustc-wasm-host-source-changes.md`.
 - [x] Plan confirmed; commits at end of each session approved (2026-10-23).
 - [x] WP-00: cmake and ninja installed by the user.
-- [ ] **[H] WP-16 index hosting:** `index.crates.io` has no CORS. Choose how the deployed IDE reaches the index: a reverse proxy on the app's own origin (with the WP-29 deploy; recommended), or a CORS mirror Worker (needs an account + deploy approval). Not blocking until deploy. Options in `docs/deps.md`.
+- [x] **WP-16 index hosting:** resolved for v1 by the local relay (WP-38), which proxies `/index/` on the app's origin. Only the optional public deploy (WP-29) would need a hosted proxy or CORS mirror (`docs/deps.md`).
 - [ ] Optional [H]: approve reporting the `path_rename` no-op bug upstream to bjorn3/browser_wasi_shim (threads). The fix is in `patches/`.
 
 ## Work packages
@@ -130,8 +130,8 @@
 | 26 | Tests, Clippy, rustfmt | blocked | 0 | |
 | 27 | Incremental compilation | blocked | 0 | check-on-idle moved to the Appendix |
 | 28 | First-visit performance | deferred | 0 | Appendix (human-only) |
-| 38 | Agent tool API | blocked | 0 | new 2026-10-24; [H] at start: where agents run |
-| 29 | Deploy v1 (M2) | blocked | 0 | now depends on WP-22 + WP-38 |
+| 38 | Agent tool API + local relay (M2) | blocked | 0 | new 2026-10-24: MCP ⇄ Python relay ⇄ WebSocket ⇄ page |
+| 29 | Public deploy (optional) | blocked | 0 | after M2; only to share beyond this machine |
 | 30, 32, 34 | v2 features | deferred | 0 | agent-useful; 34 = HTTP handlers via the tool API |
 | 31, 33, 35 | Web preview, debugger UI, collaboration | deferred | 0 | Appendix (human-only) |
 | 36 | Upstream proposals | blocked | 0 | |
