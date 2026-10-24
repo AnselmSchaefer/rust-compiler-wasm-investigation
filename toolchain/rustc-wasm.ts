@@ -49,7 +49,7 @@ const saveTemps = user.some((a, i) => a.startsWith('-Csave-temps') || (a === '-C
 const mounts = ['--dir', '.::/', '--dir', `${scratch}::/tmp`, '--dir', `${scratch}/sysroot::/sysroot`,
   '--dir', `${RUSTLIB}::/sysroot/lib/rustlib`, '--dir', `${RUSTLIB}::/lib/rustlib`];
 const wasmtime = (argv0: string, module: string, argv: string[], stderr: 'pipe' | 'inherit') =>
-  spawnSync(WASMTIME, ['run', '-W', 'threads=y,shared-memory=y', '-S', 'threads=y', '--env', 'TMPDIR=/tmp',
+  spawnSync(WASMTIME, ['run', '-W', 'threads=y,shared-memory=y,exceptions=y', '-S', 'threads=y', '--env', 'TMPDIR=/tmp',
     ...mounts, '--argv0', argv0, module, ...argv], { stdio: ['inherit', 'inherit', stderr], encoding: 'utf8' });
 // wasmtime 46 warns about -Sthreads on every run, and blanks a line of its own. rustc.wasm is built with panic=abort, so every
 // fatal error ends in abort() and a wasm trap; its backtrace says nothing to the user (WP-07).

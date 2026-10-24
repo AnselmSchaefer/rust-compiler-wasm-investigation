@@ -13,7 +13,7 @@ T=build/wp-05/verify; rm -rf "$T"; mkdir -p "$T/root/sysroot/bin" "$T/root/work"
 ln -s ../lib/rustc-is-a-wasm-module "$T/root/sysroot/bin/rustc"
 cp tests/smoke/hello.rs bench/programs/medium.rs "$T/root/work/"
 run() {
-  wasmtime-threads run -W threads=y,shared-memory=y -S threads=y --argv0 /sysroot/bin/rustc \
+  wasmtime-threads run -W threads=y,shared-memory=y,exceptions=y -S threads=y --argv0 /sysroot/bin/rustc \
     --dir "$T/root::/" --dir "$RL::/sysroot/lib/rustlib" --dir "$RL::/lib/rustlib" "$W" "$@" 2>&1 \
     | grep -v '^WARNING: the `-Sthreads`' || true
 }

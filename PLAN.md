@@ -182,6 +182,7 @@ These are taken as defaults so work can start. Changing one later only affects t
   - Build the rustc host with `panic=unwind` using Wasm exception handling (exnref).
   - Make sure a compile error, or an internal compiler error, returns to the driver and leaves the instance usable.
 - **Done when:** a test runs, in one instance: a compile with an error, then a successful compile. Both give correct results in wasmtime and in Chromium.
+  - *Done 2026-10-24:* config only (unwind host std as bootstrap's stage 0, `toolchain/build-host-std.sh`). "One instance" uses the out-of-tree `toolchain/rustc-multi` driver, which also catches ICEs; WP-09 grows it into the compile server.
 
 #### WP-08 Sysroots and lazy metadata
 - **Depends:** WP-06 · **Est.:** 2–3 sessions

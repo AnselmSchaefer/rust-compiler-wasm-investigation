@@ -7,6 +7,10 @@ const pages = {
   'wasi-rustc': {
     src: 'tests/e2e/wasi-rustc', entries: { main: 'main', 'process-worker': '../../../web/wasi/process-worker' }, assets: { 'vfs.wasm': 'build/www/vfs/vfs.wasm' },
   },
+  // WP-07; the big assets come from scripts/prep-rustc-host-page.sh.
+  'rustc-host': {
+    src: 'tests/e2e/rustc-host', entries: { main: 'main', 'process-worker': '../../../web/wasi/process-worker' }, assets: { 'vfs.wasm': 'build/www/vfs/vfs.wasm' },
+  },
 };
 
 for (const [name, { src, entries, assets }] of Object.entries(pages)) {
