@@ -2,6 +2,12 @@
 
 Fixed defaults (PLAN.md §1), plus decisions and findings recorded during work packages, newest first.
 
+## 2026-10-24 · WP-01 findings (details: docs/baseline-notes.md)
+- oligamiq rust_wasm v3 (rustc 1.83-dev) compiles and runs hello in wasmtime-threads, Chromium and Firefox. Browser compile is about 1.5 s; native is 0.16 s.
+- **Our host build must use exnref EH.** The oligamiq unwind build uses legacy EH, which wasmtime 46 can't load and Firefox flags as deprecated (affects WP-07).
+- **Patch needed: temp dir and cleanup.** rustc puts its temp dir at `/` regardless of `TMPDIR`, and leaves `.rcgu.o` files and temp dirs behind (affects WP-05).
+- **Don't reuse `browser_wasi_shim-threads` for WP-11.** It copies every read through a fixed-size SAB bounce buffer (10 MB by default; libcore.rlib is 32 MB) and needs manual memory sizing. It stays only as the baseline harness.
+
 ## 2026-10-23 · WP-00 findings
 - **wasi-threads removed from wasmtime in v47** ([RFC](https://github.com/bytecodealliance/rfcs/blob/main/accepted/wasmtime-remove-wasi-threads.md)). Current wasmtime (v50) cannot run `wasm32-wasip1-threads` binaries.
   **Decision:** keep wasmtime v50 for wasip1/p2/p3 work, and install **v46.0.3 as `wasmtime-threads`** for native testing of the threaded rustc host (WP-04–WP-10, WP-18 prebuild).

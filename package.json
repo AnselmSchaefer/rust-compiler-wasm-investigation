@@ -8,7 +8,10 @@
     "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@bjorn3/browser_wasi_shim": "0.4.2",
+    "@oligami/browser_wasi_shim-threads": "0.5.0",
     "@playwright/test": "latest",
+    "esbuild": "0.28.2",
     "typescript": "latest"
   }
 }
