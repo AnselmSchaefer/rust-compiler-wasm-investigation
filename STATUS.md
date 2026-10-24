@@ -3,9 +3,13 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** none. Next is **WP-02** (ready): benchmark harness. WP-03 and WP-11 are also unblocked (ready).
-- **Last session:** 2026-10-24 (session 3). WP-01 done: oligamiq rust_wasm v3 compiles and runs hello in wasmtime-threads, Chromium and Firefox.
-- **Next step:** WP-02. Turn `tests/e2e/baseline/` into a Playwright benchmark (`pnpm bench`) covering cold load, instantiate, check/build hello, a 500-line program, run, and peak memory. Write `bench/results/*.json`, `bench/compare.ts` and `bench/baseline.md`.
+- **Active WP:** WP-02 (in-progress).
+- **Current session (2026-10-24, session 4) goals:**
+  - Turn the baseline page into a harness API with phases: load, module compile, rustc runs, and running the output.
+  - Write `bench/programs/` (hello plus a ~500-line std-only program).
+  - Write `bench/run.ts` (`pnpm bench`): Chromium is required, Firefox optional. Add wasmtime and native rustc 1.83 reference numbers. Results go to `bench/results/<date>-<commit>.json`.
+  - Write `bench/compare.ts`, `bench/baseline.md` and `scripts/verify/wp-02.sh`.
+- **Scope change (user, 2026-10-24):** only Chromium-based browsers must work. Firefox is best-effort.
 - **Running background jobs:** none
 
 ## Human actions needed
@@ -18,7 +22,7 @@
 |---|---|---|---|---|
 | 00 | Repository bootstrap and tooling | done | 1 | `scripts/verify/wp-00.sh` passes. wasi-threads needs wasmtime v46 (`wasmtime-threads`) |
 | 01 | Reproduce existing baseline | done | 1 | `scripts/verify/wp-01.sh` passes. Notes in `docs/baseline-notes.md` |
-| 02 | Benchmark harness | ready | 0 | |
+| 02 | Benchmark harness | in-progress | 1 | |
 | 03 | Patch inventory and base version | ready | 0 | |
 | 04 | Build LLVM for a Wasm host | blocked | 0 | |
 | 05 | rustc for a Wasm host: front end | blocked | 0 | |

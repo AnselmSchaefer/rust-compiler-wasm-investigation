@@ -5,7 +5,8 @@
   "packageManager": "pnpm@12.15.0",
   "scripts": {
     "doctor": "bash scripts/doctor.sh",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "bench": "node bench/run.ts"
   },
   "devDependencies": {
     "@bjorn3/browser_wasi_shim": "0.4.2",

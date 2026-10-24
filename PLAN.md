@@ -39,7 +39,6 @@ Claude is the sole developer, and work happens in separate sessions, not continu
 **Human checkpoints** are marked **[H]**. Claude prepares everything and then stops, so the user can:
 - run a `sudo` install
 - create an account or approve spending
-- test on Safari/macOS
 - approve publishing anything to the internet
 - approve posting to upstream Rust forums
 
@@ -57,7 +56,8 @@ These are taken as defaults so work can start. Changing one later only affects t
 | Hosting | Static CDN (Cloudflare Pages + R2 or GitHub Pages). No server-side compiling | WP-16, WP-29 |
 | Base rustc version | Latest stable at WP-03; rebased every 6 weeks (WP-37) | all toolchain WPs |
 | Language for host glue | TypeScript (workers, UI); Rust → Wasm for VFS, resolver, cache, planner | — |
-| Browser test automation | Playwright (Chromium, Firefox, WebKit) | all browser WPs |
+| Target browsers | **Chromium-based only** (user decision 2026-10-24). Firefox runs where it's free but is never a gate. Safari/WebKit are out of scope | all browser WPs |
+| Browser test automation | Playwright. Chromium is the required project, Firefox is best-effort | all browser WPs |
 
 ---
 
@@ -130,7 +130,7 @@ These are taken as defaults so work can start. Changing one later only affects t
   - Store results in `bench/results/<date>-<commit>.json`, with `bench/compare.ts` to diff two runs.
   - Native rustc numbers as a reference.
   - Write `bench/baseline.md` with the oligamiq toolchain numbers.
-- **Done when:** `pnpm bench` produces a JSON result and `baseline.md` exists with Chromium and Firefox numbers.
+- **Done when:** `pnpm bench` produces a JSON result and `baseline.md` exists with Chromium numbers (Firefox numbers where available).
 
 ### Phase B: Our own toolchain
 
@@ -216,7 +216,7 @@ These are taken as defaults so work can start. Changing one later only affects t
 - **Tasks**
   - `crates/vfs`: an in-memory tree plus OPFS persistence, using sync access handles in workers, with a shared view across workers via SharedArrayBuffer.
   - A WASI preview-1 adapter for rustc, integrated with or forked from browser_wasi_shim.
-  - Unit tests natively, e2e tests in Chromium and Firefox.
+  - Unit tests natively, e2e tests in Chromium.
 - **Done when:** two workers see each other's writes, and files survive a page reload (Playwright test).
 
 #### WP-12 Orchestrator and worker pool
@@ -375,8 +375,7 @@ These are taken as defaults so work can start. Changing one later only affects t
   - **[H]** The user approves hosting, domain and accounts.
   - Static deploy with COOP/COEP headers and a CDN for L2.
   - Prebuild the top ~2,000 crates.
-  - **[H]** Safari 27 / macOS check by the user, or via a paid cloud browser if approved.
-- **Done when:** the public URL passes the e2e smoke suite in all three engines, and the user signs off.
+- **Done when:** the public URL passes the e2e smoke suite in Chromium, and the user signs off.
 
 ### Phase F: v2 features (in order; each can be deferred)
 
@@ -426,7 +425,6 @@ Because sessions run one at a time, "parallel" here means **switching to a WP wh
 
 - 12 cores, **15 GB RAM**: LLVM/rustc builds use `-j10` and `LLVM_PARALLEL_LINK_JOBS=1`. Expect the first LLVM + rustc build to take 3–6 h in total, split across sessions.
 - 409 GB of free disk is enough. Budget about 80 GB for build trees.
-- No Safari on Linux, so Safari checks are **[H]** tasks.
 - A background command is limited to 2 h, so every build must be resumable.
 - **wasmtime ≥ 47 has no wasi-threads** (found in WP-00). Native runs of the threaded rustc host use `wasmtime-threads` (v46.0.3); see `docs/decisions.md`.
 

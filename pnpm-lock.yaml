@@ -162,6 +162,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@oligami/browser_wasi_shim-threads@0.5.0': 27dd9ca158a69c488eb4cb967f6d9eeb222dccc16352a62021b346dfdb25bf32
+
 importers:
 
   .:
@@ -171,7 +174,7 @@ importers:
         version: 0.4.2
       '@oligami/browser_wasi_shim-threads':
         specifier: 0.5.0
-        version: 0.5.0(@bjorn3/browser_wasi_shim@0.4.2)
+        version: 0.5.0(patch_hash=27dd9ca158a69c488eb4cb967f6d9eeb222dccc16352a62021b346dfdb25bf32)(@bjorn3/browser_wasi_shim@0.4.2)
       '@playwright/test':
         specifier: latest
         version: 1.64.1
@@ -575,7 +578,7 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
-  '@oligami/browser_wasi_shim-threads@0.5.0(@bjorn3/browser_wasi_shim@0.4.2)':
+  '@oligami/browser_wasi_shim-threads@0.5.0(patch_hash=27dd9ca158a69c488eb4cb967f6d9eeb222dccc16352a62021b346dfdb25bf32)(@bjorn3/browser_wasi_shim@0.4.2)':
     dependencies:
       '@bjorn3/browser_wasi_shim': 0.4.2
 

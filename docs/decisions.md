@@ -2,6 +2,10 @@
 
 Fixed defaults (PLAN.md §1), plus decisions and findings recorded during work packages, newest first.
 
+## 2026-10-24 · Scope: Chromium only (user decision)
+- Only Chromium-based browsers have to work. Firefox is best-effort: we keep it in tests while it passes for free, but it never blocks a WP. Safari/WebKit are out of scope.
+- This lets us depend on Chromium-only or Chromium-first features where they help, e.g. JSPI, memory64, `measureUserAgentSpecificMemory`, and Liftoff/TurboFan tiering controls.
+
 ## 2026-10-24 · WP-01 findings (details: docs/baseline-notes.md)
 - oligamiq rust_wasm v3 (rustc 1.83-dev) compiles and runs hello in wasmtime-threads, Chromium and Firefox. Browser compile is about 1.5 s; native is 0.16 s.
 - **Our host build must use exnref EH.** The oligamiq unwind build uses legacy EH, which wasmtime 46 can't load and Firefox flags as deprecated (affects WP-07).
@@ -25,4 +29,4 @@ Fixed defaults (PLAN.md §1), plus decisions and findings recorded during work p
 | Hosting | Static CDN, no server-side compiling |
 | Base rustc version | Chosen in WP-03; rebased every 6 weeks |
 | Host glue | TypeScript; Rust → Wasm for VFS, resolver, cache, planner |
-| Browser automation | Playwright (Chromium, Firefox; WebKit opt-in) |
+| Browser automation | Playwright: Chromium required, Firefox best-effort |

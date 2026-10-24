@@ -1,4 +1,5 @@
 // Static dev server with the cross-origin isolation headers needed for SharedArrayBuffer (Wasm threads).
+// Serves <file>.br with Content-Encoding: br when it exists.
 // Usage: node scripts/serve.mjs <root> [/prefix=dir ...]   (extra mounts, e.g. /vendor=build/vendor)
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
@@ -22,9 +23,12 @@ createServer(async (req, res) => {
   if (!file.startsWith(base)) { res.writeHead(403).end(); return; }
   try {
     if ((await stat(file)).isDirectory()) file = join(file, 'index.html');
-    const body = await readFile(file);
+    // Serve a precompressed sibling (file.br) like a CDN would, so transfer sizes are realistic.
+    const br = /\bbr\b/.test(req.headers['accept-encoding'] ?? '') && await stat(file + '.br').then(() => true, () => false);
+    const body = await readFile(br ? file + '.br' : file);
     res.writeHead(200, {
       'Content-Type': types[extname(file)] ?? 'application/octet-stream',
+      ...(br ? { 'Content-Encoding': 'br' } : {}),
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
       'Cross-Origin-Resource-Policy': 'same-origin',

@@ -21,7 +21,10 @@ if [ ! -f "$lib/.stamp" ]; then
   touch "$lib/.stamp"
 fi
 
+# Per-file brotli variants so the dev server can send them with Content-Encoding: br (realistic transfer sizes).
+find sysroot -type f ! -name .stamp ! -name '*.br' | while read -r f; do [ -f "$f.br" ] || brotli -q 9 -k "$f"; done
+
 # File list for the browser harness, which cannot list directories over HTTP.
-(cd sysroot && find . -type f ! -name .stamp | sed 's|^\./||' | sort) \
+(cd sysroot && find . -type f ! -name .stamp ! -name '*.br' | sed 's|^\./||' | sort) \
   | python3 -c 'import json,sys; print(json.dumps([l.strip() for l in sys.stdin]))' > sysroot.json
 echo "baseline toolchain ready in $dir"

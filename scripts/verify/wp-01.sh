@@ -16,5 +16,6 @@ grep -q Hello <<<"$out" || { echo "FAIL: wasmtime hello printed: $out"; exit 1; 
 echo "  ok   rustc.wasm under wasmtime-threads: $out"
 
 node scripts/build-baseline.mjs
-pnpm exec playwright test tests/e2e/baseline.spec.ts --reporter=line
+# Chromium is the gate (scope decision 2026-10-24); Firefox is best-effort.
+pnpm exec playwright test tests/e2e/baseline.spec.ts --project=chromium --reporter=line
 echo "WP-01 verified."

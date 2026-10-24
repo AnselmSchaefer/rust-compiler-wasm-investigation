@@ -1,107 +1,127 @@
-// WP-01 baseline page: compile hello.rs with the oligamiq rust_wasm v3 rustc.wasm, then run the result.
+// Baseline harness page for the oligamiq rust_wasm v3 toolchain (WP-01 e2e test, WP-02 benchmarks).
 // The page thread owns the in-memory filesystem (WASIFarm); rustc runs in a worker (rustc-worker.ts).
+// Driven from Playwright through `window.harness`; every step reports its own timings.
 import { ConsoleStdout, Directory, File, type Inode, PreopenDirectory, WASI } from '@bjorn3/browser_wasi_shim';
 import { WASIFarm } from '@oligami/browser_wasi_shim-threads';
 
 const VENDOR = '/vendor/rust_wasm-v3/';
-const HELLO = 'fn main() { println!("Hello from the browser"); }\n';
 
-type Result = {
-  ok: boolean; stage: string; error?: string;
-  rustcStdout: string; rustcStderr: string; rustcExit?: number; programStdout: string;
-  ms: Record<string, number>;
-};
-const result: Result = { ok: false, stage: 'start', rustcStdout: '', rustcStderr: '', programStdout: '', ms: {} };
-(window as any).partial = result;
-const log = (s: string) => { document.getElementById('log')!.textContent += s + '\n'; };
+export type RustcResult = { code?: number; error?: string; stdout: string; stderr: string; ms: number; memBytes?: number };
 
-function capture(key: 'rustcStdout' | 'rustcStderr') {
+const io = { stdout: '', stderr: '' };
+let root: PreopenDirectory;
+let worker: Worker;
+let pending: ((r: any) => void) | undefined;
+let transferBytes = 0;
+
+const ms = (since: number) => Math.round(performance.now() - since);
+
+function capture(key: 'stdout' | 'stderr') {
   const dec = new TextDecoder();
-  return new ConsoleStdout(buf => { result[key] += dec.decode(buf, { stream: true }); });
+  return new ConsoleStdout(buf => { io[key] += dec.decode(buf, { stream: true }); });
+}
+
+// Counts bytes on the wire (brotli-encoded when the server has a .br variant).
+function countTransfer(url: string) {
+  const e = performance.getEntriesByName(new URL(url, location.href).href).at(-1) as PerformanceResourceTiming | undefined;
+  transferBytes += e?.encodedBodySize ?? 0;
 }
 
 async function fetchBytes(url: string): Promise<Uint8Array> {
   const r = await fetch(url);
   if (!r.ok) throw new Error(`${url}: HTTP ${r.status}`);
-  return new Uint8Array(await r.arrayBuffer());
+  const b = new Uint8Array(await r.arrayBuffer());
+  countTransfer(url);
+  return b;
 }
 
 // Build a nested Directory from "a/b/c.rlib" paths.
 async function loadSysroot(): Promise<Directory> {
   const paths: string[] = await (await fetch(VENDOR + 'sysroot.json')).json();
-  const root = new Map<string, Inode>();
+  const tree = new Map<string, Inode>();
   await Promise.all(paths.map(async p => {
     const parts = p.split('/');
-    let dir = root;
+    let dir = tree;
     for (const part of parts.slice(0, -1)) {
       if (!dir.has(part)) dir.set(part, new Directory(new Map()));
       dir = (dir.get(part) as Directory).contents;
     }
     dir.set(parts.at(-1)!, new File(await fetchBytes(VENDOR + 'sysroot/' + p)));
   }));
-  return new Directory(root);
+  return new Directory(tree);
 }
 
-async function main() {
-  const t0 = performance.now();
-  const lap = (name: string, since: number) => (result.ms[name] = Math.round(performance.now() - since));
-
-  result.stage = 'load-sysroot';
-  const sysroot = await loadSysroot();
-  lap('loadSysroot', t0);
-
-  const root = new PreopenDirectory('/', new Map<string, Inode>([
-    ['hello.rs', new File(new TextEncoder().encode(HELLO))],
-    ['sysroot', sysroot],
-    ['tmp', new Directory(new Map())],
-  ]));
-  const farm = new WASIFarm(new ConsoleStdout(() => {}), capture('rustcStdout'), capture('rustcStderr'), [root], {
-    // Reads go through a shared bounce buffer (default 10 MB); libcore.rlib alone is 32 MB.
-    allocator_size: 128 * 1024 * 1024,
-  });
-
-  result.stage = 'rustc';
-  const t1 = performance.now();
-  const worker = new Worker('rustc-worker.js', { type: 'module' });
-  const done = new Promise<{ code?: number; error?: string; ms: Record<string, number> }>(res => {
-    worker.onmessage = e => res(e.data);
-    worker.onerror = e => res({ error: String(e.message), ms: {} });
-  });
-  worker.postMessage({
-    ref: farm.get_ref(),
-    wasmUrl: VENDOR + (new URLSearchParams(location.search).get('rustc') ?? 'rustc_opt.wasm'),
-    args: ['/hello.rs', '--sysroot', '/sysroot', '--target', 'wasm32-wasip1', '-o', '/hello.wasm'],
-  });
-  const r = await done;
-  Object.assign(result.ms, r.ms);
-  lap('rustcTotal', t1);
-  result.rustcExit = r.code;
-  if (r.error) throw new Error('rustc worker: ' + r.error);
-  if (r.code !== 0) throw new Error(`rustc exited with ${r.code}`);
-
-  result.stage = 'run';
-  const out = root.dir.contents.get('hello.wasm');
-  if (!(out instanceof File)) throw new Error('rustc produced no /hello.wasm');
-  const t2 = performance.now();
-  const dec = new TextDecoder();
-  const wasi = new WASI(['hello'], [], [
-    new ConsoleStdout(() => {}), // empty stdin
-    new ConsoleStdout(buf => { result.programStdout += dec.decode(buf, { stream: true }); }),
-    capture('rustcStderr'),
-  ]);
-  const inst = await WebAssembly.instantiate(await WebAssembly.compile(out.data as Uint8Array<ArrayBuffer>), {
-    wasi_snapshot_preview1: wasi.wasiImport,
-  });
-  wasi.start(inst as any);
-  lap('run', t2);
-  lap('total', t0);
-  result.ok = true;
-  result.stage = 'done';
+function call(msg: object): Promise<any> {
+  return new Promise(res => { pending = res; worker.postMessage(msg); });
 }
 
-main()
-  .catch(e => { result.error = String(e?.stack ?? e); })
-  .finally(() => {
-    log(JSON.stringify(result, null, 2));
-    (window as any).result = result;
-  });
+const harness = {
+  /** Fetch + compile rustc.wasm and the sysroot, start the rustc worker. */
+  async load(rustc = 'rustc_opt.wasm') {
+    performance.setResourceTimingBufferSize(10_000);
+    transferBytes = 0;
+    const t0 = performance.now();
+    const [sysroot, rustcBytes] = await Promise.all([
+      loadSysroot().then(d => [d, ms(t0)] as const),
+      fetchBytes(VENDOR + rustc).then(b => [b, ms(t0)] as const),
+    ]);
+    const t1 = performance.now();
+    const module = await WebAssembly.compile(rustcBytes[0] as Uint8Array<ArrayBuffer>);
+    const compileMs = ms(t1);
+
+    root = new PreopenDirectory('/', new Map<string, Inode>([['sysroot', sysroot[0]], ['tmp', new Directory(new Map())]]));
+    const farm = new WASIFarm(new ConsoleStdout(() => {}), capture('stdout'), capture('stderr'), [root], {
+      // Reads go through a shared bounce buffer (default 10 MB); libcore.rlib alone is 32 MB.
+      allocator_size: 128 * 1024 * 1024,
+    });
+    worker = new Worker('rustc-worker.js', { type: 'module' });
+    worker.onmessage = e => pending?.(e.data);
+    worker.onerror = e => pending?.({ error: String(e.message) });
+    await call({ type: 'init', ref: farm.get_ref(), module });
+    return {
+      fetchSysrootMs: sysroot[1], fetchRustcMs: rustcBytes[1], compileRustcMs: compileMs, totalMs: ms(t0),
+      transferBytes, rustcBytes: rustcBytes[0].byteLength,
+    };
+  },
+
+  writeFile(path: string, text: string) {
+    root.dir.contents.set(path.replace(/^\//, ''), new File(new TextEncoder().encode(text)));
+  },
+
+  /** One rustc invocation in a fresh instance (fresh linear memory). */
+  async rustc(args: string[]): Promise<RustcResult> {
+    io.stdout = io.stderr = '';
+    const r = await call({ type: 'run', args });
+    return { ...r, stdout: io.stdout, stderr: io.stderr };
+  },
+
+  /** Run a WASI command produced by rustc on the page thread. */
+  async run(path: string) {
+    const out = root.dir.contents.get(path.replace(/^\//, ''));
+    if (!(out instanceof File)) throw new Error(`no ${path}`);
+    const t0 = performance.now();
+    let stdout = '';
+    const dec = new TextDecoder();
+    const wasi = new WASI([path], [], [
+      new ConsoleStdout(() => {}), // empty stdin
+      new ConsoleStdout(buf => { stdout += dec.decode(buf, { stream: true }); }),
+      new ConsoleStdout(() => {}),
+    ]);
+    const inst = await WebAssembly.instantiate(await WebAssembly.compile(out.data as Uint8Array<ArrayBuffer>), {
+      wasi_snapshot_preview1: wasi.wasiImport,
+    });
+    const code = wasi.start(inst as any);
+    return { code, stdout, ms: ms(t0) };
+  },
+
+  /** Whole-agent memory (Chromium only, needs cross-origin isolation). Undefined if unavailable. */
+  async measureMemory(timeoutMs = 30_000): Promise<number | undefined> {
+    const p = (performance as any).measureUserAgentSpecificMemory?.();
+    if (!p) return undefined;
+    const r = await Promise.race([p, new Promise(res => setTimeout(res, timeoutMs))]);
+    return (r as any)?.bytes;
+  },
+};
+
+(window as any).harness = harness;
+(window as any).harnessReady = true;
