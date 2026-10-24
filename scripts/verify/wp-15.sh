@@ -12,7 +12,7 @@ fi
 
 # 1. Native: golden corpus + scenario unit tests.
 (cd crates && cargo test --release -p resolver -- --nocapture 2>&1) | tee build/wp-15/test.log | grep -E '^golden:|^test result'
-grep -q '^test result: ok. 1 passed' build/wp-15/test.log
+grep -q '^golden: ' build/wp-15/test.log
 ! grep -q 'FAILED' build/wp-15/test.log
 
 # 2. Scenarios against native cargo.
