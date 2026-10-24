@@ -3,7 +3,7 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** WP-05 (blocked on a human decision, see Human actions). rust 1.99.1 is cloned in `build/rust`; no rustc source has been edited.
+- **Active WP:** WP-05 (blocked on A1/A2, which the user writes; see Follow-ups). Preparation that needs no rustc changes is done: `toolchain/build-rustc.sh` (config and build dir outside the checkout), an `llvm-config` for the wasm LLVM, and VFS symlinks for sysroot detection (B1). The first build stops at A1, as expected.
 - **Last session:** 2026-10-24 (session 6). WP-04 and WP-11 done. LLVM 23.1.1 + lld for a Wasm host is installed in `build/llvm-wasm-install` (rebuild: `toolchain/build-llvm.sh`, ~1.5 h of compute).
 - **Next step:** WP-05.
   1. Bootstrap needs an `llvm-config` describing the *wasm* build, and the cross build doesn't produce one that runs natively. Write a small script `toolchain/llvm-config-wasm` that answers bootstrap's/rustc_llvm's queries (`--version`, `--libs`, `--system-libs`, `--libdir`, `--includedir`, `--cxxflags`, `--ldflags`, `--components`, `--link-static`, `--shared-mode`, `--host-target`) from `build/llvm-wasm-install`, using the native `build/llvm-native` build's answers as a template.
@@ -70,6 +70,7 @@
 - Smoke: hello world runs on wasip1, wasip2, wasip3 (wasmtime 50) and wasip1-threads with a real thread (wasmtime 46.0.3).
 
 ## Session log
+- 2026-10-24 (session 7): WP-05 prep without touching rustc. `build-rustc.sh` (pinned rustup 1.99.1 as stage 0, per-target rustflags because `RUSTFLAGS_BOOTSTRAP` leaks into bootstrap.py's native build), native `llvm-config` installed into the wasm LLVM prefix, VFS + WASI symlinks with an e2e test. Discovery build: bootstrap + std OK, stops at A1 (rustc_driver dylib-only). Drafted and verified the browser_wasi_shim bug report.
 - 2026-10-24 (session 6, interrupted by a system suspend/hibernate crash at 11:11, resumed): WP-04: LLVM 23.1.1 source + ported WASI patch + `build-llvm.sh`; build now runs under `systemd-inhibit`. WP-11 done in parallel: `crates/vfs` (shared-memory FS, fd tables), `web/vfs` (wrapper, OPFS persister), `web/wasi` (WASI p1 + thread spawning). The oligamiq rustc.wasm builds and links on it, faster than on browser_wasi_shim.
 - 2026-10-24 (session 5): WP-03. Reviewed bjorn3 (wasm20, Cranelift), oligamiq (wasm17, the v3 build), YoWASP LLVM WASI patch (not upstream), and danlapid/Cloudflare (7 patches, rust 1.98.1). Chose danlapid as the primary base and rustc 1.99.1, version-pinned so rustup's std can be reused. Pinned sources are fetched by `scripts/fetch-patch-sources.sh`.
 - 2026-10-24 (session 4): WP-02. Turned the baseline page into a harness API. Added `bench/run.ts`/`compare.ts`/`measure.py`, a 563-line benchmark program, native rustc 1.83.0, and browser RSS sampling. Fixed the shim `path_rename` bug (pnpm patch). Scope is now Chromium only.

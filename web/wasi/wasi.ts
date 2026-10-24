@@ -8,7 +8,9 @@
 import { Kind, ROOT, type Vfs } from '../vfs/vfs';
 
 export const E = { SUCCESS: 0, ACCES: 2, BADF: 8, INVAL: 28, IO: 29, ISDIR: 31, NOSYS: 52, NOTDIR: 54, NOTSUP: 58, SPIPE: 70 } as const;
-const FILETYPE_DIR = 3, FILETYPE_FILE = 4;
+const FILETYPE_DIR = 3, FILETYPE_FILE = 4, FILETYPE_SYMLINK = 7;
+const LOOKUP_SYMLINK_FOLLOW = 1;
+const filetype = (k: Kind) => (k === Kind.Dir ? FILETYPE_DIR : k === Kind.Symlink ? FILETYPE_SYMLINK : FILETYPE_FILE);
 const OFLAGS = { CREAT: 1, DIRECTORY: 2, EXCL: 4, TRUNC: 8 };
 const FDFLAGS_APPEND = 1;
 
@@ -113,7 +115,7 @@ export class WasiProcess {
     const dv = this.dv;
     dv.setBigUint64(out, 0n, true); // dev
     dv.setBigUint64(out + 8, BigInt(ino), true);
-    dv.setUint8(out + 16, s.kind === Kind.Dir ? FILETYPE_DIR : FILETYPE_FILE);
+    dv.setUint8(out + 16, filetype(s.kind));
     dv.setBigUint64(out + 24, 1n, true); // nlink
     dv.setBigUint64(out + 32, BigInt(s.size), true);
     dv.setBigUint64(out + 40, s.mtimeNs, true);
@@ -236,7 +238,7 @@ export class WasiProcess {
         const s = this.vfs.rawStat(info.ino);
         if (typeof s === 'number') return s;
         const dv = this.dv;
-        dv.setUint8(out, s.kind === Kind.Dir ? FILETYPE_DIR : FILETYPE_FILE);
+        dv.setUint8(out, filetype(s.kind));
         dv.setUint16(out + 2, info.append ? FDFLAGS_APPEND : 0, true);
         dv.setBigUint64(out + 8, 0xffff_ffff_ffff_ffffn, true);
         dv.setBigUint64(out + 16, 0xffff_ffff_ffff_ffffn, true);
@@ -274,7 +276,7 @@ export class WasiProcess {
           hv.setBigUint64(0, BigInt(i + 1), true);
           hv.setBigUint64(8, BigInt(e.ino), true);
           hv.setUint32(16, name.length, true);
-          hv.setUint8(20, e.kind === Kind.Dir ? FILETYPE_DIR : FILETYPE_FILE);
+          hv.setUint8(20, filetype(e.kind));
           const entry = new Uint8Array(24 + name.length);
           entry.set(head);
           entry.set(name, 24);
@@ -308,12 +310,22 @@ export class WasiProcess {
     path_create_directory: (fd: number, p: number, l: number) => this.pathOp(fd, p, l, (d, s) => this.vfs.rawMkdir(d, s)),
     path_remove_directory: (fd: number, p: number, l: number) => this.pathOp(fd, p, l, (d, s) => this.vfs.rawRmdir(d, s)),
     path_unlink_file: (fd: number, p: number, l: number) => this.pathOp(fd, p, l, (d, s) => this.vfs.rawUnlink(d, s)),
-    path_filestat_get: (fd: number, _flags: number, p: number, l: number, out: number) =>
-      this.pathOp(fd, p, l, (d, s) => { const ino = this.vfs.rawLookup(d, s); return ino < 0 ? ino : this.writeFilestat(out, ino); }),
+    path_filestat_get: (fd: number, flags: number, p: number, l: number, out: number) =>
+      this.pathOp(fd, p, l, (d, s) => {
+        const ino = flags & LOOKUP_SYMLINK_FOLLOW ? this.vfs.rawLookup(d, s) : this.vfs.rawLookupNofollow(d, s);
+        return ino < 0 ? ino : this.writeFilestat(out, ino);
+      }),
     path_filestat_set_times: (fd: number, _flags: number, p: number, l: number) =>
       this.pathOp(fd, p, l, (d, s) => Math.min(0, this.vfs.rawLookup(d, s))),
-    path_readlink: (fd: number, p: number, l: number) =>
-      this.pathOp(fd, p, l, (d, s) => { const ino = this.vfs.rawLookup(d, s); return ino < 0 ? ino : -E.INVAL; }), // no symlinks
+    path_readlink: (fd: number, p: number, l: number, buf: number, bufLen: number, usedPtr: number) =>
+      this.pathOp(fd, p, l, (d, s) => {
+        const t = this.vfs.rawReadlink(d, s);
+        if (typeof t === 'number') return t;
+        const n = Math.min(t.length, bufLen); // truncated, as POSIX readlink
+        this.u8.set(t.subarray(0, n), buf);
+        this.dv.setUint32(usedPtr, n, true);
+        return 0;
+      }),
     path_rename: (fd: number, p: number, l: number, fd2: number, p2: number, l2: number) => {
       const from = this.str(p, l), to = this.str(p2, l2);
       return this.vfs.locked(() => {
@@ -324,7 +336,10 @@ export class WasiProcess {
       });
     },
     path_link: () => E.NOTSUP, // callers (rustc's link_or_copy) fall back to copying
-    path_symlink: () => E.NOTSUP,
+    path_symlink: (op: number, ol: number, fd: number, p: number, l: number) => {
+      const target = this.str(op, ol);
+      return this.pathOp(fd, p, l, (d, s) => this.vfs.rawSymlink(d, target, s));
+    },
 
     poll_oneoff: (inPtr: number, outPtr: number, n: number, neventsPtr: number) => {
       // Clock subscriptions sleep; fd subscriptions are always ready (files never block).

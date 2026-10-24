@@ -183,3 +183,33 @@ fn fd_tables() {
     assert_eq!(p.get(a, 0).map(|f| f.ino), Err(Error::BadF));
     assert_eq!(p.new_proc(), a); // pid reused
 }
+
+#[test]
+fn symlinks() {
+    let mut fs = Fs::new();
+    fs.mkdir_all(ROOT, "/sysroot/lib/rustlib", 0).unwrap();
+    fs.mkdir_all(ROOT, "/sysroot/bin", 0).unwrap();
+    let real = fs.create_file(ROOT, "/rustc.wasm", false, false, 0).unwrap();
+    // rustc finds its sysroot from argv[0] only if argv[0] is a symlink.
+    let link = fs.symlink(ROOT, "/rustc.wasm", "/sysroot/bin/rustc", 0).unwrap();
+    assert_eq!(fs.readlink(ROOT, "/sysroot/bin/rustc"), Ok("/rustc.wasm"));
+    assert_eq!(fs.lookup(ROOT, "/sysroot/bin/rustc"), Ok(real));
+    assert_eq!(fs.lookup_nofollow(ROOT, "/sysroot/bin/rustc"), Ok(link));
+    assert_eq!(fs.get(link).unwrap().kind(), Kind::Symlink);
+    assert_eq!(fs.readlink(ROOT, "/rustc.wasm"), Err(Error::Inval));
+    // Relative targets resolve from the link's directory; links in the middle of a path work.
+    fs.symlink(ROOT, "../lib", "/sysroot/bin/libdir", 0).unwrap();
+    assert_eq!(fs.lookup(ROOT, "/sysroot/bin/libdir/rustlib"), fs.lookup(ROOT, "/sysroot/lib/rustlib"));
+    // Loops are detected; unlink removes the link, not the target.
+    fs.symlink(ROOT, "/loop2", "/loop1", 0).unwrap();
+    fs.symlink(ROOT, "/loop1", "/loop2", 0).unwrap();
+    assert_eq!(fs.lookup(ROOT, "/loop1"), Err(Error::Loop));
+    fs.unlink(ROOT, "/sysroot/bin/rustc", 0).unwrap();
+    assert!(fs.lookup(ROOT, "/rustc.wasm").is_ok());
+    // Symlinks inside a persisted tree are not reported for persistence.
+    let p = fs.mkdir_all(ROOT, "/project", 0).unwrap();
+    fs.set_persist_tree(p, true);
+    fs.take_changes();
+    fs.symlink(ROOT, "/rustc.wasm", "/project/link", 0).unwrap();
+    assert!(fs.take_changes().dirty.iter().all(|(path, _)| path != "/project/link"));
+}

@@ -5,7 +5,8 @@
 #
 #   toolchain/build-llvm.sh [stage...]    stages: source native configure build install (default: all)
 #
-# Outputs: build/llvm-wasm (build tree), build/llvm-wasm-install (static libs, headers, llc.wasm, wasm-ld.wasm).
+# Outputs: build/llvm-wasm (build tree), build/llvm-wasm-install (static libs, headers, llc.wasm, wasm-ld.wasm,
+# and a native llvm-config describing them for rustc's bootstrap).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 LLVM_SHA=1b9c0d5ff9bbe7634aead059efe6b11a7eeba145 # rust-lang/rust 1.99.1 src/llvm-project (rustc/23.1-2026-07-22)
@@ -38,7 +39,7 @@ stage_native() {
     -DLLVM_TARGETS_TO_BUILD=WebAssembly -DLLVM_ENABLE_PROJECTS= \
     -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF \
     -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache >/dev/null
-  ninja -C "$NATIVE" -j "$JOBS" llvm-tblgen llvm-min-tblgen
+  ninja -C "$NATIVE" -j "$JOBS" llvm-tblgen llvm-min-tblgen llvm-config
 }
 
 stage_configure() {
@@ -85,6 +86,10 @@ stage_install() {
   # LLVM names its executables without a suffix even for a wasm host.
   cp "$WASM/bin/llc" "$INSTALL/bin/llc.wasm"
   cp "$WASM/bin/lld" "$INSTALL/bin/wasm-ld.wasm" # multicall lld; pick the wasm flavor with `-flavor wasm`
+  # rustc's bootstrap runs llvm-config natively, so it gets the native one (same version and
+  # targets). Placed here, it derives lib/ and include/ from its own location and so describes
+  # the wasm libraries.
+  cp "$NATIVE/bin/llvm-config" "$INSTALL/bin/llvm-config"
 }
 
 stages=("$@"); [ ${#stages[@]} -gt 0 ] || stages=(source native configure build install)

@@ -2,6 +2,8 @@
 //! (on wasm, `ffi` holds one lock around every call).
 //!
 //! Every inode has exactly one parent (no hard links), so its path can always be rebuilt.
+//! Symlinks exist mainly so rustc can find its sysroot from `argv[0]` (it only trusts argv[0]
+//! when it is a symlink); they are followed during lookup and not persisted.
 //! That keeps change tracking for persistence simple: a set of dirty inodes, plus the paths
 //! of everything removed or moved away since the last `take_changes`.
 
@@ -32,14 +34,16 @@ pub type Result<T> = core::result::Result<T, Error>;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Kind {
-    Dir = 3,  // WASI filetype directory
-    File = 4, // WASI filetype regular_file
+    Dir = 3,     // WASI filetype directory
+    File = 4,    // WASI filetype regular_file
+    Symlink = 7, // WASI filetype symbolic_link
 }
 
 #[derive(Debug)]
 pub enum Node {
     File(Vec<u8>),
     Dir(BTreeMap<String, Ino>),
+    Symlink(String),
 }
 
 #[derive(Debug)]
@@ -57,12 +61,14 @@ impl Inode {
         match self.node {
             Node::File(_) => Kind::File,
             Node::Dir(_) => Kind::Dir,
+            Node::Symlink(_) => Kind::Symlink,
         }
     }
     pub fn size(&self) -> u64 {
         match &self.node {
             Node::File(d) => d.len() as u64,
             Node::Dir(e) => e.len() as u64,
+            Node::Symlink(t) => t.len() as u64,
         }
     }
 }
@@ -109,30 +115,79 @@ impl Fs {
     fn entries(&self, dir: Ino) -> Result<&BTreeMap<String, Ino>> {
         match &self.get(dir)?.node {
             Node::Dir(e) => Ok(e),
-            Node::File(_) => Err(Error::NotDir),
+            _ => Err(Error::NotDir),
         }
     }
 
     fn entries_mut(&mut self, dir: Ino) -> Result<&mut BTreeMap<String, Ino>> {
         match &mut self.get_mut(dir)?.node {
             Node::Dir(e) => Ok(e),
-            Node::File(_) => Err(Error::NotDir),
+            _ => Err(Error::NotDir),
         }
     }
 
-    /// Resolve `path` relative to `dir` (absolute paths start at the root). `.` and `..` are
-    /// handled lexically against the tree; `..` at the root stays at the root.
+    /// Resolve `path` relative to `dir` (absolute paths start at the root), following symlinks.
+    /// `..` goes to the parent in the tree; at the root it stays at the root.
     pub fn lookup(&self, dir: Ino, path: &str) -> Result<Ino> {
+        self.resolve(dir, path, true)
+    }
+
+    /// Like `lookup`, but a symlink as the last component is returned itself (`lstat`, `readlink`).
+    pub fn lookup_nofollow(&self, dir: Ino, path: &str) -> Result<Ino> {
+        self.resolve(dir, path, false)
+    }
+
+    fn resolve(&self, dir: Ino, path: &str, follow_last: bool) -> Result<Ino> {
+        const MAX_LINKS: usize = 40; // as Linux
         let mut cur = if path.starts_with('/') { ROOT } else { dir };
         self.get(cur)?;
-        for comp in path.split('/') {
+        // Components still to walk, last first, so a link target can be pushed in front.
+        let mut todo: Vec<&str> = path.split('/').rev().collect();
+        let mut links = 0;
+        while let Some(comp) = todo.pop() {
             match comp {
-                "" | "." => {}
-                ".." => cur = self.get(cur)?.parent,
-                name => cur = *self.entries(cur)?.get(name).ok_or(Error::NoEnt)?,
+                "" | "." => continue,
+                ".." => {
+                    cur = self.get(cur)?.parent;
+                    continue;
+                }
+                name => {
+                    let next = *self.entries(cur)?.get(name).ok_or(Error::NoEnt)?;
+                    let is_last = todo.iter().all(|c| c.is_empty() || *c == ".");
+                    match &self.get(next)?.node {
+                        Node::Symlink(target) if follow_last || !is_last => {
+                            links += 1;
+                            if links > MAX_LINKS {
+                                return Err(Error::Loop);
+                            }
+                            if target.starts_with('/') {
+                                cur = ROOT;
+                            }
+                            todo.extend(target.split('/').rev());
+                        }
+                        _ => cur = next,
+                    }
+                }
             }
         }
         Ok(cur)
+    }
+
+    /// Create a symlink at `path` pointing to `target` (stored as given, resolved on use).
+    pub fn symlink(&mut self, dir: Ino, target: &str, path: &str, now: u64) -> Result<Ino> {
+        let (parent, name) = self.parent_of(dir, path)?;
+        let ino = self.insert(parent, name, Node::Symlink(target.to_string()), now)?;
+        // Not persisted: OPFS has no symlinks, and nothing needs them across reloads yet.
+        self.get_mut(ino)?.persist = false;
+        self.dirty.remove(&ino);
+        Ok(ino)
+    }
+
+    pub fn readlink(&self, dir: Ino, path: &str) -> Result<&str> {
+        match &self.get(self.lookup_nofollow(dir, path)?)?.node {
+            Node::Symlink(t) => Ok(t),
+            _ => Err(Error::Inval),
+        }
     }
 
     /// Split `path` into (parent directory inode, final name). The name must be a real name.
@@ -273,7 +328,7 @@ impl Fs {
 
     pub fn unlink(&mut self, dir: Ino, path: &str, now: u64) -> Result<()> {
         let (parent, name) = self.parent_of(dir, path)?;
-        let ino = self.lookup(parent, name)?;
+        let ino = self.lookup_nofollow(parent, name)?;
         if self.get(ino)?.kind() == Kind::Dir {
             return Err(Error::IsDir);
         }
@@ -305,7 +360,7 @@ impl Fs {
     pub fn rename(&mut self, from_dir: Ino, from: &str, to_dir: Ino, to: &str, now: u64) -> Result<()> {
         let (fp, fname) = self.parent_of(from_dir, from)?;
         let (tp, tname) = self.parent_of(to_dir, to)?;
-        let ino = self.lookup(fp, fname)?;
+        let ino = self.lookup_nofollow(fp, fname)?;
         let kind = self.get(ino)?.kind();
         if fp == tp && fname == tname {
             return Ok(());
@@ -370,6 +425,7 @@ impl Fs {
         match &self.get(ino)?.node {
             Node::File(d) => Ok(d),
             Node::Dir(_) => Err(Error::IsDir),
+            Node::Symlink(_) => Err(Error::Inval),
         }
     }
 
@@ -420,7 +476,7 @@ impl Fs {
         let removed = core::mem::take(&mut self.removed);
         let mut dirty: Vec<(String, Kind)> = core::mem::take(&mut self.dirty)
             .into_iter()
-            .filter_map(|ino| self.get(ino).ok().filter(|i| i.persist).map(|i| (ino, i.kind())))
+            .filter_map(|ino| self.get(ino).ok().filter(|i| i.persist && i.kind() != Kind::Symlink).map(|i| (ino, i.kind())))
             .map(|(ino, kind)| (self.path_of(ino), kind))
             .collect();
         // Parents before children (a path sorts before its descendants).

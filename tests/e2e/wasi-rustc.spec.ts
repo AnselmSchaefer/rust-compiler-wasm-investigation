@@ -38,12 +38,26 @@ test('rustc.wasm on the shared VFS', async ({ page }, info) => {
     const bad = await h.rustc(['/work/bad.rs', ...c, '-o', '/work/bad.wasm']);
     const runHello = await h.run('/work/hello.wasm');
     const runMedium = await h.run('/work/medium.wasm');
-    return { load, steps, bad: { code: bad.code, stderr: bad.stderr.slice(0, 300) }, runHello, runMedium: runMedium.stdout.slice(-11), work: h.ls('/work') };
+    // Symlinks through WASI: what rustc's sysroot detection from argv[0] relies on (findings doc B1).
+    h.symlink('/work/hello.rs', '/sysroot/bin/rustc');
+    h.writeFile('/work/links.rs', [
+      'fn main() {',
+      '    let p = "/sysroot/bin/rustc";',
+      '    println!("target={}", std::fs::read_link(p).unwrap().display());',
+      '    println!("is_symlink={}", std::fs::symlink_metadata(p).unwrap().file_type().is_symlink());',
+      '    println!("follows={}", std::fs::metadata(p).unwrap().is_file());',
+      '    println!("rustlib={}", std::path::Path::new("/sysroot/bin/../lib/rustlib").exists());',
+      '}',
+    ].join('\n'));
+    const linksBuild = await h.rustc(['/work/links.rs', ...c, '-o', '/work/links.wasm']);
+    const links = linksBuild.code === 0 ? (await h.run('/work/links.wasm')).stdout : linksBuild.stderr;
+    return { load, steps, bad: { code: bad.code, stderr: bad.stderr.slice(0, 300) }, runHello, runMedium: runMedium.stdout.slice(-11), links, work: h.ls('/work') };
   }, programs);
   console.log(JSON.stringify(r, null, 1));
   for (const s of ['version', 'check-hello', 'build-hello', 'lib-hello', 'build-medium']) expect(r.steps[s]?.code, s).toBe(0);
   expect(r.runHello.stdout).toContain('Hello from Wasm');
   expect(r.runMedium.endsWith('medium ok\n')).toBe(true);
+  expect(r.links).toBe('target=/work/hello.rs\nis_symlink=true\nfollows=true\nrustlib=true\n');
   expect(r.bad.stderr).toContain('mismatched types');
   expect(r.bad.code).not.toBe(0); // the abort build traps after the diagnostics (WP-01 finding #1)
 });

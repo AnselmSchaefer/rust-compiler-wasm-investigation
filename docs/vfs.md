@@ -7,7 +7,8 @@
 - **One copy per read or write:** a read copies straight from the VFS memory into the guest's memory (`rawRead(ino, off, guestView)`). A write reserves space in the file and copies straight from the guest. Compare `browser_wasi_shim-threads`, which copies every read through a fixed-size bounce buffer and a message to the filesystem owner (WP-01 finding #7).
 - **fd tables live in the VFS, per pid**, so all threads of a WASI process (each in its own worker) share fds and seek positions. stdio are plain VFS files (the host picks the paths), so output from any thread lands in one place.
 - **Persistence:** `persist.ts` mirrors a subtree (e.g. `/project`) to OPFS from one worker using sync access handles. The Rust core records dirty inodes and removed paths for persisted subtrees (`take_changes`). The persister waits on a change counter (`Atomics.waitAsync`), debounces 20 ms and writes the changes out: removals first, then directories, then files. On start it restores the subtree from OPFS.
-- **No hard links or symlinks.** `path_link` returns ENOTSUP; rustc then falls back to copying. Every inode has exactly one parent, so its path can always be rebuilt for persistence.
+- **No hard links.** `path_link` returns ENOTSUP; rustc then falls back to copying. Every inode has exactly one parent, so its path can always be rebuilt for persistence.
+- **Symlinks** are supported (followed during lookup, max 40 hops; `readlink`, `lstat`) but **not persisted**. They exist so rustc can find its sysroot from `argv[0]`, which it only trusts when `argv[0]` is a symlink (`/sysroot/bin/rustc`), so no rustc patch is needed for that.
 
 ## WASI preview 1 (`web/wasi/`)
 - `wasi.ts`: all fd/path/clock/random/poll calls over the VFS. Sockets and signals return ENOSYS.

@@ -89,6 +89,25 @@ pub extern "C" fn vfs_lookup(dir: Ino, p: *const u8, len: usize) -> i32 {
     ret(path(p, len).and_then(|p| fs().lookup(dir, p)))
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn vfs_lookup_nofollow(dir: Ino, p: *const u8, len: usize) -> i32 {
+    ret(path(p, len).and_then(|p| fs().lookup_nofollow(dir, p)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn vfs_symlink(dir: Ino, tp: *const u8, tl: usize, p: *const u8, len: usize, now: u64) -> i32 {
+    ret(path(tp, tl).and_then(|t| path(p, len).and_then(|p| fs().symlink(dir, t, p, now))))
+}
+
+/// Writes `[ptr, len]` of the link target to `out`. Valid until the lock is released.
+#[unsafe(no_mangle)]
+pub extern "C" fn vfs_readlink(dir: Ino, p: *const u8, len: usize, out: *mut u32) -> i32 {
+    ret_unit(path(p, len).and_then(|p| fs().readlink(dir, p)).map(|t| unsafe {
+        out.write(t.as_ptr() as u32);
+        out.add(1).write(t.len() as u32);
+    }))
+}
+
 /// Open-or-create a file. `flags`: bit 0 exclusive, bit 1 truncate.
 #[unsafe(no_mangle)]
 pub extern "C" fn vfs_create(dir: Ino, p: *const u8, len: usize, flags: u32, now: u64) -> i32 {

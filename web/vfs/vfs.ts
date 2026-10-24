@@ -18,7 +18,7 @@ export class VfsError extends Error {
   }
 }
 
-export enum Kind { Dir = 3, File = 4 }
+export enum Kind { Dir = 3, File = 4, Symlink = 7 }
 export type Stat = { kind: Kind; size: number; mtimeNs: bigint };
 export type DirEntry = { name: string; ino: number; kind: Kind };
 export type Changes = { removed: string[]; dirty: { path: string; kind: Kind }[] };
@@ -38,6 +38,9 @@ type Exports = {
   VFS_LOCK: WebAssembly.Global; VFS_CHANGE_SEQ: WebAssembly.Global; VFS_NEXT_SLOT: WebAssembly.Global;
   VFS_SLOTS: WebAssembly.Global; VFS_SLOT_LAYOUT: WebAssembly.Global;
   vfs_lookup(dir: number, p: number, l: number): number;
+  vfs_lookup_nofollow(dir: number, p: number, l: number): number;
+  vfs_symlink(dir: number, tp: number, tl: number, p: number, l: number, now: bigint): number;
+  vfs_readlink(dir: number, p: number, l: number, out: number): number;
   vfs_create(dir: number, p: number, l: number, flags: number, now: bigint): number;
   vfs_mkdir(dir: number, p: number, l: number, now: bigint): number;
   vfs_mkdir_all(dir: number, p: number, l: number, now: bigint): number;
@@ -130,6 +133,18 @@ export class Vfs {
   // Used by the WASI adapter, which needs errnos and already holds the lock.
 
   rawLookup(dir: number, path: string) { return this.x.vfs_lookup(dir, ...this.putPath(path)); }
+  rawLookupNofollow(dir: number, path: string) { return this.x.vfs_lookup_nofollow(dir, ...this.putPath(path)); }
+  rawSymlink(dir: number, target: string, path: string) {
+    const [tp, tl] = this.putPath(target), [p, l] = this.putPath(path, 31 * 1024);
+    return this.x.vfs_symlink(dir, tp, tl, p, l, now());
+  }
+  /** Link target as UTF-8 bytes, or -errno. */
+  rawReadlink(dir: number, path: string): Uint8Array | number {
+    const r = this.x.vfs_readlink(dir, ...this.putPath(path), this.out);
+    if (r < 0) return r;
+    const [ptr, len] = new Uint32Array(this.memory.buffer, this.out, 2);
+    return this.u8.slice(ptr, ptr + len);
+  }
   rawCreate(dir: number, path: string, excl: boolean, trunc: boolean) {
     return this.x.vfs_create(dir, ...this.putPath(path), (excl ? 1 : 0) | (trunc ? 2 : 0), now());
   }
@@ -198,6 +213,15 @@ export class Vfs {
 
   lookup(path: string, dir = ROOT) { return this.locked(() => this.check(this.rawLookup(dir, path), 'lookup', path)); }
   exists(path: string) { return this.locked(() => this.rawLookup(ROOT, path) >= 0); }
+  /** Create a symlink at `path` pointing to `target` (e.g. so rustc finds its sysroot from argv[0]). */
+  symlink(target: string, path: string) { this.locked(() => this.check(this.rawSymlink(ROOT, target, path), 'symlink', path)); }
+  readlink(path: string) {
+    return this.locked(() => {
+      const r = this.rawReadlink(ROOT, path);
+      if (typeof r === 'number') throw new VfsError(-r, 'readlink', path);
+      return dec.decode(r);
+    });
+  }
   mkdir(path: string) { return this.locked(() => this.check(this.rawMkdir(ROOT, path), 'mkdir', path)); }
   mkdirAll(path: string) {
     return this.locked(() => this.check(this.x.vfs_mkdir_all(ROOT, ...this.putPath(path), now()), 'mkdirAll', path));

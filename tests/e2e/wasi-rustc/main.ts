@@ -63,6 +63,10 @@ async function run(path: string) {
 
 const writeFile = (path: string, text: string) => vfs.writeFile(path, text);
 const ls = (path: string) => vfs.readdir(path).map(e => e.name);
+const symlink = (target: string, path: string) => {
+  vfs.mkdirAll(path.slice(0, path.lastIndexOf('/')));
+  vfs.symlink(target, path);
+};
 
-(window as any).rustcVfs = { load, rustc, run, writeFile, ls };
+(window as any).rustcVfs = { load, rustc, run, writeFile, ls, symlink };
 (window as any).rustcVfsReady = true;
