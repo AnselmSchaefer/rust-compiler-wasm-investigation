@@ -12,7 +12,7 @@
 ## Current session (2026-10-24, session 9): done
 - **No rust-tree change needed:** exnref is already rustc's wasm default, and std supports `wasi` + `panic=unwind` via libunwind. Bootstrap links the stage-1 compiler against *stage 0's* std, though, and rustup's is panic=abort, so `toolchain/build-host-std.sh` builds an unwind `wasm32-wasip1-threads` std with `-Zbuild-std` (danlapid's technique). It installs it into a hard-linked copy of rustup 1.99.1 (`build/rustc-wasm/stage0`), which is bootstrap's `rustc`. `-lunwind` comes from wasi-sdk's eh multilib (only libunwind.a, via `host-shims/eh-lib`).
 - `toolchain/rustc-multi/main.rs` + `build-rustc-multi.sh`: out-of-tree driver (like clippy-driver). It runs `--next`-separated rustc invocations in one instance and catches ICEs (`catch_with_exit_code` re-raises them). It links like bootstrap's rustc-main: deps from `.librustc-stamp`, native paths from the newest build-script runs, rustflags from `bootstrap.toml`.
-- Found: with `RUSTC_BOOTSTRAP=1` (nightly mode), `ice_path` calls `std::process::id()`, which panics on WASI, inside the panic hook, and the instance hangs. That's why `-Zno-link` "hung" in session 8. Workaround: `RUSTC_ICE=0`. bjorn3 has a one-line fix (`1a0d591a9c`, `rustc_driver_impl/src/lib.rs` hunk) the user could apply; stable mode (no RUSTC_BOOTSTRAP) never reaches it.
+- Found: with `RUSTC_BOOTSTRAP=1` (nightly mode), `ice_path` calls `std::process::id()`, which panics on WASI, inside the panic hook, and the instance hangs. That's why `-Zno-link` "hung" in session 8. Workaround: `RUSTC_ICE=0`. bjorn3's one-line fix is saved as `toolchain/patches/rust/available/bjorn3-ice-path-pid.diff` (see Follow-ups); stable mode (no RUSTC_BOOTSTRAP) never reaches it.
 - Chromium page `tests/e2e/rustc-host/` + `rustc-host.spec.ts` (assets: `scripts/prep-rustc-host-page.sh`). `scripts/verify/wp-07.sh` passes; WP-05/06 verify still pass on the unwind build.
 
 ## Current session (2026-10-24, session 8): done
@@ -22,6 +22,7 @@
 - `-Zno-link` (with RUSTC_BOOTSTRAP=1) hangs idle in rustc.wasm. Not needed now; note it for WP-09/WP-17 if `.rlink` is ever wanted.
 
 ## Follow-ups (check these at the start of every session)
+- [ ] **Saved for later (user applies, optional):** bjorn3's `ice_path` pid fix, extracted as `toolchain/patches/rust/available/bjorn3-ice-path-pid.diff` (applies cleanly to 1.99.1; problem, workaround and apply command in `toolchain/patches/rust/README.md`). Needed only if nightly-mode (`RUSTC_BOOTSTRAP=1`) runs should write ICE files; until then hosts set `RUSTC_ICE=0`. Re-check before WP-09.
 - [ ] **browser_wasi_shim bug report** (user posting, 2026-10-24): `path_rename` no-op in the threads package. Draft: `~/Projects/browser_wasi_shim-path_rename-issue.md`. Check https://github.com/bjorn3/browser_wasi_shim/issues for a reply. If the fix is released upstream, drop `patches/@oligami__browser_wasi_shim-threads@0.5.0.patch`.
 - [ ] **#llm-mentoring Zulip post** (user to write): ask about reviewing A1/A2 and whether "rustc as a Wasm host" is welcome upstream; mention bjorn3. Points to cover: see the 2026-10-24 conversation summary in `~/Projects/rustc-wasm-host-source-changes.md` §5.
 - [x] **A1/A2 rustc changes**: written by the user 2026-10-24 and saved as `toolchain/patches/rust/wasm-host.diff`. WP-05 done.
