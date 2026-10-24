@@ -7,6 +7,12 @@ const pages = {
   'wasi-rustc': {
     src: 'tests/e2e/wasi-rustc', entries: { main: 'main', 'process-worker': '../../../web/wasi/process-worker' }, assets: { 'vfs.wasm': 'build/www/vfs/vfs.wasm' },
   },
+  // WP-12: the toolchain comes from a release (toolchain/release.sh), served at /release/.
+  orchestrator: {
+    src: 'tests/e2e/orchestrator',
+    entries: { main: 'main', 'orchestrator-worker': '../../../web/orchestrator/orchestrator-worker', 'process-worker': '../../../web/wasi/process-worker' },
+    assets: { 'vfs.wasm': 'build/www/vfs/vfs.wasm' },
+  },
   // WP-07; the big assets come from scripts/prep-rustc-host-page.sh.
   'rustc-host': {
     src: 'tests/e2e/rustc-host', entries: { main: 'main', 'process-worker': '../../../web/wasi/process-worker' }, assets: { 'vfs.wasm': 'build/www/vfs/vfs.wasm' },

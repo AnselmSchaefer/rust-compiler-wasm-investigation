@@ -22,9 +22,13 @@ createServer(async (req, res) => {
   let file = join(base, path.slice(prefix.length - 1));
   if (!file.startsWith(base)) { res.writeHead(403).end(); return; }
   try {
-    if ((await stat(file)).isDirectory()) file = join(file, 'index.html');
+    const st = await stat(file).catch(() => null);
+    if (st?.isDirectory()) file = join(file, 'index.html');
     // Serve a precompressed sibling (file.br) like a CDN would, so transfer sizes are realistic.
-    const br = /\bbr\b/.test(req.headers['accept-encoding'] ?? '') && await stat(file + '.br').then(() => true, () => false);
+    // A release (toolchain/release.sh) has only the .br files: then file.br is the only copy.
+    const accepts = /\bbr\b/.test(req.headers['accept-encoding'] ?? '');
+    const br = accepts && await stat(file + '.br').then(() => true, () => false);
+    if (!st && !br) throw new Error('not found');
     const body = await readFile(br ? file + '.br' : file);
     res.writeHead(200, {
       'Content-Type': types[extname(file)] ?? 'application/octet-stream',

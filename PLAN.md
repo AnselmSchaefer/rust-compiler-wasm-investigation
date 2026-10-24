@@ -232,6 +232,7 @@ These are taken as defaults so work can start. Changing one later only affects t
   - Dev server with COOP/COEP headers.
   - Load the toolchain from the `manifest.json` assets and cache the compiled `WebAssembly.Module`s.
 - **Done when:** an e2e test compiles hello through the orchestrator, entirely using our own toolchain.
+  - *Done 2026-10-24:* `web/orchestrator` (`Release` loader with sha256 + Cache Storage, ustar reader, `Orchestrator` with compile server + wasm-ld process + job queue, worker + typed protocol + client). `tests/e2e/orchestrator.spec.ts` compiles, links and runs hello and medium.
 
 #### WP-13 Run sandbox
 - **Depends:** WP-12 · **Est.:** 1 session

@@ -13,8 +13,8 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, copyFileSync, rmSync, statSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
-import { parseLinkCommand, wasmLdArgs } from '../web/link/link-args.ts';
+import { dirname, join, resolve } from 'node:path';
+import { linkerSpawnError, outputDestination, parseLinkCommand, rewriteOutputs, wasmLdArgs } from '../web/link/link-args.ts';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const RUSTC = process.env.RUSTC_WASM ?? join(ROOT, 'build/rustc-wasm/build/wasm32-wasip1-threads/stage1/bin/rustc.wasm');
@@ -32,21 +32,8 @@ mkdirSync(join(scratch, 'out'));
 mkdirSync(join(scratch, 'sysroot/bin'), { recursive: true });
 symlinkSync('../lib/rustc-is-a-wasm-module', join(scratch, 'sysroot/bin/rustc'));
 
-// Rewrite the output location into the scratch dir; remember where things should end up.
-const args: string[] = [];
-let oPath: string | undefined; // -o, relative to cwd
-let outDir = '.';
-const user = process.argv.slice(2);
-for (let i = 0; i < user.length; i++) {
-  const a = user[i];
-  if (a === '-o') { oPath = user[++i]; args.push('-o', `${OUT}/${basename(oPath)}`); }
-  else if (a.startsWith('-o') && a.length > 2) { oPath = a.slice(2); args.push('-o', `${OUT}/${basename(oPath)}`); }
-  else if (a === '--out-dir') { outDir = user[++i]; }
-  else if (a.startsWith('--out-dir=')) { outDir = a.slice(10); }
-  else args.push(a);
-}
-if (!oPath) args.push('--out-dir', OUT);
-const saveTemps = user.some((a, i) => a.startsWith('-Csave-temps') || (a === '-C' && user[i + 1]?.startsWith('save-temps')));
+// Outputs go to the scratch dir and are moved into place afterwards (web/link/link-args.ts).
+const plan = rewriteOutputs(process.argv.slice(2), OUT, '/tmp/link-args');
 
 const mounts = ['--dir', '.::/', '--dir', `${scratch}::/tmp`, '--dir', `${scratch}/sysroot::/sysroot`,
   '--dir', `${RUSTLIB}::/sysroot/lib/rustlib`, '--dir', `${RUSTLIB}::/lib/rustlib`];
@@ -61,14 +48,14 @@ const quiet = (s: string) => s.split('\n').filter((l) => !l.startsWith('WARNING:
 
 let status = 1;
 try {
-  const r = wasmtime('/sysroot/bin/rustc', RUSTC, [...args, '--print', 'link-args=/tmp/link-args'], 'pipe');
+  const r = wasmtime('/sysroot/bin/rustc', RUSTC, plan.args, 'pipe');
   let err = quiet(r.stderr);
   const linkFile = join(scratch, 'link-args');
   status = r.status ?? 1;
   if (status !== 0 && existsSync(linkFile)) {
     // rustc got to the link step and could not spawn the linker (WASI has no processes). Drop that
     // error (and, with panic=abort, the trap it causes); earlier diagnostics stay.
-    const at = err.search(/^error: (linker `[^`]*` not found|could not exec the linker)/m);
+    const at = linkerSpawnError(err);
     if (at < 0) { process.stderr.write(err); throw new Error('rustc failed at the link step for another reason'); }
     process.stderr.write(err.slice(0, at));
     const cmd = parseLinkCommand(readFileSync(linkFile, 'utf8'));
@@ -82,8 +69,8 @@ try {
     // Move the results into place; rustc's own leftovers (temp dirs, objects) stay behind.
     for (const f of readdirSync(join(scratch, 'out'))) {
       const src = join(scratch, 'out', f);
-      if (!statSync(src).isFile() || (!saveTemps && f.endsWith('.rcgu.o'))) continue;
-      const dst = oPath && f === basename(oPath) ? oPath : join(oPath ? dirname(oPath) : outDir, f);
+      const dst = outputDestination(plan, f);
+      if (!statSync(src).isFile() || !dst) continue;
       mkdirSync(dirname(dst), { recursive: true });
       try { renameSync(src, dst); } catch { copyFileSync(src, dst); }
     }

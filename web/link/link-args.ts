@@ -76,3 +76,59 @@ export function wasmLdArgs(cmd: LinkCommand): string[] {
   }
   return a.slice();
 }
+
+/** Where a host's rustc invocation writes, and where the results then go (see rewriteOutputs). */
+export interface OutputPlan {
+  /** rustc's arguments, with -o/--out-dir pointing into the scratch dir and link-args printed. */
+  args: string[];
+  /** The user's -o, if any (relative to the user's working directory). */
+  oPath?: string;
+  /** Where outputs go without -o: the user's --out-dir, or ".". */
+  outDir: string;
+  /** -C save-temps: keep rustc's intermediate objects too. */
+  saveTemps: boolean;
+}
+
+const base = (p: string) => p.slice(p.lastIndexOf('/') + 1);
+
+/**
+ * Point rustc's outputs at `scratch` (a directory only this invocation uses) and have it print
+ * its link command to `linkArgsFile`. rustc's temp dirs and objects then never reach the user's
+ * output dir, even when rustc stops at the link step. Handles -o and --out-dir; `--emit kind=path`
+ * is not rewritten.
+ */
+export function rewriteOutputs(user: string[], scratch: string, linkArgsFile: string): OutputPlan {
+  const args: string[] = [];
+  let oPath: string | undefined, outDir = '.';
+  for (let i = 0; i < user.length; i++) {
+    const a = user[i];
+    if (a === '-o') { oPath = user[++i]; args.push('-o', `${scratch}/${base(oPath)}`); }
+    else if (a.startsWith('-o') && a.length > 2) { oPath = a.slice(2); args.push('-o', `${scratch}/${base(oPath)}`); }
+    else if (a === '--out-dir') outDir = user[++i];
+    else if (a.startsWith('--out-dir=')) outDir = a.slice(10);
+    else args.push(a);
+  }
+  if (!oPath) args.push('--out-dir', scratch);
+  args.push('--print', `link-args=${linkArgsFile}`);
+  const saveTemps = user.some((a, i) => a.startsWith('-Csave-temps') || (a === '-C' && user[i + 1]?.startsWith('save-temps')));
+  return { args, oPath, outDir, saveTemps };
+}
+
+/**
+ * Where a file that rustc (and the linker) left in the scratch dir goes, or null to drop it:
+ * rustc's intermediate objects, unless -C save-temps.
+ */
+export function outputDestination(plan: OutputPlan, name: string): string | null {
+  if (!plan.saveTemps && name.endsWith('.rcgu.o')) return null;
+  if (plan.oPath && name === base(plan.oPath)) return plan.oPath;
+  const dir = plan.oPath ? (plan.oPath.includes('/') ? plan.oPath.slice(0, plan.oPath.lastIndexOf('/')) : '.') : plan.outDir;
+  return `${dir}/${name}`;
+}
+
+/**
+ * rustc reached the link step and failed to start the linker (WASI has no processes): the index
+ * in `stderr` where that error starts, or -1. Everything before it are the real diagnostics.
+ */
+export function linkerSpawnError(stderr: string): number {
+  return stderr.search(/^error: (linker `[^`]*` not found|could not exec the linker)/m);
+}
