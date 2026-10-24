@@ -126,6 +126,10 @@ export class Orchestrator {
     return res;
   }
 
+  stats() {
+    return { vfsBytes: this.handle.memory.buffer.byteLength, rustcBytes: this.server.memoryBytes, jobs: this.jobs };
+  }
+
   /** Stop the compile server; resolves with its process result. */
   async close(): Promise<RunResult> { await this.queue; return this.server.quit(); }
 }
@@ -160,6 +164,9 @@ class CompileServer {
   private readonly stdout: string;
   private readonly stderr: string;
   private readonly done: Promise<RunResult>;
+  private readonly memory: WebAssembly.Memory;
+
+  get memoryBytes() { return this.memory.buffer.byteLength; }
 
   constructor(private readonly vfs: Vfs, handle: VfsHandle, rustc: Tool, workerUrl: URL) {
     this.stdin = '/proc/rustc.in';
@@ -167,6 +174,7 @@ class CompileServer {
     this.stderr = '/proc/rustc.err';
     vfs.writeFile(this.stdin, '');
     const memory = new WebAssembly.Memory({ ...rustc.limits, shared: true });
+    this.memory = memory;
     this.done = runProcess(vfs, handle, rustc.module, memory, {
       args: [RUSTC_ARGV0, '--server', '--follow'], env: ENV,
       stdin: this.stdin, stdout: this.stdout, stderr: this.stderr, preopens: [['/', '/']],

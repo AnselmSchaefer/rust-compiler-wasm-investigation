@@ -14,6 +14,8 @@ export type Ops = {
   rustc: { args: { args: string[] }; result: RustcResult };
   /** Run a wasm32-wasip1 program from the VFS in the run sandbox (no stdin; see web/sandbox for more). */
   run: { args: { path: string; args?: string[] }; result: RunOutput };
+  /** Sizes of the big memories: the VFS and the compile server's rustc instance (both only grow). */
+  stats: { args: Record<string, never>; result: { vfsBytes: number; rustcBytes: number; jobs: number } };
   close: { args: Record<string, never>; result: { code: number } };
 };
 export type Op = keyof Ops;

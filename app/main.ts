@@ -125,4 +125,4 @@ $('run').onclick = () => void run();
 $('stop').onclick = () => program?.kill();
 
 // For tests and the bench (tests/e2e/app.spec.ts).
-(window as any).ide = { view, term, ready, check, run, stop: () => program?.kill(), busy: () => busy };
+(window as any).ide = { view, term, orch, ready, check, run, stop: () => program?.kill(), busy: () => busy };

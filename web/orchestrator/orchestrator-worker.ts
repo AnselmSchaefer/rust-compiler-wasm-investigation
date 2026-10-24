@@ -19,6 +19,7 @@ const handlers: { [O in keyof Ops]: (a: Ops[O]['args']) => Promise<Ops[O]['resul
   ls: a => need().vfs.readdir(a.path).map(e => e.name),
   rustc: a => need().rustcJob(a.args),
   run: a => runProgram(a.path, a.args ?? []),
+  stats: () => need().stats(),
   close: async () => ({ code: (await need().close()).code }),
 };
 
