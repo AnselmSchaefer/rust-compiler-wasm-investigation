@@ -1,0 +1,13 @@
+diff --git a/compiler/rustc_driver_impl/src/lib.rs b/compiler/rustc_driver_impl/src/lib.rs
+index ff7e170543bea..747cf57b121be 100644
+--- a/compiler/rustc_driver_impl/src/lib.rs
++++ b/compiler/rustc_driver_impl/src/lib.rs
+@@ -1423,7 +1423,7 @@ fn ice_path_with_config(config: Option<&UnstableOptions>) -> &'static Option<Pat
+         };
+         // Don't use a standard datetime format because Windows doesn't support `:` in paths
+         let file_now = jiff::Zoned::now().strftime("%Y-%m-%dT%H_%M_%S");
+-        let pid = std::process::id();
++        let pid = if cfg!(target_family = "wasm") { 1 } else { std::process::id() };
+         path.push(format!("rustc-ice-{file_now}-{pid}.txt"));
+         Some(path)
+     })

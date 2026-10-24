@@ -19,3 +19,21 @@ branch (commit 1a0d591a9c, `[WIP] Support compiling rustc to WebAssembly`; fetch
 Apply both as **uncommitted** working-tree changes (`git -C build/rust apply toolchain/patches/rust/{wasm-host,bjorn3-get-linker-path}.diff`),
 so `build/rust` HEAD stays at the 1.99.1 release commit and the compiler's version string matches
 stable exactly (see `toolchain/build-rustc.sh`).
+
+## Available, not applied (`available/`)
+
+Existing human-written fixes we know about but don't need yet. The project owner applies them if and
+when they're wanted (`git -C build/rust apply "$PWD/toolchain/patches/rust/available/<file>"`, then
+move the file up a directory and rebuild with `toolchain/build-rustc.sh`, ~3 min).
+
+- `bjorn3-ice-path-pid.diff`: by bjorn3, unchanged from `compile_rustc_for_wasm20` commit 1a0d591a9c
+  (the `rustc_driver_impl/src/lib.rs` hunk). Checked on 2026-10-24: applies cleanly to 1.99.1.
+  - Problem: in nightly mode (`RUSTC_BOOTSTRAP=1`, e.g. for `-Z` flags), `ice_path_with_config`
+    names the ICE report file with `std::process::id()`, which panics on WASI ("no pids on this
+    platform"). This happens inside the panic hook, and the Wasm instance hangs at 0% CPU. Stable
+    mode returns before that line.
+  - Current workaround: hosts set `RUSTC_ICE=0` (no ICE file) whenever they set `RUSTC_BOOTSTRAP=1`
+    (`scripts/verify/wp-07.sh`, `tests/e2e/rustc-host.spec.ts`).
+  - The fix uses pid 1 on wasm hosts, so ICE files can be written. Worth applying before anything
+    runs rustc.wasm in nightly mode without `RUSTC_ICE=0` (e.g. WP-09's compile server, if it uses
+    `-Z` flags).
