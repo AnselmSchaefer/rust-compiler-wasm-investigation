@@ -7,12 +7,12 @@ export interface RunOutput { code: number; stdout: string; stderr: string; ms: n
 
 /** Each request names its operation; the answer type is in `Ops`. */
 export type Ops = {
-  init: { args: { releaseUrl: string; vfsUrl: string; workerUrl: string }; result: InitResult };
+  init: { args: { releaseUrl: string; vfsUrl: string; workerUrl: string; sandboxWorkerUrl?: string }; result: InitResult };
   writeFile: { args: { path: string; data: string | Uint8Array }; result: void };
   readFile: { args: { path: string }; result: Uint8Array };
   ls: { args: { path: string }; result: string[] };
   rustc: { args: { args: string[] }; result: RustcResult };
-  /** Run a wasm32-wasip1 program from the VFS (a stand-in until the run sandbox, WP-13). */
+  /** Run a wasm32-wasip1 program from the VFS in the run sandbox (no stdin; see web/sandbox for more). */
   run: { args: { path: string; args?: string[] }; result: RunOutput };
   close: { args: Record<string, never>; result: { code: number } };
 };

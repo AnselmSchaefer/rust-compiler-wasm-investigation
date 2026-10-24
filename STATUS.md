@@ -3,11 +3,16 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** none. Next is **WP-13** (ready): run sandbox.
-- **Last session:** 2026-10-24 (session 13). WP-12 done: the orchestrator worker compiles **and links** hello and medium in Chromium with only our release (`/release/<RUSTC_ID>/`). First visit: toolchain 2.6 s, first build of hello 2.3 s (fetches lld + the link group); warm rebuild 318 ms (rustc 228, link 89); after a reload, toolchain 0.84 s from Cache Storage.
+- **Active WP:** none. Next is **WP-14** (ready): minimal UI (M1a). It ends with an **[H]** checkpoint: the user tries the local demo.
+- **Last session:** 2026-10-24 (session 14). WP-13 done: the run sandbox (`web/sandbox`) runs compiled programs in a worker of their own, with stdin (also interactive), args, env, files, streamed output, exit codes, panics as exit 134, and kill/timeout.
 - **Rule for rustc source:** rust-lang's agent policy (`build/rust/AGENTS.md`) applies. Claude does not write or edit rustc source, and does not draft rust-lang issues, PRs or Zulip posts. The user writes those, or applies existing **human-written** patches (bjorn3/oligamiq), which the user prefers whenever one exists. **danlapid 0005–0007 are LLM-generated** (Claude co-author trailers), so they don't qualify even if the user applies them; design reference only (`docs/patches.md`). Claude reviews, builds and explains. Everything outside `build/rust` is Claude's, including out-of-tree drivers using `rustc_driver` (`toolchain/rustc-multi`).
-- **Next step:** WP-13, the run sandbox. Replace the orchestrator's stand-in `run` op (`web/orchestrator/orchestrator-worker.ts` `runProgram`, which runs on the orchestrator's own thread) with a sandbox worker: stdin/stdout/args/env, files, exit codes, panics, a kill button (terminate the worker), no network. Read PLAN WP-13 for the done-check.
+- **Next step:** WP-14, minimal UI. CodeMirror 6 editor, xterm.js terminal (sandbox stdin/stdout via `runSandboxed` with `interactive: true`), Run/Check buttons through the orchestrator client, inline diagnostics from rustc's JSON output (`--error-format=json`). The editor loads first and the toolchain streams in after. Bench: editor interactive < 2 s on cold load. Needs npm deps (codemirror, @xterm/xterm), added with pnpm (no sudo). Ends at **[H]**: the user tries the local demo (`node scripts/serve.mjs …`) and gives feedback.
 - **Running background jobs:** none
+
+## Current session (2026-10-24, session 14): done
+- `web/sandbox/`: `pipe.ts` (SharedArrayBuffer stdin ring; the reader blocks with Atomics.wait), `sandbox-worker.ts` (a worker and its own VFS per run, only the given files, streamed stdout/stderr, exit/trap), `sandbox.ts` (`runSandboxed`: stdin up front and/or interactive, files in/out, timeout, kill). `WasiProcess` takes a `readStdin` hook.
+- Fixed: `WasiProcess`'s `onWrite` ran inside the VFS lock, so a callback that used the VFS deadlocked. It now runs after the lock is released.
+- The orchestrator's `run` op now goes through the sandbox. `tests/e2e/sandbox.spec.ts` + `scripts/verify/wp-13.sh` pass; the full Chromium suite (10 specs) passes.
 
 ## Current session (2026-10-24, session 13): done
 - `web/orchestrator/`: `toolchain.ts` (`Release`: manifest, files fetched without `.br` and sent with Content-Encoding br, sha256 check, Cache Storage per RUSTC_ID, compiled modules memoized), `tar.ts` (ustar reader), `orchestrator.ts` (VFS, sysroot meta group at start, compile server, wasm-ld.wasm per link, job queue, scratch dir per job), `protocol.ts` + `orchestrator-worker.ts` + `client.ts` (typed messages).
@@ -78,8 +83,8 @@
 | 10 | Toolchain release packaging | done | 1 | `scripts/verify/wp-10.sh` passes. `toolchain/release.sh`, 53.5 MiB brotli; second build bit-identical; `docs/rebase.md` |
 | 11 | Virtual filesystem | done | 2 | `scripts/verify/wp-11.sh` passes. Shared-memory VFS + OPFS + WASI p1 adapter; design in `docs/vfs.md` |
 | 12 | Orchestrator and worker pool | done | 1 | `scripts/verify/wp-12.sh` passes. Orchestrator worker compiles + links + runs hello/medium from the release; Cache Storage on reload |
-| 13 | Run sandbox | ready | 0 | |
-| 14 | Minimal UI (M1a) | blocked | 0 | |
+| 13 | Run sandbox | done | 1 | `scripts/verify/wp-13.sh` passes. Worker + own VFS per run, interactive stdin, streamed output, panic → 134, kill/timeout |
+| 14 | Minimal UI (M1a) | ready | 0 | |
 | 15 | Cargo resolver | blocked | 0 | |
 | 16 | Index and crate download | blocked | 0 | |
 | 17 | Build planner | blocked | 0 | |
@@ -100,6 +105,7 @@
 | 37 | Release-train rebase | blocked | 0 | recurring |
 
 ## Measurements
+- 2026-10-24 WP-13 (Chromium): a sandboxed run of a small program (new worker + VFS + instantiate) 22–42 ms; kill while waiting for input 202 ms (200 ms delay + teardown); timeout precision ±4 ms.
 - 2026-10-24 WP-12 (Chromium, localhost, orchestrator + release 1.99.1-f501aa64fd28): init (fetch + brotli + sha256 + compile rustc, meta sysroot) 2.6 s first visit, 0.84 s from Cache Storage. Build hello (compile + link) first 2.3 s (incl. lld + link group), warm 318 ms (rustc 228 ms, wasm-ld 89 ms); check hello 50 ms; build medium 1.64 s.
 - 2026-10-24 WP-10 release `1.99.1-f501aa64fd28` (brotli 11): rustc.wasm.br 19.0 MiB (raw 136.1), lld.wasm.br 10.1 MiB (63.3), sysroot meta tar 18.8 MiB (80.5), link tar 5.6 MiB (23.6); total download 53.5 MiB (the WP-02 baseline was 41.9 MiB for rustc + sysroot without a linker). release.sh takes ~9 min.
 - 2026-10-24 WP-09 (Chromium): compile server warm check-hello median 22.1 ms (19.5–23.2) vs cold, a new instance per compile, 67 ms (65–76): 3.0×. wasmtime: warm 21.1–21.6 ms. Peak 141 MiB over 10 requests. Details: `bench/compile-server.md`.
@@ -115,6 +121,7 @@
 - Smoke: hello world runs on wasip1, wasip2, wasip3 (wasmtime 50) and wasip1-threads with a real thread (wasmtime 46.0.3).
 
 ## Session log
+- 2026-10-24 (session 14): **WP-13 done.** Run sandbox with interactive stdin pipe, streamed output, panics, kill/timeout; fixed an onWrite-inside-lock deadlock in WasiProcess.
 - 2026-10-24 (session 13): **WP-12 done.** Orchestrator worker with the release loader, compile server and wasm-ld linker; hello and medium compile, link and run in Chromium with our toolchain only. Linking builds need the rlibs at rustc time.
 - 2026-10-24 (session 12): **WP-10 done.** release.sh + manifest with RUSTC_ID, deterministic sysroot tars, versions.env, docs/rebase.md; an independent second build is bit-identical.
 - 2026-10-24 (session 11): **WP-09 done.** Compile server mode, worker reuse for threads, stdout wake-up. Warm/cold 3.0×; the user re-scoped the target to 2.5× because the remaining cost (rustc reloading std metadata per session) can't be cached out of tree.

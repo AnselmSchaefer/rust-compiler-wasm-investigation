@@ -239,6 +239,7 @@ These are taken as defaults so work can start. Changing one later only affects t
 - **Tasks**
   - A sandbox worker runs the `wasm32-wasip1` output: stdin/stdout/args/env, files, exit codes, panics, a kill button, no network.
 - **Done when:** e2e tests cover a program that reads stdin, panics with a non-zero exit, and gets killed after a timeout.
+  - *Done 2026-10-24:* `web/sandbox` (a worker and its own VFS per run, SharedArrayBuffer stdin pipe for interactive input, streamed stdout/stderr, exit/trap/kill/timeout). The orchestrator's `run` op uses it. `tests/e2e/sandbox.spec.ts`.
 
 #### WP-14 Minimal UI → **M1a**
 - **Depends:** WP-13 · **Est.:** 2 sessions

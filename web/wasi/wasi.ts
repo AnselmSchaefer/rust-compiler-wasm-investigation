@@ -61,10 +61,15 @@ const sleepCell = new Int32Array(new SharedArrayBuffer(4));
 export class WasiProcess {
   private memory!: WebAssembly.Memory;
 
-  /** `onWrite` is called after each successful fd_write (the host's process runner uses it for stdout). */
+  /**
+   * `onWrite` is called after each successful fd_write (the host's process runner uses it for stdout).
+   * `readStdin`, if given, serves fd_read on fd 0 instead of the VFS: it fills the buffers (blocking
+   * as long as it likes, outside the VFS lock) and returns the byte count, 0 at end of input.
+   */
   constructor(
     private readonly vfs: Vfs, readonly pid: number, private readonly args: string[], private readonly env: string[],
     private readonly onWrite?: (fd: number) => void,
+    private readonly readStdin?: (bufs: Uint8Array[]) => number,
   ) {}
 
   /** Call once the instance exists (the guest's memory is imported or exported). */
@@ -159,7 +164,7 @@ export class WasiProcess {
 
     fd_write: (fd: number, iovs: number, n: number, nwritten: number) => {
       const bufs = this.iovs(iovs, n);
-      return this.withFd(fd, info => {
+      const errno = this.withFd(fd, info => {
         let pos = info.append ? (this.vfs.rawStat(info.ino) as { size: number }).size : info.pos, total = 0;
         for (const b of bufs) {
           const r = this.vfs.rawWrite(info.ino, pos, b);
@@ -169,9 +174,11 @@ export class WasiProcess {
         }
         this.vfs.rawFdSetPos(this.pid, fd, pos);
         this.dv.setUint32(nwritten, total, true);
-        this.onWrite?.(fd);
         return 0;
       });
+      // After the VFS lock is released: the callback may use the VFS itself (the sandbox does).
+      if (errno === 0) this.onWrite?.(fd);
+      return errno;
     },
     fd_pwrite: (fd: number, iovs: number, n: number, offset: bigint, nwritten: number) => {
       const bufs = this.iovs(iovs, n);
@@ -189,6 +196,20 @@ export class WasiProcess {
     },
     fd_read: (fd: number, iovs: number, n: number, nread: number) => {
       const bufs = this.iovs(iovs, n);
+      if (fd === 0 && this.readStdin) {
+        // The views may be detached if the guest's memory grows meanwhile; take fresh ones after.
+        const tmp = bufs.map(b => new Uint8Array(b.length));
+        const total = this.readStdin(tmp);
+        let left = total;
+        const fresh = this.iovs(iovs, n);
+        for (let i = 0; i < fresh.length && left > 0; i++) {
+          const k = Math.min(left, fresh[i].length);
+          fresh[i].set(tmp[i].subarray(0, k));
+          left -= k;
+        }
+        this.dv.setUint32(nread, total, true);
+        return 0;
+      }
       return this.withFd(fd, info => {
         let pos = info.pos, total = 0;
         for (const b of bufs) {
