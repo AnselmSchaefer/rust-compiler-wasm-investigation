@@ -13,9 +13,10 @@
 # 1.99.1's exactly, and it accepts rustup's prebuilt wasm32-wasip1 std (danlapid's technique).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-TAG=1.99.1
+. "$ROOT/toolchain/versions.env"
+TAG=$RUST_TAG
 RUST="$ROOT/build/rust"
-OUT="$ROOT/build/rustc-wasm"
+OUT="${RUSTC_WASM_OUT:-$ROOT/build/rustc-wasm}" # another dir: a second, independent build (WP-10 reproducibility)
 LLVM="$ROOT/build/llvm-wasm-install"
 WASI_SDK="${WASI_SDK_PATH:-$HOME/opt/wasi-sdk}"
 HOST=wasm32-wasip1-threads

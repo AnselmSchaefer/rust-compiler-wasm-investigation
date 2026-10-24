@@ -9,11 +9,13 @@
 # sources taken from build/rust/library (unmodified). The std for *user* programs stays rustup's.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-TAG=1.99.1
+. "$ROOT/toolchain/versions.env"
+TAG=$RUST_TAG
 HOST=wasm32-wasip1-threads
 RUST="$ROOT/build/rust"
-WORK="$ROOT/build/rustc-wasm/host-std"
-STAGE0="$ROOT/build/rustc-wasm/stage0"
+OUT="${RUSTC_WASM_OUT:-$ROOT/build/rustc-wasm}"
+WORK="$OUT/host-std"
+STAGE0="$OUT/stage0"
 STABLE="$(rustc +$TAG --print sysroot)"
 
 mkdir -p "$WORK/build/src"

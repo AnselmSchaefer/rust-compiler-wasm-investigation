@@ -4,9 +4,10 @@
 # Build first with toolchain/build-rustc.sh (needs the rustc changes in toolchain/patches/rust/).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. toolchain/versions.env
 W=build/rustc-wasm/build/wasm32-wasip1-threads/stage1/bin/rustc.wasm
 [ -f "$W" ] || { echo "FAIL: no $W (run toolchain/build-rustc.sh)"; exit 1; }
-RL=$(rustc +1.99.1 --print sysroot)/lib/rustlib
+RL=$(rustc +$RUST_TAG --print sysroot)/lib/rustlib
 T=build/wp-05/verify; rm -rf "$T"; mkdir -p "$T/root/sysroot/bin" "$T/root/work"
 # rustc trusts argv[0] for its sysroot only if it is a symlink, and then checks for lib/rustlib
 # relative to the *working directory* (/), hence the second rustlib mount (see docs/decisions.md).
@@ -18,7 +19,7 @@ run() {
     | grep -v '^WARNING: the `-Sthreads`' || true
 }
 v=$(run -V | tr -d '\r' | grep '^rustc')
-[ "$v" = "$(rustc +1.99.1 -V)" ] || { echo "FAIL: version '$v' != '$(rustc +1.99.1 -V)'"; exit 1; }
+[ "$v" = "$(rustc +$RUST_TAG -V)" ] || { echo "FAIL: version '$v' != '$(rustc +$RUST_TAG -V)'"; exit 1; }
 echo "  ok   $v (identical to stable)"
 run /work/hello.rs --target wasm32-wasip1 --edition 2021 --emit=metadata -o /work/hello.rmeta >/dev/null
 [ -f "$T/root/work/hello.rmeta" ] || { echo "FAIL: no hello.rmeta"; exit 1; }

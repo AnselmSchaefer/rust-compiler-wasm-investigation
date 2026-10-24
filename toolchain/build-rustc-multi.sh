@@ -4,7 +4,7 @@
 # same stage-0 rustc, flags and libraries, but our own main. Output: build/rustc-wasm/rustc-multi.wasm
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-OUT="$ROOT/build/rustc-wasm"
+OUT="${RUSTC_WASM_OUT:-$ROOT/build/rustc-wasm}" # another dir: a second, independent build (WP-10 reproducibility)
 REL="$OUT/build/x86_64-unknown-linux-gnu/stage1-rustc/wasm32-wasip1-threads/release"
 STAMP="$REL/.librustc-stamp"
 [ -f "$STAMP" ] || { echo "no $STAMP: run toolchain/build-rustc.sh" >&2; exit 1; }

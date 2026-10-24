@@ -1,5 +1,6 @@
 // Several rustc invocations in one Wasm instance (WP-07, WP-09). Two modes:
 //
+//   rustc-multi <args>                        exactly like `rustc <args>`
 //   rustc-multi <args> --next <args> ...      each group runs like `rustc <args>`; prints
 //                                             `rustc-multi: exit <code>` to stderr after each
 //   rustc-multi --server [--follow]           compile server: one JSON request per line on stdin,
@@ -105,6 +106,10 @@ fn main() -> ExitCode {
     let args = rustc_driver::args::raw_args(&early_dcx);
     if args.get(1).map(String::as_str) == Some("--server") {
         return serve(&args[0], args.get(2).map(String::as_str) == Some("--follow"));
+    }
+    // Without --next it is a plain rustc: same output, same exit code (what release.sh ships).
+    if !args.iter().any(|a| a == "--next") {
+        return ExitCode::from(compile(&args));
     }
     let mut last = 0;
     for group in args[1..].split(|a| a == "--next") {

@@ -5,7 +5,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 ROOT=$PWD
-W=build/rustc-wasm/build/wasm32-wasip1-threads/stage1/bin/rustc.wasm
+# RUSTC_WASM / WASM_LD_WASM / RUSTLIB: test other artifacts, e.g. a release (scripts/verify/wp-10.sh).
+W=${RUSTC_WASM:-build/rustc-wasm/build/wasm32-wasip1-threads/stage1/bin/rustc.wasm}
 [ -f "$W" ] || { echo "FAIL: no $W (run toolchain/build-rustc.sh)"; exit 1; }
 T=build/wp-06/verify; rm -rf "$T"; mkdir -p "$T/work" "$T/tmp"
 cp tests/smoke/hello.rs bench/programs/medium.rs "$T/work/"

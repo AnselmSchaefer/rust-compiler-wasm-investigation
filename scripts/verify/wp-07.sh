@@ -5,14 +5,17 @@
 # Build first: toolchain/build-rustc.sh, then toolchain/build-rustc-multi.sh.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-W=build/rustc-wasm/build/wasm32-wasip1-threads/stage1/bin/rustc.wasm
-M=build/rustc-wasm/rustc-multi.wasm
+. toolchain/versions.env
+# RUSTC_WASM / RUSTC_MULTI_WASM / RUSTLIB: test other artifacts, e.g. a release (scripts/verify/wp-10.sh);
+# WASMTIME_ONLY=1 skips the Chromium part (its page loads from the build dirs).
+W=${RUSTC_WASM:-build/rustc-wasm/build/wasm32-wasip1-threads/stage1/bin/rustc.wasm}
+M=${RUSTC_MULTI_WASM:-build/rustc-wasm/rustc-multi.wasm}
 for f in "$W" "$M"; do [ -f "$f" ] || { echo "FAIL: no $f"; exit 1; }; done
 legacy=$(wasm-tools print "$W" | grep -cE '^\s*(try|delegate|rethrow)\b' || true)
 [ "$legacy" = 0 ] || { echo "FAIL: rustc.wasm uses legacy EH ($legacy instructions)"; exit 1; }
 echo "  ok   rustc.wasm uses exnref EH only (no legacy try/delegate/rethrow)"
 
-RL=$(rustc +1.99.1 --print sysroot)/lib/rustlib
+RL=${RUSTLIB:-$(rustc +$RUST_TAG --print sysroot)/lib/rustlib}
 T=build/wp-07/verify; rm -rf "$T"; mkdir -p "$T/root/sysroot/bin" "$T/root/work"
 ln -s ../lib/rustc-is-a-wasm-module "$T/root/sysroot/bin/rustc"
 cp tests/smoke/hello.rs "$T/root/work/"
@@ -46,9 +49,11 @@ echo "  ok   one instance: ICE (101), error (1), check (0), codegen (0) in ${ms}
 
 scripts/verify/wp-06.sh | sed -n 's/^  ok   build-hello/  ok   WP-06 build-hello/p'
 
-bash scripts/build-vfs.sh >/dev/null
-scripts/prep-rustc-host-page.sh >/dev/null
-node scripts/build-web-tests.mjs >/dev/null
-pnpm exec playwright test tests/e2e/rustc-host.spec.ts --project=chromium --reporter=line | tail -3
+if [ "${WASMTIME_ONLY:-}" != 1 ]; then
+  bash scripts/build-vfs.sh >/dev/null
+  scripts/prep-rustc-host-page.sh >/dev/null
+  node scripts/build-web-tests.mjs >/dev/null
+  pnpm exec playwright test tests/e2e/rustc-host.spec.ts --project=chromium --reporter=line | tail -3
+fi
 echo "  size: rustc.wasm $(awk -v b="$(stat -c %s "$W")" 'BEGIN { printf "%.1f MiB", b/1048576 }'), brotli: see STATUS"
 echo "WP-07 verified."

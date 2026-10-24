@@ -8,7 +8,8 @@
 // even when rustc aborts at the link step. Limits: one linked crate type per call; `-o` and
 // `--out-dir` are rewritten, `--emit kind=path` is not.
 //
-// Env: RUSTC_WASM, WASM_LD_WASM (module paths), WASMTIME (default wasmtime-threads).
+// Env: RUSTC_WASM, WASM_LD_WASM (module paths), RUSTLIB (sysroot's lib/rustlib, default rustup
+// 1.99.1's), WASMTIME (default wasmtime-threads).
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, copyFileSync, rmSync, statSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -19,7 +20,8 @@ const ROOT = resolve(import.meta.dirname, '..');
 const RUSTC = process.env.RUSTC_WASM ?? join(ROOT, 'build/rustc-wasm/build/wasm32-wasip1-threads/stage1/bin/rustc.wasm');
 const WASM_LD = process.env.WASM_LD_WASM ?? join(ROOT, 'build/llvm-wasm-install/bin/wasm-ld.wasm');
 const WASMTIME = process.env.WASMTIME ?? 'wasmtime-threads';
-const RUSTLIB = join(execFileSync('rustc', ['+1.99.1', '--print', 'sysroot'], { encoding: 'utf8' }).trim(), 'lib/rustlib');
+const RUST_TAG = readFileSync(join(ROOT, 'toolchain/versions.env'), 'utf8').match(/^RUST_TAG=(.+)$/m)![1];
+const RUSTLIB = process.env.RUSTLIB ?? join(execFileSync('rustc', [`+${RUST_TAG}`, '--print', 'sysroot'], { encoding: 'utf8' }).trim(), 'lib/rustlib');
 
 const scratch = mkdtempSync(join(tmpdir(), 'rustc-wasm-'));
 const OUT = '/tmp/out'; // guest path of scratch/out

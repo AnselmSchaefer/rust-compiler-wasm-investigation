@@ -5,9 +5,10 @@
 # cold in Chromium (3x in PLAN, re-scoped 2026-10-24; see bench/compile-server.md).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+. toolchain/versions.env
 M=build/rustc-wasm/rustc-multi.wasm
 [ -f "$M" ] || { echo "FAIL: no $M (toolchain/build-rustc-multi.sh)"; exit 1; }
-RL=$(rustc +1.99.1 --print sysroot)/lib/rustlib
+RL=$(rustc +$RUST_TAG --print sysroot)/lib/rustlib
 T=build/wp-09/verify; rm -rf "$T"; mkdir -p "$T/root/sysroot/bin" "$T/root/work"
 ln -s ../lib/rustc-is-a-wasm-module "$T/root/sysroot/bin/rustc"
 cp tests/smoke/hello.rs bench/programs/medium.rs "$T/root/work/"

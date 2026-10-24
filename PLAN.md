@@ -212,6 +212,7 @@ These are taken as defaults so work can start. Changing one later only affects t
   - Write `docs/rebase.md`, a step-by-step rebase onto a new rustc version.
   - Make the build reproducible: two builds give identical hashes, or the differences are documented.
 - **Done when:** `release.sh` output passes `scripts/verify/wp-10.sh` (manifest hashes match, and WP-06/07 tests pass with the packaged artifacts).
+  - *Done 2026-10-24:* `rustc.wasm.br` is `rustc-multi.wasm` (a drop-in rustc, plus `--next` and `--server`); the sysroot ships as two tars (meta/link). Pins are in `toolchain/versions.env`. An independent second build is bit-identical (`docs/rebase.md`).
 
 ### Phase C: Browser runtime
 

@@ -13,7 +13,7 @@ import { promisify } from 'node:util';
 
 const [out, target = 'wasm32-wasip1'] = process.argv.slice(2);
 if (!out) throw new Error('usage: package-sysroot.mjs <out-dir> [target]');
-const VERSION = '1.99.1';
+const VERSION = readFileSync(new URL('versions.env', import.meta.url), 'utf8').match(/^RUST_TAG=(.+)$/m)[1];
 const sysroot = execFileSync('rustc', [`+${VERSION}`, '--print', 'sysroot'], { encoding: 'utf8' }).trim();
 const src = join(sysroot, 'lib/rustlib', target, 'lib');
 const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)]));

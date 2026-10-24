@@ -9,7 +9,7 @@
 # and a native llvm-config describing them for rustc's bootstrap).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-LLVM_SHA=1b9c0d5ff9bbe7634aead059efe6b11a7eeba145 # rust-lang/rust 1.99.1 src/llvm-project (rustc/23.1-2026-07-22)
+. "$ROOT/toolchain/versions.env" # LLVM_SHA
 SRC="$ROOT/build/llvm-project"
 NATIVE="$ROOT/build/llvm-native"
 WASM="$ROOT/build/llvm-wasm"
