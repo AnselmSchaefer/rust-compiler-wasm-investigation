@@ -12,6 +12,11 @@
   4. Run `x build --stage 1 compiler/rustc` under `systemd-inhibit`, in ≤ 2 h chunks.
 - **Running background jobs:** none
 
+## Follow-ups (check these at the start of every session)
+- [ ] **browser_wasi_shim bug report** (user posting, 2026-10-24): `path_rename` no-op in the threads package. Draft: `~/Projects/browser_wasi_shim-path_rename-issue.md`. Check https://github.com/bjorn3/browser_wasi_shim/issues for a reply. If the fix is released upstream, drop `patches/@oligami__browser_wasi_shim-threads@0.5.0.patch`.
+- [ ] **#llm-mentoring Zulip post** (user to write): ask about reviewing A1/A2 and whether "rustc as a Wasm host" is welcome upstream; mention bjorn3. Points to cover: see the 2026-10-24 conversation summary in `~/Projects/rustc-wasm-host-source-changes.md` §5.
+- [ ] **A1/A2 rustc changes** (user to write, Claude reviews and builds): see `~/Projects/rustc-wasm-host-source-changes.md` §3. Unblocks WP-05.
+
 ## Human actions needed
 - [ ] **WP-05 decision (2026-10-24):** the rust checkout's AGENTS.md forbids AI-authored rustc changes without a named reviewer, and bans them in codegen/metadata. The minimum changes (A1 driver `lib`, A2 dlopen guards) need to be written by the user or reviewed. B1/B2 can avoid rustc changes (VFS symlink, external wasm-ld). Details: `~/Projects/rustc-wasm-host-source-changes.md`.
 - [x] Plan confirmed; commits at end of each session approved (2026-10-23).
