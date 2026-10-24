@@ -173,6 +173,7 @@ These are taken as defaults so work can start. Changing one later only affects t
 - **Tasks**
   - **Re-scoped 2026-10-24:** an in-process lld call would be an AI-authored change in `rustc_codegen_ssa`, which rust-lang's agent policy bans. Instead, link **outside rustc**: run rustc with `--emit=obj`/`-C save-temps` (or capture the failed linker spawn and its link line, e.g. `--print link-args`), then have the host run `wasm-ld.wasm` with that link line on the same filesystem (wasmtime first, the browser VFS in WP-12). In-process linking stays possible later as a human-authored patch.
   - Check that no temp dirs or `.o` files are left behind (WP-01 finding #4).
+  - *Done 2026-10-24:* `toolchain/rustc-wasm.ts` + `web/link/link-args.ts`. It also needed a wasi-libc stat-mode shim (`toolchain/host-shims/`) and bjorn3's `get_linker` PATH fix (applied by the user).
 - **Done when:** under wasmtime, `rustc.wasm hello.rs --target wasm32-wasip1 -o hello.wasm` builds a binary, and `wasmtime hello.wasm` prints `Hello`.
 
 #### WP-07 Unwinding build and error recovery

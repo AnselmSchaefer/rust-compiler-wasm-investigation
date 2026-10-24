@@ -51,10 +51,11 @@ const mounts = ['--dir', '.::/', '--dir', `${scratch}::/tmp`, '--dir', `${scratc
 const wasmtime = (argv0: string, module: string, argv: string[], stderr: 'pipe' | 'inherit') =>
   spawnSync(WASMTIME, ['run', '-W', 'threads=y,shared-memory=y', '-S', 'threads=y', '--env', 'TMPDIR=/tmp',
     ...mounts, '--argv0', argv0, module, ...argv], { stdio: ['inherit', 'inherit', stderr], encoding: 'utf8' });
-// wasmtime 46 warns about -Sthreads on every run. rustc.wasm is built with panic=abort, so every
+// wasmtime 46 warns about -Sthreads on every run, and blanks a line of its own. rustc.wasm is built with panic=abort, so every
 // fatal error ends in abort() and a wasm trap; its backtrace says nothing to the user (WP-07).
-const quiet = (s: string) => s.split('\n').filter((l) => !l.startsWith('WARNING: the `-Sthreads`')).join('\n')
-  .replace(/^Error: failed to run main module[\s\S]*?error while executing at wasm backtrace:\n\s+0: [^\n]*!abort\n[\s\S]*?wasm trap: wasm `unreachable` instruction executed\n?/m, '');
+const quiet = (s: string) => s.split('\n').filter((l) => !l.startsWith('WARNING: the `-Sthreads`') && !/^ +$/.test(l)).join('\n')
+  .replace(/^Error: (?:failed to run main module|error while executing at wasm backtrace)[\s\S]*?wasm trap: wasm `unreachable` instruction executed\n?/m,
+    (t) => (/^\s+0: [^\n]*!abort$/m.test(t) ? '' : t));
 
 let status = 1;
 try {
