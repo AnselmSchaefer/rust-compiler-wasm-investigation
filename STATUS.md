@@ -4,12 +4,12 @@
 
 ## Current
 - **Active WP:** none. Next is **WP-06** (ready): linking for `wasm32-wasip1` output, done **outside** rustc (host runs `wasm-ld.wasm`), since in-process linking would be an AI-authored codegen change.
-- **Last session:** 2026-10-24 (session 6). WP-04 and WP-11 done. LLVM 23.1.1 + lld for a Wasm host is installed in `build/llvm-wasm-install` (rebuild: `toolchain/build-llvm.sh`, ~1.5 h of compute).
-- **Next step:** WP-05.
-  1. Bootstrap needs an `llvm-config` describing the *wasm* build, and the cross build doesn't produce one that runs natively. Write a small script `toolchain/llvm-config-wasm` that answers bootstrap's/rustc_llvm's queries (`--version`, `--libs`, `--system-libs`, `--libdir`, `--includedir`, `--cxxflags`, `--ldflags`, `--components`, `--link-static`, `--shared-mode`, `--host-target`) from `build/llvm-wasm-install`, using the native `build/llvm-native` build's answers as a template.
-  2. Clone rust 1.99.1 into `build/rust` and apply danlapid patches 0001, 0002, 0004 plus our WASI 0005 rewrite (see `docs/patches.md`).
-  3. Write `bootstrap.toml`: `local-rebuild`, stable 1.99.1 as stage0, host `wasm32-wasip1-threads`, `[target.wasm32-wasip1-threads] llvm-config`, `cc`/`cxx` = wasi-sdk clang with `-pthread`.
-  4. Run `x build --stage 1 compiler/rustc` under `systemd-inhibit`, in ≤ 2 h chunks.
+- **Last session:** 2026-10-24 (session 7). WP-05 done: rustc 1.99.1 runs as `build/rustc-wasm/build/wasm32-wasip1-threads/stage1/bin/rustc.wasm` (126.7 MiB). Rebuild: `toolchain/build-rustc.sh` with the user's changes from `toolchain/patches/rust/wasm-host.diff` applied *uncommitted* in `build/rust`.
+- **Rule for rustc source:** rust-lang's agent policy (`build/rust/AGENTS.md`) applies. Claude does not write or edit rustc source, and does not draft rust-lang issues, PRs or Zulip posts. The user writes those; Claude reviews, builds and explains. Everything outside `build/rust` is Claude's.
+- **Next step:** WP-06, linking outside rustc.
+  1. Get rustc.wasm to emit objects for hello world (`--emit=obj` or `-C save-temps`) and obtain the link line (`--print link-args`, or capture the failed linker spawn).
+  2. Run `build/llvm-wasm-install/bin/wasm-ld.wasm` under wasmtime-threads with that link line (crt1 from rustup's `wasm32-wasip1` self-contained dir, the user objects, the std rlibs).
+  3. Check `wasmtime hello.wasm` prints Hello, then put it into a script and `scripts/verify/wp-06.sh`.
 - **Running background jobs:** none
 
 ## Follow-ups (check these at the start of every session)
