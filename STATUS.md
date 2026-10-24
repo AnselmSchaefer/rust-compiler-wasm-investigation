@@ -3,14 +3,18 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** none. Next is **WP-04** (ready): build LLVM for a Wasm host. WP-11 is also ready.
+- **Active WP:** WP-04 (in-progress, LLVM build running) and **WP-11** in parallel (PLAN allows this while Phase B waits on builds).
+- **Current session (2026-10-24, session 6) goals:**
+  - Sparse-fetch rust-lang/llvm-project @ 1b9c0d5ff9 and rebase the YoWASP WASI patch onto it (`toolchain/patches/llvm/0001`).
+  - Write `toolchain/build-llvm.sh` (resumable: native tblgen, then a wasm32-wasip1-threads cross build with lld).
+  - Run the build in the background (≤ 2 h chunks), smoke-test llc.wasm and wasm-ld.wasm, record sizes, write `scripts/verify/wp-04.sh`.
 - **Last session:** 2026-10-24 (session 5). WP-03 done: `docs/patches.md` (21 concerns, planned series), base tag **1.99.1** recorded in `docs/decisions.md`.
 - **Scope (user, 2026-10-24):** only Chromium-based browsers must work. Firefox is best-effort, Safari is out of scope.
 - **Next step:** WP-04.
   1. Sparse-fetch rust-lang/llvm-project @ `1b9c0d5ff9` (`llvm lld cmake third-party`) into `build/llvm-project`.
   2. Rebase YoWASP `97196c8eeb` (fetched by `scripts/fetch-patch-sources.sh`) onto it and save it as `toolchain/patches/llvm/0001-*.patch`.
   3. Write a resumable `toolchain/build-llvm.sh`: native tblgen, then a wasm32-wasip1-threads build with wasi-sdk-34, YoWASP flags, lld, ninja, sccache, `-j10`, `LLVM_PARALLEL_LINK_JOBS=1`. Run it in the background (≤ 2 h chunks) with logs in `build-logs/wp-04/`.
-- **Running background jobs:** none
+- **Running background jobs:** LLVM wasm build (`ninja -C build/llvm-wasm -k 0`), log `build-logs/wp-04/build-2.log`. Resume with `toolchain/build-llvm.sh build install`.
 
 ## Human actions needed
 - [x] Plan confirmed; commits at end of each session approved (2026-10-23).
@@ -25,14 +29,14 @@
 | 01 | Reproduce existing baseline | done | 1 | `scripts/verify/wp-01.sh` passes. Notes in `docs/baseline-notes.md` |
 | 02 | Benchmark harness | done | 1 | `scripts/verify/wp-02.sh` passes. Numbers in `bench/baseline.md` |
 | 03 | Patch inventory and base version | done | 1 | `scripts/verify/wp-03.sh` passes. Base 1.99.1; series in `docs/patches.md` |
-| 04 | Build LLVM for a Wasm host | ready | 0 | |
+| 04 | Build LLVM for a Wasm host | in-progress | 1 | |
 | 05 | rustc for a Wasm host: front end | blocked | 0 | |
 | 06 | In-process linking | blocked | 0 | |
 | 07 | Unwinding build and error recovery | blocked | 0 | |
 | 08 | Sysroots and lazy metadata | blocked | 0 | |
 | 09 | Compile-server mode | blocked | 0 | |
 | 10 | Toolchain release packaging | blocked | 0 | |
-| 11 | Virtual filesystem | ready | 0 | |
+| 11 | Virtual filesystem | in-progress | 1 | |
 | 12 | Orchestrator and worker pool | blocked | 0 | |
 | 13 | Run sandbox | blocked | 0 | |
 | 14 | Minimal UI (M1a) | blocked | 0 | |

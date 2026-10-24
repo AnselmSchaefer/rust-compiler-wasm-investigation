@@ -1,0 +1,11 @@
+[package]
+name = "vfs"
+version = "0.1.0"
+edition = "2024"
+description = "In-memory filesystem shared by all workers through one shared WebAssembly memory (WP-11)."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+dlmalloc = { version = "0.2", default-features = false }
