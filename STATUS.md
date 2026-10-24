@@ -3,18 +3,16 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** WP-02 (in-progress).
-- **Current session (2026-10-24, session 4) goals:**
-  - Turn the baseline page into a harness API with phases: load, module compile, rustc runs, and running the output.
-  - Write `bench/programs/` (hello plus a ~500-line std-only program).
-  - Write `bench/run.ts` (`pnpm bench`): Chromium is required, Firefox optional. Add wasmtime and native rustc 1.83 reference numbers. Results go to `bench/results/<date>-<commit>.json`.
-  - Write `bench/compare.ts`, `bench/baseline.md` and `scripts/verify/wp-02.sh`.
-- **Scope change (user, 2026-10-24):** only Chromium-based browsers must work. Firefox is best-effort.
+- **Active WP:** none. Next is **WP-03** (ready): patch inventory and base rustc version. WP-11 is also ready.
+- **Last session:** 2026-10-24 (session 4). WP-02 done: `pnpm bench` plus baseline numbers in `bench/baseline.md`.
+- **Scope change (user, 2026-10-24):** only Chromium-based browsers must work. Firefox is best-effort, Safari is out of scope (PLAN §1, CLAUDE.md).
+- **Next step:** WP-03. Catalogue the patches from bjorn3's `compile_rustc_for_wasm*` branch, oligamiq/rust (the fork behind rust_wasm), and danlapid/rust-playground `toolchain/rustc-patches` into `docs/patches.md`. Choose the base rustc tag (latest stable, 1.99.x) and record it in `docs/decisions.md`. Include the WP-01/02 findings as requirements: exnref EH, temp dir/TMPDIR, cleanup, no linker-line on stdout, errors exit instead of trapping.
 - **Running background jobs:** none
 
 ## Human actions needed
 - [x] Plan confirmed; commits at end of each session approved (2026-10-23).
 - [x] WP-00: cmake and ninja installed by the user.
+- [ ] Optional [H]: approve reporting the `path_rename` no-op bug upstream to bjorn3/browser_wasi_shim (threads). The fix is in `patches/`.
 
 ## Work packages
 
@@ -22,7 +20,7 @@
 |---|---|---|---|---|
 | 00 | Repository bootstrap and tooling | done | 1 | `scripts/verify/wp-00.sh` passes. wasi-threads needs wasmtime v46 (`wasmtime-threads`) |
 | 01 | Reproduce existing baseline | done | 1 | `scripts/verify/wp-01.sh` passes. Notes in `docs/baseline-notes.md` |
-| 02 | Benchmark harness | in-progress | 1 | |
+| 02 | Benchmark harness | done | 1 | `scripts/verify/wp-02.sh` passes. Numbers in `bench/baseline.md` |
 | 03 | Patch inventory and base version | ready | 0 | |
 | 04 | Build LLVM for a Wasm host | blocked | 0 | |
 | 05 | rustc for a Wasm host: front end | blocked | 0 | |
@@ -57,9 +55,11 @@
 ## Measurements
 - 2026-10-23 engine probe: Chromium and Firefox (Playwright 1.64.1) both have COI, SAB, shared memory, exnref EH, JSPI, memory64, OPFS.
 - 2026-10-24 WP-01 baseline (oligamiq v3, rustc 1.83-dev, hello, wasm32-wasip1, debug). Native: 0.16 s. wasmtime-threads, warm: 0.85 s (19 s on the first run because of Cranelift). Chromium: rustc 1.25–1.47 s, module compile 0.2 s, end-to-end 1.7 s. Firefox: rustc 0.59–0.78 s, module compile 0.65–0.8 s, end-to-end 1.9 s. Unwind build works in both browsers but not in wasmtime 46.
+- 2026-10-24 WP-02 baseline (`bench/results/2026-10-24-c029d0d.json`). Chromium 156 medians: check-hello 447 ms (12.1× native), build-hello 1010 ms (6.4×), check-medium 732 ms (5.1×), build-medium 1935 ms (5.9×), build-medium-O 4038 ms (4.8×). First compile after load up to 2× slower. Load: 41.9 MB brotli, 1.15 s on localhost, 3.4 s download at 100 Mbit. Wasm memory 108–360 MiB per step; browser RSS 0.85–2.0 GiB.
 - Smoke: hello world runs on wasip1, wasip2, wasip3 (wasmtime 50) and wasip1-threads with a real thread (wasmtime 46.0.3).
 
 ## Session log
+- 2026-10-24 (session 4): WP-02. Turned the baseline page into a harness API. Added `bench/run.ts`/`compare.ts`/`measure.py`, a 563-line benchmark program, native rustc 1.83.0, and browser RSS sampling. Fixed the shim `path_rename` bug (pnpm patch). Scope is now Chromium only.
 - 2026-10-24 (session 3): WP-01. Fetch script, threaded browser harness using browser_wasi_shim-threads, `baseline.spec.ts`, and verify script. Found 11 issues (see `docs/baseline-notes.md`), the main ones being: errors trap the abort build, the unwind build uses legacy EH, and the temp dir is hard-wired to `/`.
 - 2026-10-23 (session 2): WP-00. Installed nightly + Wasm targets, pnpm, jco, wasmtime 50 + 46, wasm-tools, sccache, wasi-sdk-34, Playwright. Found wasi-threads removed in wasmtime 47. WebKit can't run on Arch, so it's opt-in.
 - 2026-10-23 (session 1): planning only, no code yet.

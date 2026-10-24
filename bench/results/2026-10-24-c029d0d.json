@@ -1,0 +1,525 @@
+{
+  "date": "2026-10-24T08:26:55.655Z",
+  "commit": "c029d0d",
+  "toolchain": "oligamiq rust_wasm v3.0.0 rustc_opt.wasm",
+  "iters": 5,
+  "machine": {
+    "cpu": "11th Gen Intel(R) Core(TM) i5-11400H @ 2.70GHz",
+    "cores": 12,
+    "memBytes": 16370327552,
+    "kernel": "7.2.8-9-omarchy",
+    "node": "v26.8.1"
+  },
+  "browsers": {
+    "chromium": {
+      "version": "156.0.8078.4",
+      "load": {
+        "totalMs": {
+          "runs": [
+            1146,
+            1153,
+            1150
+          ],
+          "first": 1146,
+          "median": 1150,
+          "min": 1146
+        },
+        "fetchMs": {
+          "runs": [
+            1019,
+            1023,
+            1016
+          ],
+          "first": 1019,
+          "median": 1019,
+          "min": 1016
+        },
+        "compileRustcMs": {
+          "runs": [
+            113,
+            114,
+            121
+          ],
+          "first": 113,
+          "median": 114,
+          "min": 113
+        },
+        "transferBytes": 41922543,
+        "rustcBytes": 95427808,
+        "est100MbitDownloadMs": 3354
+      },
+      "steps": {
+        "version": {
+          "runs": [
+            98,
+            93,
+            92,
+            91,
+            96
+          ],
+          "first": 98,
+          "median": 93,
+          "min": 91,
+          "wasmMemoryBytes": 26345472,
+          "browserPeakRssBytes": 888500224
+        },
+        "check-hello": {
+          "runs": [
+            910,
+            484,
+            300,
+            333,
+            447
+          ],
+          "first": 910,
+          "median": 447,
+          "min": 300,
+          "wasmMemoryBytes": 113704960,
+          "browserPeakRssBytes": 1397739520
+        },
+        "build-hello": {
+          "runs": [
+            1196,
+            953,
+            1010,
+            1006,
+            1029
+          ],
+          "first": 1196,
+          "median": 1010,
+          "min": 953,
+          "wasmMemoryBytes": 134479872,
+          "browserPeakRssBytes": 1606258688
+        },
+        "check-medium": {
+          "runs": [
+            1017,
+            784,
+            719,
+            708,
+            732
+          ],
+          "first": 1017,
+          "median": 732,
+          "min": 708,
+          "wasmMemoryBytes": 122159104,
+          "browserPeakRssBytes": 1672019968
+        },
+        "build-medium": {
+          "runs": [
+            1910,
+            2030,
+            1954,
+            1901,
+            1935
+          ],
+          "first": 1910,
+          "median": 1935,
+          "min": 1901,
+          "wasmMemoryBytes": 211877888,
+          "browserPeakRssBytes": 1848659968
+        },
+        "build-medium-O": {
+          "runs": [
+            4246,
+            4113,
+            3921,
+            3962,
+            4038
+          ],
+          "first": 4246,
+          "median": 4038,
+          "min": 3921,
+          "wasmMemoryBytes": 377028608,
+          "browserPeakRssBytes": 2126913536
+        },
+        "run-hello": {
+          "runs": [
+            5,
+            1,
+            1,
+            1,
+            1
+          ],
+          "first": 5,
+          "median": 1,
+          "min": 1
+        },
+        "run-medium": {
+          "runs": [
+            27,
+            6,
+            5,
+            5,
+            22
+          ],
+          "first": 27,
+          "median": 6,
+          "min": 5
+        }
+      }
+    },
+    "firefox": {
+      "version": "157.0",
+      "load": {
+        "totalMs": {
+          "runs": [
+            1322,
+            1142,
+            1150
+          ],
+          "first": 1322,
+          "median": 1150,
+          "min": 1142
+        },
+        "fetchMs": {
+          "runs": [
+            587,
+            583,
+            568
+          ],
+          "first": 587,
+          "median": 583,
+          "min": 568
+        },
+        "compileRustcMs": {
+          "runs": [
+            709,
+            524,
+            553
+          ],
+          "first": 709,
+          "median": 553,
+          "min": 524
+        },
+        "transferBytes": 41922543,
+        "rustcBytes": 95427808,
+        "est100MbitDownloadMs": 3354
+      },
+      "steps": {
+        "version": {
+          "runs": [
+            108,
+            97,
+            95,
+            101,
+            101
+          ],
+          "first": 108,
+          "median": 101,
+          "min": 95,
+          "wasmMemoryBytes": 26345472,
+          "browserPeakRssBytes": 1870995456
+        },
+        "check-hello": {
+          "runs": [
+            473,
+            452,
+            494,
+            452,
+            444
+          ],
+          "first": 473,
+          "median": 452,
+          "min": 444,
+          "wasmMemoryBytes": 113704960,
+          "browserPeakRssBytes": 2395660288
+        },
+        "build-hello": {
+          "runs": [
+            982,
+            739,
+            938,
+            933,
+            972
+          ],
+          "first": 982,
+          "median": 938,
+          "min": 739,
+          "wasmMemoryBytes": 133300224,
+          "browserPeakRssBytes": 2476998656
+        },
+        "check-medium": {
+          "runs": [
+            783,
+            776,
+            766,
+            759,
+            768
+          ],
+          "first": 783,
+          "median": 768,
+          "min": 759,
+          "wasmMemoryBytes": 122159104,
+          "browserPeakRssBytes": 2379001856
+        },
+        "build-medium": {
+          "runs": [
+            2240,
+            2139,
+            2206,
+            2275,
+            2141
+          ],
+          "first": 2240,
+          "median": 2206,
+          "min": 2139,
+          "wasmMemoryBytes": 213123072,
+          "browserPeakRssBytes": 2370002944
+        },
+        "build-medium-O": {
+          "runs": [
+            4292,
+            4296,
+            4264,
+            4281,
+            4261
+          ],
+          "first": 4292,
+          "median": 4281,
+          "min": 4261,
+          "wasmMemoryBytes": 392691712,
+          "browserPeakRssBytes": 2328723456
+        },
+        "run-hello": {
+          "runs": [
+            6,
+            5,
+            5,
+            5,
+            5
+          ],
+          "first": 6,
+          "median": 5,
+          "min": 5
+        },
+        "run-medium": {
+          "runs": [
+            14,
+            13,
+            13,
+            13,
+            14
+          ],
+          "first": 14,
+          "median": 13,
+          "min": 13
+        }
+      }
+    }
+  },
+  "wasmtime": {
+    "version": "wasmtime 46.0.3 (c5569e6aa 2026-08-20)",
+    "steps": {
+      "version": {
+        "runs": [
+          673,
+          664,
+          664,
+          664,
+          656
+        ],
+        "first": 673,
+        "median": 664,
+        "min": 656,
+        "maxRssBytes": 763490304
+      },
+      "check-hello": {
+        "runs": [
+          688,
+          714,
+          733,
+          754,
+          751
+        ],
+        "first": 688,
+        "median": 733,
+        "min": 688,
+        "maxRssBytes": 763449344
+      },
+      "build-hello": {
+        "runs": [
+          857,
+          866,
+          861,
+          853,
+          850
+        ],
+        "first": 857,
+        "median": 857,
+        "min": 850,
+        "maxRssBytes": 763375616
+      },
+      "check-medium": {
+        "runs": [
+          962,
+          945,
+          938,
+          935,
+          933
+        ],
+        "first": 962,
+        "median": 938,
+        "min": 933,
+        "maxRssBytes": 763502592
+      },
+      "build-medium": {
+        "runs": [
+          1485,
+          1537,
+          1529,
+          1533,
+          1526
+        ],
+        "first": 1485,
+        "median": 1529,
+        "min": 1485,
+        "maxRssBytes": 763457536
+      },
+      "build-medium-O": {
+        "runs": [
+          3960,
+          3715,
+          3668,
+          3704,
+          3668
+        ],
+        "first": 3960,
+        "median": 3704,
+        "min": 3668,
+        "maxRssBytes": 763338752
+      },
+      "run-hello": {
+        "runs": [
+          11,
+          6,
+          7,
+          11,
+          11
+        ],
+        "first": 11,
+        "median": 11,
+        "min": 6
+      },
+      "run-medium": {
+        "runs": [
+          17,
+          17,
+          18,
+          17,
+          15
+        ],
+        "first": 17,
+        "median": 17,
+        "min": 15
+      }
+    }
+  },
+  "native": {
+    "version": "rustc 1.83.0 (90b35a623 2024-11-26)",
+    "steps": {
+      "version": {
+        "runs": [
+          22,
+          18,
+          23,
+          22,
+          18
+        ],
+        "first": 22,
+        "median": 22,
+        "min": 18,
+        "maxRssBytes": 57188352
+      },
+      "check-hello": {
+        "runs": [
+          33,
+          37,
+          35,
+          40,
+          40
+        ],
+        "first": 33,
+        "median": 37,
+        "min": 33,
+        "maxRssBytes": 144781312
+      },
+      "build-hello": {
+        "runs": [
+          133,
+          159,
+          160,
+          157,
+          157
+        ],
+        "first": 133,
+        "median": 157,
+        "min": 133,
+        "maxRssBytes": 186941440
+      },
+      "check-medium": {
+        "runs": [
+          142,
+          144,
+          146,
+          143,
+          148
+        ],
+        "first": 142,
+        "median": 144,
+        "min": 142,
+        "maxRssBytes": 173793280
+      },
+      "build-medium": {
+        "runs": [
+          323,
+          329,
+          342,
+          340,
+          318
+        ],
+        "first": 323,
+        "median": 329,
+        "min": 318,
+        "maxRssBytes": 282853376
+      },
+      "build-medium-O": {
+        "runs": [
+          823,
+          845,
+          843,
+          874,
+          819
+        ],
+        "first": 823,
+        "median": 843,
+        "min": 819,
+        "maxRssBytes": 281137152
+      },
+      "run-hello": {
+        "runs": [
+          14,
+          9,
+          8,
+          8,
+          8
+        ],
+        "first": 14,
+        "median": 8,
+        "min": 8
+      },
+      "run-medium": {
+        "runs": [
+          19,
+          16,
+          19,
+          15,
+          18
+        ],
+        "first": 19,
+        "median": 18,
+        "min": 15
+      }
+    }
+  }
+}

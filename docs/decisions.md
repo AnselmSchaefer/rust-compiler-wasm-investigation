@@ -2,6 +2,14 @@
 
 Fixed defaults (PLAN.md §1), plus decisions and findings recorded during work packages, newest first.
 
+## 2026-10-24 · WP-02 findings (details: bench/baseline.md)
+- Baseline in Chromium: check-hello 447 ms (12× native), build-medium 1.9 s (5.9×), build-medium-O 4.0 s (4.8×). Load is 41.9 MB brotli (3.4 s at 100 Mbit).
+- **Most of the cost for small crates is per-invocation sysroot metadata loading** (~350 ms). This confirms the priority of WP-08 (lazy metadata) and WP-09 (compile server).
+- **Chromium's first compile after load is up to 2× slower** (tier-up). This goes to WP-28.
+- **Browser RSS rises across fresh-instance runs** (0.85 → 2 GiB). WP-12 needs a memory soak test.
+- Patched `@oligami/browser_wasi_shim-threads` (`path_rename` no-op bug) with `pnpm patch`. It's a candidate for an upstream report ([H]).
+- Benchmarks use native rustc 1.83.0 (installed via rustup) as the same-version reference.
+
 ## 2026-10-24 · Scope: Chromium only (user decision)
 - Only Chromium-based browsers have to work. Firefox is best-effort: we keep it in tests while it passes for free, but it never blocks a WP. Safari/WebKit are out of scope.
 - This lets us depend on Chromium-only or Chromium-first features where they help, e.g. JSPI, memory64, `measureUserAgentSpecificMemory`, and Liftoff/TurboFan tiering controls.

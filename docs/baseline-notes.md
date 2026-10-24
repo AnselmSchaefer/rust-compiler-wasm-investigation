@@ -1,7 +1,7 @@
 # Baseline notes (WP-01)
 
 Reproduction of the existing prebuilt toolchain **oligamiq/rust_wasm v3.0.0-release** (rustc 1.83.0-dev, LLVM + lld linked in).
-Measured 2026-10-24 on the dev machine (15 GB RAM, Linux). Reproduce with `scripts/verify/wp-01.sh`.
+Measured 2026-10-24 on the dev machine (15 GB RAM, Linux). Reproduce with `scripts/verify/wp-01.sh`. Full benchmark numbers are in `bench/baseline.md`.
 
 ## What was used
 | Item | Source | Size (raw / brotli) |
@@ -38,7 +38,8 @@ Firefox runs rustc itself faster but compiles the module more slowly; Chromium p
 8. **Shim: stdin must be provided** to `WASIFarm`, or the animal throws "stdin is not found".
 9. **Firefox works** with the threads shim (the shim README says the demo failed on Firefox; that's out of date as of Firefox in Playwright 1.64.1). Warnings `notify number is 0. ref is late?` / `invoke_func_loop is late` appear but are harmless.
 10. **Memory cap 1 GiB.** The module declares max 16384 pages. Larger crates may hit this (PLAN §7 risk trigger at 4 GB applies to our own build).
-11. **Old compiler.** 1.83.0-dev (2024). Fine as a baseline only. Edition 2024 and newer std APIs are unavailable.
+11. **Shim: `path_rename` within one directory fd is a no-op** (found in WP-02). This broke `--emit=metadata` and every library build ("failed to create encoded metadata from file"). Patched via `pnpm patch` (`patches/`).
+12. **Old compiler.** 1.83.0-dev (2024). Fine as a baseline only. Edition 2024 and newer std APIs are unavailable.
 
 ## Harness layout
 - `scripts/fetch-baseline.sh`: downloads and unpacks into `build/vendor/rust_wasm-v3/`, re-roots the flat sysroot tarball to `sysroot/lib/rustlib/wasm32-wasip1/lib/`, and writes `sysroot.json` (file list for the browser).
