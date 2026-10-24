@@ -23,7 +23,7 @@
 - [ ] **Possible upstream rustc bug** (user to report, if wanted): `filesearch.rs` `from_env_args_next` checks `lib/rustlib` relative to the *working directory*, not next to argv[0] (see `~/Projects/rustc-wasm-host-source-changes.md` §6).
 
 ## Human actions needed
-- [ ] **WP-06 decision:** option A (the user writes a std or `get_linker` change) or option B (Claude rebuilds the link line outside rustc). See "Blocker" above.
+- [ ] **WP-06 (decided 2026-10-24: option A, std):** the user writes a WASI `join_paths` in std (uncommitted in `build/rust`, then add it to `toolchain/patches/rust/wasm-host.diff`). Claude then rebuilds and verifies.
 - [x] **WP-05 decision (2026-10-24):** resolved: the user wrote A1/A2. the rust checkout's AGENTS.md forbids AI-authored rustc changes without a named reviewer, and bans them in codegen/metadata. The minimum changes (A1 driver `lib`, A2 dlopen guards) need to be written by the user or reviewed. B1/B2 can avoid rustc changes (VFS symlink, external wasm-ld). Details: `~/Projects/rustc-wasm-host-source-changes.md`.
 - [x] Plan confirmed; commits at end of each session approved (2026-10-23).
 - [x] WP-00: cmake and ninja installed by the user.
