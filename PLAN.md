@@ -201,6 +201,7 @@ These are taken as defaults so work can start. Changing one later only affects t
   - Message protocol: JSON in/out over a WASI fd, or a host import. Later it gets the WIT facade.
   - Measure cold vs warm.
 - **Done when:** 10 sequential compiles in one instance work, and the warm `check` of hello is at least 3× faster than cold. The numbers are recorded.
+  - *Done 2026-10-24, re-scoped by the user to ≥ 2.5×:* measured 3.0× (cold 67 ms, warm 22 ms). The rest is rustc reloading std metadata per session, which only a rustc change could cache (`bench/compile-server.md`). Server: `rustc-multi --server` (JSON on stdin/stdout); `web/wasi` reuses thread workers and notifies on stdout writes.
 
 #### WP-10 Toolchain release packaging and rebase procedure
 - **Depends:** WP-09 · **Est.:** 1–2 sessions

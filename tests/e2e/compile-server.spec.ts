@@ -3,9 +3,11 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 // WP-09: rustc-multi --server in Chromium. 10 sequential requests (checks, an error, codegen) in one
-// instance, all with correct results; warm check-hello at least 3x faster than cold (a new instance
+// instance, all with correct results; warm check-hello at least 2.5x faster than cold (a new instance
 // per compile, as without the server; the module is already compiled and warmed up, so this is
-// instance start + rustc start-up, not JIT). Numbers: bench/results/<date>-<commit>-compile-server.json.
+// instance start + rustc start-up, not JIT). PLAN's 3x was re-scoped to 2.5x by the user (2026-10-24):
+// the rest is rustc reloading std's metadata per session, which needs a rustc change to cache.
+// Numbers: bench/results/<date>-<commit>-compile-server.json.
 // Assets: scripts/prep-rustc-host-page.sh, scripts/build-web-tests.mjs (scripts/verify/wp-09.sh).
 test('compile server: warm vs cold', async ({ page }, info) => {
   test.skip(info.project.name !== 'chromium', 'Chromium is the target (Firefox best-effort)');
@@ -66,5 +68,5 @@ test('compile server: warm vs cold', async ({ page }, info) => {
   expect(r.answers.find(a => a.name === 'bad')!.stderr).toContain('mismatched types');
   expect(r.quitCode).toBe(0);
   expect(r.work).toEqual(expect.arrayContaining(['h.rmeta', 'm.rmeta', 'h.o']));
-  expect(r.warmMedian * 3).toBeLessThanOrEqual(r.coldMedian);
+  expect(r.warmMedian * 2.5).toBeLessThanOrEqual(r.coldMedian);
 });
