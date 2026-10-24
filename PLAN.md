@@ -250,6 +250,7 @@ These are taken as defaults so work can start. Changing one later only affects t
   - the e2e test passes
   - editor is interactive in < 2 s on cold load (bench)
   - **[H]** the user tries the local demo and gives feedback
+  - *2026-10-24:* e2e test and bench done (`app/`, `tests/e2e/app.spec.ts`, `scripts/verify/wp-14.sh`): editor interactive at ~200 ms cold. Waiting on the **[H]** user trial (`pnpm demo`).
 
 ### Phase D: Dependencies
 

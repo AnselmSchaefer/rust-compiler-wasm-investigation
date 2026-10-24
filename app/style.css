@@ -1,0 +1,17 @@
+@import '@xterm/xterm/css/xterm.css';
+:root { color-scheme: dark; --bg: #1e1e1e; --panel: #252526; --fg: #d4d4d4; --muted: #8b8b8b; --accent: #d97757; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 14px system-ui, sans-serif; }
+body { display: flex; flex-direction: column; }
+header { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--panel); border-bottom: 1px solid #333; }
+.title { font-weight: 600; margin-right: 12px; }
+button { background: #3a3d41; color: var(--fg); border: 1px solid #4a4d51; border-radius: 4px; padding: 4px 14px; font: inherit; cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: .45; cursor: default; }
+#run:not(:disabled) { background: var(--accent); border-color: var(--accent); color: #fff; }
+#status { margin-left: auto; color: var(--muted); font-size: 13px; }
+main { flex: 1; display: grid; grid-template-rows: 3fr 2fr; min-height: 0; }
+#editor { min-height: 0; overflow: hidden; border-bottom: 1px solid #333; }
+#editor .cm-editor { height: 100%; }
+#terminal { min-height: 0; padding: 4px 0 0 8px; background: #1e1e1e; }
+@media (min-width: 1000px) { main { grid-template-rows: none; grid-template-columns: 3fr 2fr; } #editor { border-bottom: 0; border-right: 1px solid #333; } }

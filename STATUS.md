@@ -3,11 +3,17 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** none. Next is **WP-14** (ready): minimal UI (M1a). It ends with an **[H]** checkpoint: the user tries the local demo.
-- **Last session:** 2026-10-24 (session 14). WP-13 done: the run sandbox (`web/sandbox`) runs compiled programs in a worker of their own, with stdin (also interactive), args, env, files, streamed output, exit codes, panics as exit 134, and kill/timeout.
+- **Active WP:** **WP-14** (in-progress, 1 session used): everything automated is done; **waiting on the [H] user trial** of the local demo.
+- **Last session:** 2026-10-24 (session 15). The IDE (`app/`) works: CodeMirror 6 editor, xterm.js terminal, Check with inline diagnostics, Run with the terminal as stdin/stdout, Stop. Cold load: editor interactive at ~200 ms, toolchain ready at ~2.8 s (localhost).
 - **Rule for rustc source:** rust-lang's agent policy (`build/rust/AGENTS.md`) applies. Claude does not write or edit rustc source, and does not draft rust-lang issues, PRs or Zulip posts. The user writes those, or applies existing **human-written** patches (bjorn3/oligamiq), which the user prefers whenever one exists. **danlapid 0005–0007 are LLM-generated** (Claude co-author trailers), so they don't qualify even if the user applies them; design reference only (`docs/patches.md`). Claude reviews, builds and explains. Everything outside `build/rust` is Claude's, including out-of-tree drivers using `rustc_driver` (`toolchain/rustc-multi`).
-- **Next step:** WP-14, minimal UI. CodeMirror 6 editor, xterm.js terminal (sandbox stdin/stdout via `runSandboxed` with `interactive: true`), Run/Check buttons through the orchestrator client, inline diagnostics from rustc's JSON output (`--error-format=json`). The editor loads first and the toolchain streams in after. Bench: editor interactive < 2 s on cold load. Needs npm deps (codemirror, @xterm/xterm), added with pnpm (no sudo). Ends at **[H]**: the user tries the local demo (`node scripts/serve.mjs …`) and gives feedback.
+- **Next step:** the user runs `pnpm demo` and opens http://localhost:8787/ in Chrome/Chromium, tries Check/Run/typing into the terminal/Stop, and gives feedback. Then: address the feedback, mark WP-14 done (M1a), and go on to WP-15 (Cargo resolver).
 - **Running background jobs:** none
+
+## Current session (2026-10-24, session 15)
+- `app/`: `main.ts` (editor first, toolchain loads after it; Check = `--emit=metadata`, Run = build + link + sandbox; Ctrl+S / Ctrl+Enter; source kept in localStorage), `diagnostics.ts` (rustc JSON → CodeMirror lint markers, UTF-8 → UTF-16 offsets; summary lines not counted), `terminal.ts` (xterm.js with a line discipline: echo, Backspace, Enter sends the line, Ctrl-D EOF, Ctrl-C stop), `index.html`, `style.css`. `scripts/build-app.mjs` → `build/www/app/` (embeds the newest RUSTC_ID). `pnpm demo` serves it with `/release`.
+- Deps (pnpm): codemirror 6.0.2, @codemirror/{lang-rust,lint,state,view,theme-one-dark}, @xterm/xterm 6.0.0, @xterm/addon-fit 0.11.0.
+- Found: rustc rejects `--color` together with `--json`; with `--error-format=json`, the "could not exec the linker" error is a JSON line, so `linkerSpawnError` now recognizes both forms.
+- `tests/e2e/app.spec.ts` + `scripts/verify/wp-14.sh` pass; the full Chromium suite (11 specs) and WP-06 pass.
 
 ## Current session (2026-10-24, session 14): done
 - `web/sandbox/`: `pipe.ts` (SharedArrayBuffer stdin ring; the reader blocks with Atomics.wait), `sandbox-worker.ts` (a worker and its own VFS per run, only the given files, streamed stdout/stderr, exit/trap), `sandbox.ts` (`runSandboxed`: stdin up front and/or interactive, files in/out, timeout, kill). `WasiProcess` takes a `readStdin` hook.
@@ -59,6 +65,7 @@
 - [ ] **Possible upstream rustc bug** (user to report, if wanted): `filesearch.rs` `from_env_args_next` checks `lib/rustlib` relative to the *working directory*, not next to argv[0] (see `~/Projects/rustc-wasm-host-source-changes.md` §6).
 
 ## Human actions needed
+- [ ] **[H] WP-14 user trial:** run `pnpm demo`, open http://localhost:8787/ in Chrome/Chromium, try Check, Run, typing into the terminal and Stop, and give feedback.
 - [x] **WP-09 decision (2026-10-24):** re-scope the target to 2.5× (option B). A cross-session metadata cache stays a possible human-written rustc change for later (WP-22).
 - [x] **WP-06:** resolved 2026-10-24: the user applied bjorn3's existing `get_linker` fix instead of writing a std change. A proper std `join_paths`/`split_paths` for WASI is still an optional upstream fix the user could write.
 - [x] **WP-05 decision (2026-10-24):** resolved: the user wrote A1/A2. the rust checkout's AGENTS.md forbids AI-authored rustc changes without a named reviewer, and bans them in codegen/metadata. The minimum changes (A1 driver `lib`, A2 dlopen guards) need to be written by the user or reviewed. B1/B2 can avoid rustc changes (VFS symlink, external wasm-ld). Details: `~/Projects/rustc-wasm-host-source-changes.md`.
@@ -84,7 +91,7 @@
 | 11 | Virtual filesystem | done | 2 | `scripts/verify/wp-11.sh` passes. Shared-memory VFS + OPFS + WASI p1 adapter; design in `docs/vfs.md` |
 | 12 | Orchestrator and worker pool | done | 1 | `scripts/verify/wp-12.sh` passes. Orchestrator worker compiles + links + runs hello/medium from the release; Cache Storage on reload |
 | 13 | Run sandbox | done | 1 | `scripts/verify/wp-13.sh` passes. Worker + own VFS per run, interactive stdin, streamed output, panic → 134, kill/timeout |
-| 14 | Minimal UI (M1a) | ready | 0 | |
+| 14 | Minimal UI (M1a) | in-progress | 1 | automated part done (`scripts/verify/wp-14.sh`); waiting on the [H] user trial (`pnpm demo`) |
 | 15 | Cargo resolver | blocked | 0 | |
 | 16 | Index and crate download | blocked | 0 | |
 | 17 | Build planner | blocked | 0 | |
@@ -105,6 +112,7 @@
 | 37 | Release-train rebase | blocked | 0 | recurring |
 
 ## Measurements
+- 2026-10-24 WP-14 (Chromium, cold context, localhost): editor interactive 187–200 ms (budget 2 s); toolchain ready 2.8 s; first Check 836–849 ms; first Run to the program's prompt 2.9 s (incl. lld + link group). main.js 857 KB minified.
 - 2026-10-24 WP-13 (Chromium): a sandboxed run of a small program (new worker + VFS + instantiate) 22–42 ms; kill while waiting for input 202 ms (200 ms delay + teardown); timeout precision ±4 ms.
 - 2026-10-24 WP-12 (Chromium, localhost, orchestrator + release 1.99.1-f501aa64fd28): init (fetch + brotli + sha256 + compile rustc, meta sysroot) 2.6 s first visit, 0.84 s from Cache Storage. Build hello (compile + link) first 2.3 s (incl. lld + link group), warm 318 ms (rustc 228 ms, wasm-ld 89 ms); check hello 50 ms; build medium 1.64 s.
 - 2026-10-24 WP-10 release `1.99.1-f501aa64fd28` (brotli 11): rustc.wasm.br 19.0 MiB (raw 136.1), lld.wasm.br 10.1 MiB (63.3), sysroot meta tar 18.8 MiB (80.5), link tar 5.6 MiB (23.6); total download 53.5 MiB (the WP-02 baseline was 41.9 MiB for rustc + sysroot without a linker). release.sh takes ~9 min.
@@ -121,6 +129,7 @@
 - Smoke: hello world runs on wasip1, wasip2, wasip3 (wasmtime 50) and wasip1-threads with a real thread (wasmtime 46.0.3).
 
 ## Session log
+- 2026-10-24 (session 15): WP-14 automated part done: the IDE with editor, terminal, Check/Run/Stop and inline diagnostics; editor interactive at ~200 ms cold. Waiting on the [H] user trial.
 - 2026-10-24 (session 14): **WP-13 done.** Run sandbox with interactive stdin pipe, streamed output, panics, kill/timeout; fixed an onWrite-inside-lock deadlock in WasiProcess.
 - 2026-10-24 (session 13): **WP-12 done.** Orchestrator worker with the release loader, compile server and wasm-ld linker; hello and medium compile, link and run in Chromium with our toolchain only. Linking builds need the rlibs at rustc time.
 - 2026-10-24 (session 12): **WP-10 done.** release.sh + manifest with RUSTC_ID, deterministic sysroot tars, versions.env, docs/rebase.md; an independent second build is bit-identical.

@@ -125,10 +125,25 @@ export function outputDestination(plan: OutputPlan, name: string): string | null
   return `${dir}/${name}`;
 }
 
+const SPAWN_FAILED = /^(linker `[^`]*` not found|could not exec the linker)/;
+
 /**
  * rustc reached the link step and failed to start the linker (WASI has no processes): the index
  * in `stderr` where that error starts, or -1. Everything before it are the real diagnostics.
+ * Handles both human-readable output and --error-format=json (one diagnostic per line).
  */
 export function linkerSpawnError(stderr: string): number {
-  return stderr.search(/^error: (linker `[^`]*` not found|could not exec the linker)/m);
+  const text = stderr.search(/^error: (linker `[^`]*` not found|could not exec the linker)/m);
+  if (text >= 0) return text;
+  let at = 0;
+  for (const line of stderr.split('\n')) {
+    if (line.startsWith('{')) {
+      try {
+        const d = JSON.parse(line);
+        if (d.$message_type === 'diagnostic' && d.level === 'error' && SPAWN_FAILED.test(d.message)) return at;
+      } catch { /* not JSON */ }
+    }
+    at += line.length + 1;
+  }
+  return -1;
 }

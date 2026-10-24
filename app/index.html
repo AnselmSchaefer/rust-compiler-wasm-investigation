@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rust in the browser</title>
+<link rel="stylesheet" href="main.css">
+<body>
+  <header>
+    <span class="title">Rust in the browser</span>
+    <button id="check" disabled title="Type-check (Ctrl+S)">Check</button>
+    <button id="run" disabled title="Build and run (Ctrl+Enter)">Run</button>
+    <button id="stop" disabled title="Stop the program (Ctrl+C in the terminal)">Stop</button>
+    <span id="status">Loading the editor…</span>
+  </header>
+  <main>
+    <section id="editor"></section>
+    <section id="terminal"></section>
+  </main>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

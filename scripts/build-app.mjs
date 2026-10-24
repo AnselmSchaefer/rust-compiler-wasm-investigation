@@ -1,0 +1,27 @@
+// Bundle the IDE (app/, WP-14) into build/www/app/: the page, its three workers (orchestrator,
+// WASI process threads, run sandbox), CSS and vfs.wasm. The toolchain is the newest release in
+// build/release/ (toolchain/release.sh), served at /release/ (`pnpm demo`, or Playwright's server).
+import { build } from 'esbuild';
+import { copyFile, mkdir, readdir, stat } from 'node:fs/promises';
+
+const out = 'build/www/app';
+const releases = await readdir('build/release').catch(() => []);
+const dated = await Promise.all(releases.map(async r => [(await stat(`build/release/${r}`)).mtimeMs, r]));
+const release = dated.sort((a, b) => b[0] - a[0])[0]?.[1];
+if (!release) throw new Error('no release in build/release (run toolchain/release.sh)');
+
+await mkdir(out, { recursive: true });
+await build({
+  entryPoints: {
+    main: 'app/main.ts',
+    'orchestrator-worker': 'web/orchestrator/orchestrator-worker.ts',
+    'process-worker': 'web/wasi/process-worker.ts',
+    'sandbox-worker': 'web/sandbox/sandbox-worker.ts',
+  },
+  outdir: out, bundle: true, format: 'esm', target: 'es2024', minify: true, sourcemap: true, logLevel: 'warning',
+  define: { __RELEASE__: JSON.stringify(release) },
+});
+await build({ entryPoints: { main: 'app/style.css' }, outdir: out, bundle: true, minify: true, logLevel: 'warning' });
+await copyFile('app/index.html', `${out}/index.html`);
+await copyFile('build/www/vfs/vfs.wasm', `${out}/vfs.wasm`);
+console.log(`built ${out} (release ${release})`);
