@@ -3,11 +3,16 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** **WP-14** (in-progress, 1 session used): everything automated is done; **waiting on the [H] user trial** of the local demo.
+- **Active WP:** **WP-15** (in-progress, session 16), while **WP-14 waits on the [H] user trial** (everything automated is done).
 - **Last session:** 2026-10-24 (session 15). The IDE (`app/`) works: CodeMirror 6 editor, xterm.js terminal, Check with inline diagnostics, Run with the terminal as stdin/stdout, Stop. Cold load: editor interactive at ~200 ms, toolchain ready at ~2.8 s (localhost).
 - **Rule for rustc source:** rust-lang's agent policy (`build/rust/AGENTS.md`) applies. Claude does not write or edit rustc source, and does not draft rust-lang issues, PRs or Zulip posts. The user writes those, or applies existing **human-written** patches (bjorn3/oligamiq), which the user prefers whenever one exists. **danlapid 0005–0007 are LLM-generated** (Claude co-author trailers), so they don't qualify even if the user applies them; design reference only (`docs/patches.md`). Claude reviews, builds and explains. Everything outside `build/rust` is Claude's, including out-of-tree drivers using `rustc_driver` (`toolchain/rustc-multi`).
-- **Next step:** the user runs `pnpm demo` and opens http://localhost:8787/ in Chrome/Chromium, tries Check/Run/typing into the terminal/Stop, and gives feedback. Then: address the feedback, mark WP-14 done (M1a), and go on to WP-15 (Cargo resolver).
+- **Next step:** WP-15 implementation, following `docs/resolver.md` "Design". Start with `index.rs` + `lockfile.rs` (writer, byte-identical) and a golden harness (`crates/resolver/tests/golden.rs`, unpacking `tests/resolver/index-snapshot.tar.zst`). Then `resolve.rs` without features (small crates: smallvec, once_cell, sha2), then features/optional/weak deps, MSRV fallback, links, and the big ones. Cargo's code for reference: `build/wp-15/cargo-src/cargo-0.100.0/src/resolver/` (re-unpack from `~/.cargo/registry/cache/*/cargo-0.100.0.crate`).
 - **Running background jobs:** none
+
+## Current session (2026-10-24, session 16): done
+- **WP-15 spike: no.** The `cargo` crate needs curl, libgit2, libssh2 and gix even without default features; their C parts need sockets and OpenSSL, which WASI lacks. Removing them means patching cargo (a rust-lang project), which we don't do. So: our own `crates/resolver`. cargo-util-schemas 0.14.3, cargo-platform 0.3.3, semver and toml build for wasm32-wasip1 (checked under wasmtime).
+- Golden corpus: `tests/resolver/corpus.txt` (50 crates, 13–795 packages per lockfile), `index-proxy.mjs` (record/replay sparse index), `make-golden.mjs` → `tests/resolver/golden/*.lock` from native cargo 1.99.1. Replay offline reproduces all 50 byte for byte. The snapshot is committed as `tests/resolver/index-snapshot.tar.zst` (3.1 MB; 88 MB unpacked).
+- `docs/resolver.md`: spike result, golden method, the cargo behaviours to match (incl. the lockfile version rule from cargo's source: 25 v3 and 25 v4 lockfiles in the corpus), design.
 
 ## Current session (2026-10-24, session 15)
 - `app/`: `main.ts` (editor first, toolchain loads after it; Check = `--emit=metadata`, Run = build + link + sandbox; Ctrl+S / Ctrl+Enter; source kept in localStorage), `diagnostics.ts` (rustc JSON → CodeMirror lint markers, UTF-8 → UTF-16 offsets; summary lines not counted), `terminal.ts` (xterm.js with a line discipline: echo, Backspace, Enter sends the line, Ctrl-D EOF, Ctrl-C stop), `index.html`, `style.css`. `scripts/build-app.mjs` → `build/www/app/` (embeds the newest RUSTC_ID). `pnpm demo` serves it with `/release`.
@@ -92,7 +97,7 @@
 | 12 | Orchestrator and worker pool | done | 1 | `scripts/verify/wp-12.sh` passes. Orchestrator worker compiles + links + runs hello/medium from the release; Cache Storage on reload |
 | 13 | Run sandbox | done | 1 | `scripts/verify/wp-13.sh` passes. Worker + own VFS per run, interactive stdin, streamed output, panic → 134, kill/timeout |
 | 14 | Minimal UI (M1a) | in-progress | 1 | automated part done (`scripts/verify/wp-14.sh`); waiting on the [H] user trial (`pnpm demo`) |
-| 15 | Cargo resolver | blocked | 0 | |
+| 15 | Cargo resolver | in-progress | 1 | spike: the cargo crate can't build for WASI, so our own resolver; golden corpus of 50 recorded (`docs/resolver.md`) |
 | 16 | Index and crate download | blocked | 0 | |
 | 17 | Build planner | blocked | 0 | |
 | 18 | Content-addressed cache | blocked | 0 | |
@@ -129,6 +134,7 @@
 - Smoke: hello world runs on wasip1, wasip2, wasip3 (wasmtime 50) and wasip1-threads with a real thread (wasmtime 46.0.3).
 
 ## Session log
+- 2026-10-24 (session 16): WP-15 started. Spike: no (cargo needs curl/libgit2/ssh). Golden corpus of 50 lockfiles from native cargo against a pinned, committed index snapshot; replay is byte-identical. WP-14 still waits on the [H] user trial.
 - 2026-10-24 (session 15): WP-14 automated part done: the IDE with editor, terminal, Check/Run/Stop and inline diagnostics; editor interactive at ~200 ms cold. Waiting on the [H] user trial.
 - 2026-10-24 (session 14): **WP-13 done.** Run sandbox with interactive stdin pipe, streamed output, panics, kill/timeout; fixed an onWrite-inside-lock deadlock in WasiProcess.
 - 2026-10-24 (session 13): **WP-12 done.** Orchestrator worker with the release loader, compile server and wasm-ld linker; hello and medium compile, link and run in Chromium with our toolchain only. Linking builds need the rlibs at rustc time.
