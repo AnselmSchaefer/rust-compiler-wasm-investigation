@@ -53,7 +53,17 @@ type Exports = {
   vfs_set_persist(ino: number, persist: number): number;
   vfs_take_changes(out: number): number;
   vfs_inode_count(): number;
+  vfs_proc_new(): number;
+  vfs_proc_free(pid: number): void;
+  vfs_fd_open(pid: number, ino: number, append: number, preopen: number, preopenLen: number): number;
+  vfs_fd_get(pid: number, fd: number, out: number): number;
+  vfs_fd_set_pos(pid: number, fd: number, pos: bigint): number;
+  vfs_fd_close(pid: number, fd: number): number;
+  vfs_fd_renumber(pid: number, from: number, to: number): number;
 };
+
+/** `preopen` is only decoded when asked for (it is off the hot read/write path). */
+export type FdInfo = { ino: number; append: boolean; pos: number; isPreopen: boolean; preopen: string | null };
 
 const canBlock = typeof (globalThis as any).WorkerGlobalScope !== 'undefined';
 const now = () => BigInt(Date.now()) * 1_000_000n;
@@ -102,10 +112,11 @@ export class Vfs {
   }
 
   private putPath(path: string, at = 0): [number, number] {
-    const dst = this.u8.subarray(this.scratch + at, this.scratch + at + 30 * 1024);
-    const { read, written } = enc.encodeInto(path, dst);
-    if (read !== path.length) throw new VfsError(37, 'path', path.slice(0, 64));
-    return [this.scratch + at, written];
+    // encodeInto() rejects shared buffers in Chromium; paths are short, so encode then copy.
+    const bytes = enc.encode(path);
+    if (bytes.length > 30 * 1024) throw new VfsError(37, 'path', path.slice(0, 64));
+    this.u8.set(bytes, this.scratch + at);
+    return [this.scratch + at, bytes.length];
   }
 
   private get out() { return this.scratch + 61 * 1024; }
@@ -161,6 +172,27 @@ export class Vfs {
     const [p, l, ino, kind] = new Uint32Array(this.memory.buffer, this.out, 4);
     return { name: dec.decode(this.u8.slice(p, p + l)), ino, kind: kind as Kind };
   }
+
+  // ---------- per-process fd tables (shared by all threads of a WASI process) ----------
+
+  rawProcNew() { return this.x.vfs_proc_new(); }
+  rawProcFree(pid: number) { this.x.vfs_proc_free(pid); }
+  rawFdOpen(pid: number, ino: number, append: boolean, preopen: string | null = null) {
+    const [p, l] = preopen === null ? [0, 0] : this.putPath(preopen);
+    return this.x.vfs_fd_open(pid, ino, append ? 1 : 0, p, l);
+  }
+  rawFdGet(pid: number, fd: number, withName = false): FdInfo | number {
+    const r = this.x.vfs_fd_get(pid, fd, this.out);
+    if (r < 0) return r;
+    const u = new Uint32Array(this.memory.buffer, this.out, 6);
+    const pos = Number(new BigUint64Array(this.memory.buffer, this.out + 8, 1)[0]);
+    const isPreopen = u[4] !== 0;
+    const preopen = isPreopen && withName ? dec.decode(this.u8.slice(u[4], u[4] + u[5])) : null;
+    return { ino: u[0], append: u[1] !== 0, pos, isPreopen, preopen };
+  }
+  rawFdSetPos(pid: number, fd: number, pos: number) { return this.x.vfs_fd_set_pos(pid, fd, BigInt(pos)); }
+  rawFdClose(pid: number, fd: number) { return this.x.vfs_fd_close(pid, fd); }
+  rawFdRenumber(pid: number, from: number, to: number) { return this.x.vfs_fd_renumber(pid, from, to); }
 
   // ---------- convenience API (takes the lock, throws VfsError) ----------
 

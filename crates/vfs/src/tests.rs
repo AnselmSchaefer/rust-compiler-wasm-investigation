@@ -160,3 +160,26 @@ fn inodes_are_reused() {
     assert_eq!(fs.inode_count(), 1);
     assert!(fs.create_file(ROOT, "x", false, false, 0).unwrap() <= 1);
 }
+
+#[test]
+fn fd_tables() {
+    use crate::fd::{Fd, Procs};
+    let mut p = Procs::default();
+    let a = p.new_proc();
+    let b = p.new_proc();
+    let fd = |ino| Fd { ino, pos: 0, append: false, preopen: None };
+    assert_eq!(p.open(a, fd(1)), Ok(0));
+    assert_eq!(p.open(a, fd(2)), Ok(1));
+    assert_eq!(p.open(b, fd(9)), Ok(0)); // separate tables
+    p.get(a, 1).unwrap().pos = 42;
+    assert_eq!(p.get(a, 1).unwrap().pos, 42);
+    p.close(a, 0).unwrap();
+    assert_eq!(p.close(a, 0), Err(Error::BadF));
+    assert_eq!(p.open(a, fd(3)), Ok(0)); // lowest free
+    p.renumber(a, 1, 5).unwrap();
+    assert_eq!(p.get(a, 5).unwrap().pos, 42);
+    assert_eq!(p.get(a, 1).map(|f| f.ino), Err(Error::BadF));
+    p.free_proc(a);
+    assert_eq!(p.get(a, 0).map(|f| f.ino), Err(Error::BadF));
+    assert_eq!(p.new_proc(), a); // pid reused
+}

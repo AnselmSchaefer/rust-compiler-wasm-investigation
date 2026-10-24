@@ -3,7 +3,7 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** WP-04 (in-progress, LLVM build running) and **WP-11** in parallel (PLAN allows this while Phase B waits on builds).
+- **Active WP:** WP-04 (in-progress, LLVM build running). WP-11 done 2026-10-24.
 - **Current session (2026-10-24, session 6) goals:**
   - Sparse-fetch rust-lang/llvm-project @ 1b9c0d5ff9 and rebase the YoWASP WASI patch onto it (`toolchain/patches/llvm/0001`).
   - Write `toolchain/build-llvm.sh` (resumable: native tblgen, then a wasm32-wasip1-threads cross build with lld).
@@ -14,7 +14,7 @@
   1. Sparse-fetch rust-lang/llvm-project @ `1b9c0d5ff9` (`llvm lld cmake third-party`) into `build/llvm-project`.
   2. Rebase YoWASP `97196c8eeb` (fetched by `scripts/fetch-patch-sources.sh`) onto it and save it as `toolchain/patches/llvm/0001-*.patch`.
   3. Write a resumable `toolchain/build-llvm.sh`: native tblgen, then a wasm32-wasip1-threads build with wasi-sdk-34, YoWASP flags, lld, ninja, sccache, `-j10`, `LLVM_PARALLEL_LINK_JOBS=1`. Run it in the background (≤ 2 h chunks) with logs in `build-logs/wp-04/`.
-- **Running background jobs:** LLVM wasm build (`ninja -C build/llvm-wasm -k 0`), log `build-logs/wp-04/build-2.log`. Resume with `toolchain/build-llvm.sh build install`.
+- **Running background jobs:** LLVM wasm build (`ninja -C build/llvm-wasm -k 0`), log `build-logs/wp-04/build-3.log` (run under `systemd-inhibit`: the 2026-10-24 11:11 suspend-then-hibernate killed the previous run). Resume with `toolchain/build-llvm.sh build install`.
 
 ## Human actions needed
 - [x] Plan confirmed; commits at end of each session approved (2026-10-23).
@@ -36,7 +36,7 @@
 | 08 | Sysroots and lazy metadata | blocked | 0 | |
 | 09 | Compile-server mode | blocked | 0 | |
 | 10 | Toolchain release packaging | blocked | 0 | |
-| 11 | Virtual filesystem | in-progress | 1 | |
+| 11 | Virtual filesystem | done | 2 | `scripts/verify/wp-11.sh` passes. Shared-memory VFS + OPFS + WASI p1 adapter; design in `docs/vfs.md` |
 | 12 | Orchestrator and worker pool | blocked | 0 | |
 | 13 | Run sandbox | blocked | 0 | |
 | 14 | Minimal UI (M1a) | blocked | 0 | |
@@ -63,9 +63,11 @@
 - 2026-10-23 engine probe: Chromium and Firefox (Playwright 1.64.1) both have COI, SAB, shared memory, exnref EH, JSPI, memory64, OPFS.
 - 2026-10-24 WP-01 baseline (oligamiq v3, rustc 1.83-dev, hello, wasm32-wasip1, debug). Native: 0.16 s. wasmtime-threads, warm: 0.85 s (19 s on the first run because of Cranelift). Chromium: rustc 1.25–1.47 s, module compile 0.2 s, end-to-end 1.7 s. Firefox: rustc 0.59–0.78 s, module compile 0.65–0.8 s, end-to-end 1.9 s. Unwind build works in both browsers but not in wasmtime 46.
 - 2026-10-24 WP-02 baseline (`bench/results/2026-10-24-c029d0d.json`). Chromium 156 medians: check-hello 447 ms (12.1× native), build-hello 1010 ms (6.4×), check-medium 732 ms (5.1×), build-medium 1935 ms (5.9×), build-medium-O 4038 ms (4.8×). First compile after load up to 2× slower. Load: 41.9 MB brotli, 1.15 s on localhost, 3.4 s download at 100 Mbit. Wasm memory 108–360 MiB per step; browser RSS 0.85–2.0 GiB.
+- 2026-10-24 WP-11: rustc.wasm on our VFS+WASI vs the shim (Chromium, under `-j10` build load): `-V` 39 vs 93 ms, check-hello 277 vs 447 ms, build-hello 673 vs 1010 ms, build-medium 1849 vs 1935 ms. VFS: 64 MiB written in 29 ms, read in 27 ms (one copy).
 - Smoke: hello world runs on wasip1, wasip2, wasip3 (wasmtime 50) and wasip1-threads with a real thread (wasmtime 46.0.3).
 
 ## Session log
+- 2026-10-24 (session 6, interrupted by a system suspend/hibernate crash at 11:11, resumed): WP-04: LLVM 23.1.1 source + ported WASI patch + `build-llvm.sh`; build now runs under `systemd-inhibit`. WP-11 done in parallel: `crates/vfs` (shared-memory FS, fd tables), `web/vfs` (wrapper, OPFS persister), `web/wasi` (WASI p1 + thread spawning). The oligamiq rustc.wasm builds and links on it, faster than on browser_wasi_shim.
 - 2026-10-24 (session 5): WP-03. Reviewed bjorn3 (wasm20, Cranelift), oligamiq (wasm17, the v3 build), YoWASP LLVM WASI patch (not upstream), and danlapid/Cloudflare (7 patches, rust 1.98.1). Chose danlapid as the primary base and rustc 1.99.1, version-pinned so rustup's std can be reused. Pinned sources are fetched by `scripts/fetch-patch-sources.sh`.
 - 2026-10-24 (session 4): WP-02. Turned the baseline page into a harness API. Added `bench/run.ts`/`compare.ts`/`measure.py`, a 563-line benchmark program, native rustc 1.83.0, and browser RSS sampling. Fixed the shim `path_rename` bug (pnpm patch). Scope is now Chromium only.
 - 2026-10-24 (session 3): WP-01. Fetch script, threaded browser harness using browser_wasi_shim-threads, `baseline.spec.ts`, and verify script. Found 11 issues (see `docs/baseline-notes.md`), the main ones being: errors trap the abort build, the unwind build uses legacy EH, and the temp dir is hard-wired to `/`.

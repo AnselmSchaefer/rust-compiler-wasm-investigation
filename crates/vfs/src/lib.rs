@@ -6,6 +6,7 @@
 
 extern crate alloc;
 
+pub mod fd;
 pub mod fs;
 
 #[cfg(target_arch = "wasm32")]

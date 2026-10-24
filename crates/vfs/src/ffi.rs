@@ -12,6 +12,7 @@
 use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicU32, Ordering};
 
+use crate::fd::{Fd, Pid, Procs};
 use crate::fs::{Error, Fs, Ino, Kind};
 
 // ---------- shared statics, located by JS through their exported addresses ----------
@@ -49,6 +50,15 @@ static CHANGES: Buf = Buf(UnsafeCell::new(alloc::vec::Vec::new()));
 fn fs() -> &'static mut Fs {
     // SAFETY: callers hold VFS_LOCK (see module docs), so there is exactly one live reference.
     unsafe { (*FS.0.get()).get_or_insert_with(Fs::new) }
+}
+
+struct GlobalProcs(UnsafeCell<Option<Procs>>);
+unsafe impl Sync for GlobalProcs {}
+static PROCS: GlobalProcs = GlobalProcs(UnsafeCell::new(None));
+
+fn procs() -> &'static mut Procs {
+    // SAFETY: as for `fs()`.
+    unsafe { (*PROCS.0.get()).get_or_insert_with(Procs::default) }
 }
 
 fn sync_seq() {
@@ -194,6 +204,54 @@ pub extern "C" fn vfs_take_changes(out: *mut u32) -> i32 {
         out.add(1).write(buf.len() as u32);
     }
     ret(Ok(0))
+}
+
+// ---------- per-process fd tables (fd.rs) ----------
+
+#[unsafe(no_mangle)]
+pub extern "C" fn vfs_proc_new() -> i32 {
+    procs().new_proc() as i32
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn vfs_proc_free(pid: Pid) {
+    procs().free_proc(pid)
+}
+
+/// Open an fd on `ino`. `preopen` (ptr 0 = none) is the guest-visible name of a preopened dir.
+#[unsafe(no_mangle)]
+pub extern "C" fn vfs_fd_open(pid: Pid, ino: Ino, append: u32, preopen: *const u8, preopen_len: usize) -> i32 {
+    let preopen = if preopen.is_null() { None } else { path(preopen, preopen_len).ok().map(alloc::string::ToString::to_string) };
+    ret(procs().open(pid, Fd { ino, pos: 0, append: append != 0, preopen }))
+}
+
+/// Writes `[ino: u32, append: u32, pos: u64, preopen_ptr: u32, preopen_len: u32]` to `out`
+/// (preopen_ptr 0 if not a preopen).
+#[unsafe(no_mangle)]
+pub extern "C" fn vfs_fd_get(pid: Pid, fd: u32, out: *mut u32) -> i32 {
+    ret_unit(procs().get(pid, fd).map(|f| unsafe {
+        out.write(f.ino);
+        out.add(1).write(f.append as u32);
+        (out.add(2) as *mut u64).write(f.pos);
+        let (p, l) = f.preopen.as_ref().map_or((0, 0), |s| (s.as_ptr() as u32, s.len() as u32));
+        out.add(4).write(p);
+        out.add(5).write(l);
+    }))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn vfs_fd_set_pos(pid: Pid, fd: u32, pos: u64) -> i32 {
+    ret_unit(procs().get(pid, fd).map(|f| f.pos = pos))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn vfs_fd_close(pid: Pid, fd: u32) -> i32 {
+    ret_unit(procs().close(pid, fd))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn vfs_fd_renumber(pid: Pid, from: u32, to: u32) -> i32 {
+    ret_unit(procs().renumber(pid, from, to))
 }
 
 #[unsafe(no_mangle)]

@@ -2,6 +2,12 @@
 
 Fixed defaults (PLAN.md §1), plus decisions and findings recorded during work packages, newest first.
 
+## 2026-10-24 · WP-11: VFS design (details: docs/vfs.md)
+- **The VFS lives in one shared `WebAssembly.Memory`, managed by `crates/vfs` (no_std Rust).** Every worker instantiates it on that memory and accesses it synchronously under a lock word. There is no filesystem server thread.
+- **WASI fd tables are kept in the VFS, per pid**, so threads in different workers share them.
+- **`browser_wasi_shim(-threads)` stays only in the WP-01/02 baseline harness.**
+- **Long builds run under `systemd-inhibit --what=sleep:idle`.** A suspend-then-hibernate crash killed a build on 2026-10-24.
+
 ## 2026-10-24 · WP-03: base version and patch strategy (details: docs/patches.md)
 - **Base rustc tag: `1.99.1`** (latest stable, released 2026-10-13, commit 58cf8f9c3). Bundled LLVM: rust-lang/llvm-project `rustc/23.1-2026-07-22` @ `1b9c0d5ff9`. wasi-sdk-34 (clang 23.1) matches that LLVM major version.
 - **Build rustc as a `local-rebuild` from stable 1.99.1, with the version string pinned to stable's** (danlapid's technique). rustc.wasm then accepts rustup's prebuilt `rust-std-wasm32-wasip1` 1.99.1, which already ships separate `.rmeta` files. We don't build std for user programs.

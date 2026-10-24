@@ -16,6 +16,7 @@ pub const ROOT: Ino = 0;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u16)]
 pub enum Error {
+    BadF = 8,
     Exist = 20,
     Inval = 28,
     IsDir = 31,
