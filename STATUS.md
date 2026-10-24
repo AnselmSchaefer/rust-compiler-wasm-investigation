@@ -3,7 +3,7 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** none. Next is **WP-05** (ready): rustc 1.99.1 for a wasm32-wasip1-threads host.
+- **Active WP:** WP-05 (blocked on a human decision, see Human actions). rust 1.99.1 is cloned in `build/rust`; no rustc source has been edited.
 - **Last session:** 2026-10-24 (session 6). WP-04 and WP-11 done. LLVM 23.1.1 + lld for a Wasm host is installed in `build/llvm-wasm-install` (rebuild: `toolchain/build-llvm.sh`, ~1.5 h of compute).
 - **Next step:** WP-05.
   1. Bootstrap needs an `llvm-config` describing the *wasm* build, and the cross build doesn't produce one that runs natively. Write a small script `toolchain/llvm-config-wasm` that answers bootstrap's/rustc_llvm's queries (`--version`, `--libs`, `--system-libs`, `--libdir`, `--includedir`, `--cxxflags`, `--ldflags`, `--components`, `--link-static`, `--shared-mode`, `--host-target`) from `build/llvm-wasm-install`, using the native `build/llvm-native` build's answers as a template.
@@ -13,6 +13,7 @@
 - **Running background jobs:** none
 
 ## Human actions needed
+- [ ] **WP-05 decision (2026-10-24):** the rust checkout's AGENTS.md forbids AI-authored rustc changes without a named reviewer, and bans them in codegen/metadata. The minimum changes (A1 driver `lib`, A2 dlopen guards) need to be written by the user or reviewed. B1/B2 can avoid rustc changes (VFS symlink, external wasm-ld). Details: `~/Projects/rustc-wasm-host-source-changes.md`.
 - [x] Plan confirmed; commits at end of each session approved (2026-10-23).
 - [x] WP-00: cmake and ninja installed by the user.
 - [ ] Optional [H]: approve reporting the `path_rename` no-op bug upstream to bjorn3/browser_wasi_shim (threads). The fix is in `patches/`.
@@ -26,7 +27,7 @@
 | 02 | Benchmark harness | done | 1 | `scripts/verify/wp-02.sh` passes. Numbers in `bench/baseline.md` |
 | 03 | Patch inventory and base version | done | 1 | `scripts/verify/wp-03.sh` passes. Base 1.99.1; series in `docs/patches.md` |
 | 04 | Build LLVM for a Wasm host | done | 1 | `scripts/verify/wp-04.sh` passes. llc.wasm 53 MiB (10.1 br), wasm-ld.wasm 63 MiB (11.7 br), 117 static libs (130 MB) |
-| 05 | rustc for a Wasm host: front end | ready | 0 | |
+| 05 | rustc for a Wasm host: front end | blocked | 1 | rust-lang AGENTS.md: AI may not edit rustc without a named reviewer; codegen/metadata changes banned. Needed changes: `~/Projects/rustc-wasm-host-source-changes.md` |
 | 06 | In-process linking | blocked | 0 | |
 | 07 | Unwinding build and error recovery | blocked | 0 | |
 | 08 | Sysroots and lazy metadata | blocked | 0 | |
