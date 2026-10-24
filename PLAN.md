@@ -192,6 +192,7 @@ These are taken as defaults so work can start. Changing one later only affects t
   - Port Cloudflare's patch that reads metadata a page at a time (series `0005`, danlapid 0007). On wasm32, rustc reads every `.rmeta` fully into memory, and 1.99.1's libcore.rmeta alone is 45 MB (~350 ms per invocation in WP-02).
   - Measure peak memory before and after.
 - **Done when:** compiling hello in Chromium peaks below 300 MB (target to confirm), and the numbers are in `bench/`.
+  - *Done 2026-10-24:* `toolchain/package-sysroot.mjs` (meta/link groups, brotli, sha256 manifest). hello peaks at 102/139 MiB (check/codegen) without paged metadata, so danlapid 0007 isn't used (it's also LLM-generated, see `docs/patches.md`). Numbers in `bench/sysroot.md`.
 
 #### WP-09 Compile-server mode
 - **Depends:** WP-07, WP-08 · **Est.:** 2–3 sessions

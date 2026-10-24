@@ -43,6 +43,14 @@ Decision legend: **keep** = apply nearly as-is · **rewrite** = same idea, our o
 | 20 | **Version string = stable**, so rustup's std works unchanged | — | ships its own sysroots | `local-rebuild` with stable 1.98.1 as stage0 + `git-commit-info` pinning the stable hash. rustc.wasm then accepts rustup's prebuilt std | **keep (build-script technique)**: we can use rustup's `rust-std-wasm32-wasip1` 1.99.1 (with `.rmeta` files) as the user-program sysroot and skip building std | WP-05, WP-08 |
 | 21 | **Max memory of the host** | — | 1 GiB (16384 pages) | Emscripten growth | **config**: 4 GiB wasm32 max (`--max-memory=4294967296`, as Y uses for clang). memory64 later only if the 4 GB risk trigger fires (PLAN §7) | WP-05 |
 
+### Authorship of the D patches (found 2026-10-24, WP-08)
+
+D's patches **0005** (default sysroot), **0006** (proc macros out of process) and **0007** (paged metadata) carry `Co-Authored-By: Claude Opus 5.5` trailers, so they are LLM-generated. rust-lang's LLM policy (`build/rust/AGENTS.md`) applies to LLM-generated text "even if a human later edits it". So unlike bjorn3's patches, these can't go into our rust tree just because a human applies them: they would need the policy's named reviewer, and 0007 (metadata decoding) and 0006 are in soundness-sensitive areas, where LLM-authored changes are banned outright. Treat them as **design references only**. Status per concern:
+
+- **#9 metadata (0007): not needed.** Measured in WP-08 without it: compiling hello peaks at 102 MiB (check) / 139 MiB (codegen) of rustc memory in Chromium, well under the 300 MB target (`bench/sysroot.md`).
+- **#8 sysroot (0005): not needed**; WASI uses the argv[0] symlink + `lib/rustlib` mount (WP-05).
+- **#5 proc macros (0006):** WP-19/20 must find a human-written route (the user writes it, or a bjorn3/oligamiq patch).
+
 ## Our series (planned)
 
 `toolchain/patches/rust/` (against `1.99.1`):
