@@ -75,11 +75,11 @@ deny-warnings = false
 
 [target.$HOST]
 llvm-config = "$LLVM/bin/llvm-config"
-cc = "$WASI_SDK/bin/clang"
-cxx = "$WASI_SDK/bin/clang++"
+cc = "$ROOT/toolchain/bin/wasi-threads-clang"
+cxx = "$ROOT/toolchain/bin/wasi-threads-clang++"
 ar = "$WASI_SDK/bin/llvm-ar"
 ranlib = "$WASI_SDK/bin/llvm-ranlib"
-linker = "$WASI_SDK/bin/clang"
+linker = "$ROOT/toolchain/bin/wasi-threads-clang"
 wasi-root = "$WASI_SDK/share/wasi-sysroot"
 # Flags for rustc.wasm itself (never the wasm32-wasip1 target spec users see): link against
 # wasi-sdk's libc/libc++ (what LLVM was built against) instead of rustup's self-contained copy;

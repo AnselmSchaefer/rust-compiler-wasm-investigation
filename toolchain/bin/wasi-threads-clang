@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# wasi-sdk clang for wasm32-wasip1-threads. The cc crate in rustc's lockfile still passes the old
+# --target=wasm32-wasi for this host, but wasi-sdk 34 only has libraries and C++ headers under the
+# new triple names, so rewrite it.
+args=()
+for a in "$@"; do
+  case "$a" in --target=wasm32-wasi|--target=wasm32-wasi-threads) a=--target=wasm32-wasip1-threads ;; esac
+  args+=("$a")
+done
+exec "${WASI_SDK_PATH:-$HOME/opt/wasi-sdk}/bin/clang" "${args[@]}"
