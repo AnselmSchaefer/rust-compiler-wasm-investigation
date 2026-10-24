@@ -3,11 +3,15 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** **WP-16** (ready, next), while **WP-14 waits on the [H] user trial** (everything automated is done). WP-15 done in session 17.
+- **Active WP:** **WP-16** (in-progress, session 18). WP-14 done (user trial passed 2026-10-24), WP-15 done in session 17.
 - **Last session:** 2026-10-24 (session 17). `crates/resolver` reproduces all 50 golden Cargo.lock files byte for byte, natively and as wasm32-wasip1 under wasmtime; 13 synthetic scenarios match native cargo.
 - **Rule for rustc source:** rust-lang's agent policy (`build/rust/AGENTS.md`) applies. Claude does not write or edit rustc source, and does not draft rust-lang issues, PRs or Zulip posts. The user writes those, or applies existing **human-written** patches (bjorn3/oligamiq), which the user prefers whenever one exists. **danlapid 0005–0007 are LLM-generated** (Claude co-author trailers), so they don't qualify even if the user applies them; design reference only (`docs/patches.md`). Claude reviews, builds and explains. Everything outside `build/rust` is Claude's, including out-of-tree drivers using `rustc_driver` (`toolchain/rustc-multi`).
 - **Next step:** WP-16 (index and crate download). Start by checking CORS on `index.crates.io` and `static.crates.io` from a Chromium page (Playwright, a real fetch with an Origin). If either lacks CORS, stop at the **[H]** checkpoint (CORS mirror Worker needs an account + deploy approval). Then: a browser `Registry` impl for `crates/resolver` (sparse index over fetch, cached in OPFS), `.crate` download + sha256 check against the index `cksum`, tar.gz unpack in Wasm into the VFS. Proper User-Agent, no bulk fetching.
 - **Running background jobs:** none
+
+## Current session (2026-10-24, session 18): in progress
+- Goals: WP-16. CORS check; browser `Registry` for `crates/resolver` over a configurable index URL; `.crate` download + sha256 check; unpack into the VFS; OPFS cache so a second load works offline.
+- **CORS result (Chromium, real fetch from http://localhost):** `index.crates.io` sends **no** `Access-Control-Allow-Origin`, so the sparse index is blocked cross-origin. `static.crates.io` sends `Access-Control-Allow-Origin: *`, so `.crate` downloads work directly. The index therefore needs a same-origin reverse proxy or a CORS mirror: **[H]** decision + account/deploy (not done). Dev and tests serve the pinned snapshot from our own server meanwhile.
 
 ## Current session (2026-10-24, session 17): done
 - Goals (all met): `crates/resolver` with `index.rs` (sparse-index lines → summaries, cargo's validity rules), `manifest.rs` (root Cargo.toml via cargo-util-schemas), `resolve.rs` (port of cargo's activation loop: most-constrained-first, candidate order incl. MSRV fallback, features, backtracking), `lockfile.rs` (cargo's exact text format).
@@ -79,12 +83,13 @@
 - [ ] **Possible upstream rustc bug** (user to report, if wanted): `filesearch.rs` `from_env_args_next` checks `lib/rustlib` relative to the *working directory*, not next to argv[0] (see `~/Projects/rustc-wasm-host-source-changes.md` §6).
 
 ## Human actions needed
-- [ ] **[H] WP-14 user trial:** run `pnpm demo`, open http://localhost:8787/ in Chrome/Chromium, try Check, Run, typing into the terminal and Stop, and give feedback.
+- [x] **[H] WP-14 user trial:** done 2026-10-24, the user reports it works fine.
 - [x] **WP-09 decision (2026-10-24):** re-scope the target to 2.5× (option B). A cross-session metadata cache stays a possible human-written rustc change for later (WP-22).
 - [x] **WP-06:** resolved 2026-10-24: the user applied bjorn3's existing `get_linker` fix instead of writing a std change. A proper std `join_paths`/`split_paths` for WASI is still an optional upstream fix the user could write.
 - [x] **WP-05 decision (2026-10-24):** resolved: the user wrote A1/A2. the rust checkout's AGENTS.md forbids AI-authored rustc changes without a named reviewer, and bans them in codegen/metadata. The minimum changes (A1 driver `lib`, A2 dlopen guards) need to be written by the user or reviewed. B1/B2 can avoid rustc changes (VFS symlink, external wasm-ld). Details: `~/Projects/rustc-wasm-host-source-changes.md`.
 - [x] Plan confirmed; commits at end of each session approved (2026-10-23).
 - [x] WP-00: cmake and ninja installed by the user.
+- [ ] **[H] WP-16 index hosting:** `index.crates.io` has no CORS. Choose how the deployed IDE reaches the index: a reverse proxy on the app's own origin (decided with the WP-29 deploy), or a CORS mirror Worker (needs an account + deploy approval).
 - [ ] Optional [H]: approve reporting the `path_rename` no-op bug upstream to bjorn3/browser_wasi_shim (threads). The fix is in `patches/`.
 
 ## Work packages
@@ -105,7 +110,7 @@
 | 11 | Virtual filesystem | done | 2 | `scripts/verify/wp-11.sh` passes. Shared-memory VFS + OPFS + WASI p1 adapter; design in `docs/vfs.md` |
 | 12 | Orchestrator and worker pool | done | 1 | `scripts/verify/wp-12.sh` passes. Orchestrator worker compiles + links + runs hello/medium from the release; Cache Storage on reload |
 | 13 | Run sandbox | done | 1 | `scripts/verify/wp-13.sh` passes. Worker + own VFS per run, interactive stdin, streamed output, panic → 134, kill/timeout |
-| 14 | Minimal UI (M1a) | in-progress | 1 | automated part done (`scripts/verify/wp-14.sh`); waiting on the [H] user trial (`pnpm demo`) |
+| 14 | Minimal UI (M1a) | done | 1 | `scripts/verify/wp-14.sh` passes; user trial passed 2026-10-24 |
 | 15 | Cargo resolver | done | 2 | `scripts/verify/wp-15.sh` passes. Own `crates/resolver` (cargo crate can't build for WASI): 50/50 golden lockfiles identical, native and wasm32-wasip1; `bench/resolver.md` |
 | 16 | Index and crate download | ready | 0 | |
 | 17 | Build planner | ready | 0 | depends on WP-15, WP-12 (both done) |
