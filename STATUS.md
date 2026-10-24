@@ -3,7 +3,7 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** WP-05 (blocked on A1/A2, which the user writes; see Follow-ups). Preparation that needs no rustc changes is done: `toolchain/build-rustc.sh` (config and build dir outside the checkout), an `llvm-config` for the wasm LLVM, and VFS symlinks for sysroot detection (B1). The first build stops at A1, as expected.
+- **Active WP:** none. Next is **WP-06** (ready): linking for `wasm32-wasip1` output, done **outside** rustc (host runs `wasm-ld.wasm`), since in-process linking would be an AI-authored codegen change.
 - **Last session:** 2026-10-24 (session 6). WP-04 and WP-11 done. LLVM 23.1.1 + lld for a Wasm host is installed in `build/llvm-wasm-install` (rebuild: `toolchain/build-llvm.sh`, ~1.5 h of compute).
 - **Next step:** WP-05.
   1. Bootstrap needs an `llvm-config` describing the *wasm* build, and the cross build doesn't produce one that runs natively. Write a small script `toolchain/llvm-config-wasm` that answers bootstrap's/rustc_llvm's queries (`--version`, `--libs`, `--system-libs`, `--libdir`, `--includedir`, `--cxxflags`, `--ldflags`, `--components`, `--link-static`, `--shared-mode`, `--host-target`) from `build/llvm-wasm-install`, using the native `build/llvm-native` build's answers as a template.
@@ -15,10 +15,11 @@
 ## Follow-ups (check these at the start of every session)
 - [ ] **browser_wasi_shim bug report** (user posting, 2026-10-24): `path_rename` no-op in the threads package. Draft: `~/Projects/browser_wasi_shim-path_rename-issue.md`. Check https://github.com/bjorn3/browser_wasi_shim/issues for a reply. If the fix is released upstream, drop `patches/@oligami__browser_wasi_shim-threads@0.5.0.patch`.
 - [ ] **#llm-mentoring Zulip post** (user to write): ask about reviewing A1/A2 and whether "rustc as a Wasm host" is welcome upstream; mention bjorn3. Points to cover: see the 2026-10-24 conversation summary in `~/Projects/rustc-wasm-host-source-changes.md` §5.
-- [ ] **A1/A2 rustc changes** (user to write, Claude reviews and builds): see `~/Projects/rustc-wasm-host-source-changes.md` §3. Unblocks WP-05.
+- [x] **A1/A2 rustc changes**: written by the user 2026-10-24 and saved as `toolchain/patches/rust/wasm-host.diff`. WP-05 done.
+- [ ] **Possible upstream rustc bug** (user to report, if wanted): `filesearch.rs` `from_env_args_next` checks `lib/rustlib` relative to the *working directory*, not next to argv[0] (see `~/Projects/rustc-wasm-host-source-changes.md` §6).
 
 ## Human actions needed
-- [ ] **WP-05 decision (2026-10-24):** the rust checkout's AGENTS.md forbids AI-authored rustc changes without a named reviewer, and bans them in codegen/metadata. The minimum changes (A1 driver `lib`, A2 dlopen guards) need to be written by the user or reviewed. B1/B2 can avoid rustc changes (VFS symlink, external wasm-ld). Details: `~/Projects/rustc-wasm-host-source-changes.md`.
+- [x] **WP-05 decision (2026-10-24):** resolved: the user wrote A1/A2. the rust checkout's AGENTS.md forbids AI-authored rustc changes without a named reviewer, and bans them in codegen/metadata. The minimum changes (A1 driver `lib`, A2 dlopen guards) need to be written by the user or reviewed. B1/B2 can avoid rustc changes (VFS symlink, external wasm-ld). Details: `~/Projects/rustc-wasm-host-source-changes.md`.
 - [x] Plan confirmed; commits at end of each session approved (2026-10-23).
 - [x] WP-00: cmake and ninja installed by the user.
 - [ ] Optional [H]: approve reporting the `path_rename` no-op bug upstream to bjorn3/browser_wasi_shim (threads). The fix is in `patches/`.
@@ -32,8 +33,8 @@
 | 02 | Benchmark harness | done | 1 | `scripts/verify/wp-02.sh` passes. Numbers in `bench/baseline.md` |
 | 03 | Patch inventory and base version | done | 1 | `scripts/verify/wp-03.sh` passes. Base 1.99.1; series in `docs/patches.md` |
 | 04 | Build LLVM for a Wasm host | done | 1 | `scripts/verify/wp-04.sh` passes. llc.wasm 53 MiB (10.1 br), wasm-ld.wasm 63 MiB (11.7 br), 117 static libs (130 MB) |
-| 05 | rustc for a Wasm host: front end | blocked | 1 | rust-lang AGENTS.md: AI may not edit rustc without a named reviewer; codegen/metadata changes banned. Needed changes: `~/Projects/rustc-wasm-host-source-changes.md` |
-| 06 | In-process linking | blocked | 0 | |
+| 05 | rustc for a Wasm host: front end | done | 2 | `scripts/verify/wp-05.sh` passes. rustc 1.99.1 for wasm32-wasip1-threads (126.7 MiB), version identical to stable; A1/A2 written by the user (`toolchain/patches/rust/`) |
+| 06 | In-process linking | ready | 0 | re-scoped: link outside rustc (no rustc change), see PLAN |
 | 07 | Unwinding build and error recovery | blocked | 0 | |
 | 08 | Sysroots and lazy metadata | blocked | 0 | |
 | 09 | Compile-server mode | blocked | 0 | |
@@ -65,11 +66,13 @@
 - 2026-10-23 engine probe: Chromium and Firefox (Playwright 1.64.1) both have COI, SAB, shared memory, exnref EH, JSPI, memory64, OPFS.
 - 2026-10-24 WP-01 baseline (oligamiq v3, rustc 1.83-dev, hello, wasm32-wasip1, debug). Native: 0.16 s. wasmtime-threads, warm: 0.85 s (19 s on the first run because of Cranelift). Chromium: rustc 1.25–1.47 s, module compile 0.2 s, end-to-end 1.7 s. Firefox: rustc 0.59–0.78 s, module compile 0.65–0.8 s, end-to-end 1.9 s. Unwind build works in both browsers but not in wasmtime 46.
 - 2026-10-24 WP-02 baseline (`bench/results/2026-10-24-c029d0d.json`). Chromium 156 medians: check-hello 447 ms (12.1× native), build-hello 1010 ms (6.4×), check-medium 732 ms (5.1×), build-medium 1935 ms (5.9×), build-medium-O 4038 ms (4.8×). First compile after load up to 2× slower. Load: 41.9 MB brotli, 1.15 s on localhost, 3.4 s download at 100 Mbit. Wasm memory 108–360 MiB per step; browser RSS 0.85–2.0 GiB.
+- 2026-10-24 WP-05: rustc.wasm 1.99.1 (Release, panic=abort, no LTO) 126.7 MiB. Under wasmtime-threads 46 (warm cache): `--emit=metadata` of medium.rs as a lib 690 ms (WP-01 baseline toolchain: 938 ms for check-medium); first run ~18 s (Cranelift compiling the module).
 - 2026-10-24 WP-04: LLVM 23.1.1 (+lld) for wasm32-wasip1-threads, Release -O3: llc.wasm 53.3 MiB (brotli-9 10.1 MiB), wasm-ld.wasm 63.3 MiB (11.7 MiB); smoke test compiles + links (multithreaded lld) + runs under wasmtime-threads 46.
 - 2026-10-24 WP-11: rustc.wasm on our VFS+WASI vs the shim (Chromium, under `-j10` build load): `-V` 39 vs 93 ms, check-hello 277 vs 447 ms, build-hello 673 vs 1010 ms, build-medium 1849 vs 1935 ms. VFS: 64 MiB written in 29 ms, read in 27 ms (one copy).
 - Smoke: hello world runs on wasip1, wasip2, wasip3 (wasmtime 50) and wasip1-threads with a real thread (wasmtime 46.0.3).
 
 ## Session log
+- 2026-10-24 (session 7, cont.): **WP-05 done.** With the user's A1/A2 changes, rustc 1.99.1 builds for wasm32-wasip1-threads. Fixed on our side: `-lc++abi` and `-ldl` (wasi-libc stubs) on the host link. `rustc.wasm -V` is identical to stable; type-checking hello and a library works with rustup's wasm32-wasip1 std (medium.rs as a lib: 690 ms in wasmtime). Sysroot detection works without a rustc change (argv[0] symlink + `lib/rustlib` visible from the cwd, because of an apparent upstream bug).
 - 2026-10-24 (session 7, cont.): The user wrote A1. The build now compiles 241 crates (no A3 dependency failures so far) and stops at the expected A2 errors in `rustc_metadata/src/host_dylib.rs`. Fixed on our side: the `cc` crate passes the old `--target=wasm32-wasi`, so `toolchain/bin/wasi-threads-clang{,++}` rewrite it.
 - 2026-10-24 (session 7): WP-05 prep without touching rustc. `build-rustc.sh` (pinned rustup 1.99.1 as stage 0, per-target rustflags because `RUSTFLAGS_BOOTSTRAP` leaks into bootstrap.py's native build), native `llvm-config` installed into the wasm LLVM prefix, VFS + WASI symlinks with an e2e test. Discovery build: bootstrap + std OK, stops at A1 (rustc_driver dylib-only). Drafted and verified the browser_wasi_shim bug report.
 - 2026-10-24 (session 6, interrupted by a system suspend/hibernate crash at 11:11, resumed): WP-04: LLVM 23.1.1 source + ported WASI patch + `build-llvm.sh`; build now runs under `systemd-inhibit`. WP-11 done in parallel: `crates/vfs` (shared-memory FS, fd tables), `web/vfs` (wrapper, OPFS persister), `web/wasi` (WASI p1 + thread spawning). The oligamiq rustc.wasm builds and links on it, faster than on browser_wasi_shim.

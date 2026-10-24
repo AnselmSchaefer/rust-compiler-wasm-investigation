@@ -1,0 +1,174 @@
+diff --git i/compiler/rustc_codegen_llvm/src/llvm/enzyme_ffi.rs w/compiler/rustc_codegen_llvm/src/llvm/enzyme_ffi.rs
+index 68ec7870..30eaff1b 100644
+--- i/compiler/rustc_codegen_llvm/src/llvm/enzyme_ffi.rs
++++ w/compiler/rustc_codegen_llvm/src/llvm/enzyme_ffi.rs
+@@ -144,12 +144,14 @@ pub(crate) struct EnzymeWrapper {
+         EnzymeSetCLBool: EnzymeSetCLBoolFn,
+         EnzymeSetCLString: EnzymeSetCLStringFn,
+         pub registerEnzymeAndPassPipeline: *const c_void,
++        #[cfg(any(unix, windows))]
+         lib: libloading::Library,
+     }
+ 
+     unsafe impl Sync for EnzymeWrapper {}
+     unsafe impl Send for EnzymeWrapper {}
+ 
++    #[cfg(any(unix, windows))]
+     fn load_ptr_by_symbol_mut_void(
+         lib: &libloading::Library,
+         bytes: &[u8],
+@@ -167,6 +169,7 @@ fn load_ptr_by_symbol_mut_void(
+     // =>
+     // let ABC = load_ptr_mut_void(&lib, b"ABC")?;
+     // let XYZ = load_ptr_mut_void(&lib, b"XYZ")?;
++    #[cfg(any(unix, windows))]
+     macro_rules! load_ptrs_by_symbols_mut_void {
+         ($lib:expr, $($name:ident),* $(,)?) => {
+             $(
+@@ -181,6 +184,7 @@ macro_rules! load_ptrs_by_symbols_mut_void {
+     // =>
+     // let ABC: libloading::Symbol<'_, ABCFn> = unsafe { lib.get(b"ABC")? };
+     // let XYZ: libloading::Symbol<'_, XYZFn> = unsafe { lib.get(b"XYZ")? };
++    #[cfg(any(unix, windows))]
+     macro_rules! load_ptrs_by_symbols_fn {
+         ($lib:expr, $($name:ident : $ty:ty),* $(,)?) => {
+             $(
+@@ -198,6 +202,7 @@ pub(crate) enum EnzymeLibraryError {
+         LoadFailed { err: String },
+     }
+ 
++    #[cfg(any(unix, windows))]
+     impl From<libloading::Error> for EnzymeLibraryError {
+         fn from(err: libloading::Error) -> Self {
+             Self::LoadFailed { err: format!("{err:?}") }
+@@ -366,6 +371,7 @@ pub(crate) fn set_rust_rules(&mut self, val: bool) {
+         }
+ 
+         #[allow(non_snake_case)]
++        #[cfg(any(unix, windows))]
+         fn call_dynamic(
+             sysroot: &rustc_session::config::Sysroot,
+         ) -> Result<Self, EnzymeLibraryError> {
+@@ -433,6 +439,15 @@ fn call_dynamic(
+             })
+         }
+ 
++        #[cfg(not(any(unix, windows)))]
++        fn call_dynamic(
++            sysroot: &rustc_session::config::Sysroot,
++        ) -> Result<Self, EnzymeLibraryError> {
++            Err(EnzymeLibraryError::LoadFailed {
++                err: "Dynamic library loading is not supported on this platform".to_string(),
++            })
++        }
++
+         fn get_enzyme_path(sysroot: &Sysroot) -> Result<String, EnzymeLibraryError> {
+             let llvm_version_major = unsafe { LLVMRustVersionMajor() };
+ 
+diff --git i/compiler/rustc_codegen_llvm/src/llvm/offload_ffi.rs w/compiler/rustc_codegen_llvm/src/llvm/offload_ffi.rs
+index 46d93202..b2d09d0c 100644
+--- i/compiler/rustc_codegen_llvm/src/llvm/offload_ffi.rs
++++ w/compiler/rustc_codegen_llvm/src/llvm/offload_ffi.rs
+@@ -17,6 +17,7 @@ pub(crate) struct RustOffloadWrapper {
+     LLVMRustOffloadEmbedBufferInModule: LLVMRustOffloadEmbedBufferInModuleFn,
+     LLVMRustOffloadMapper: LLVMRustOffloadMapperFn,
+     // Keep the dynamic library loaded while the function pointers are used.
++    #[cfg(any(unix, windows))]
+     _lib: libloading::Library,
+ }
+ 
+@@ -26,6 +27,7 @@ pub(crate) enum RustOffloadLibraryError {
+     LoadFailed { err: String },
+ }
+ 
++#[cfg(any(unix, windows))]
+ impl From<libloading::Error> for RustOffloadLibraryError {
+     fn from(err: libloading::Error) -> Self {
+         Self::LoadFailed { err: format!("{err:?}") }
+@@ -71,6 +73,7 @@ pub(crate) unsafe fn llvm_rust_offload_wrapper(&self, v1: &Value, v2: &Value, vs
+         unsafe { (self.LLVMRustOffloadMapper)(v1, v2, vs.as_ptr()) }
+     }
+ 
++    #[cfg(any(unix, windows))]
+     fn call_dynamic(
+         sysroot: &rustc_session::config::Sysroot,
+     ) -> Result<Self, RustOffloadLibraryError> {
+@@ -94,6 +97,14 @@ fn call_dynamic(
+             _lib: lib,
+         })
+     }
++    #[cfg(not(any(unix, windows)))]
++    fn call_dynamic(
++        sysroot: &rustc_session::config::Sysroot,
++    ) -> Result<Self, RustOffloadLibraryError> {
++        Err(RustOffloadLibraryError::LoadFailed {
++            err: "Dynamic library loading is not supported on this platform".to_string(),
++        })
++    }
+ 
+     fn get_rust_offload_path(
+         sysroot: &rustc_session::config::Sysroot,
+diff --git i/compiler/rustc_driver/Cargo.toml w/compiler/rustc_driver/Cargo.toml
+index 51909719..388a839a 100644
+--- i/compiler/rustc_driver/Cargo.toml
++++ w/compiler/rustc_driver/Cargo.toml
+@@ -4,7 +4,7 @@ version = "0.0.0"
+ edition = "2024"
+ 
+ [lib]
+-crate-type = ["dylib"]
++crate-type = ["dylib","lib"]
+ 
+ [dependencies]
+ # tidy-alphabetical-start
+diff --git i/compiler/rustc_metadata/src/host_dylib.rs w/compiler/rustc_metadata/src/host_dylib.rs
+index 9bd2a57f..055bfce9 100644
+--- i/compiler/rustc_metadata/src/host_dylib.rs
++++ w/compiler/rustc_metadata/src/host_dylib.rs
+@@ -9,10 +9,12 @@
+ 
+ use crate::locator::CrateError;
+ 
++#[cfg(any(unix, windows))]
+ fn format_dlopen_err(e: &(dyn std::error::Error + 'static)) -> String {
+     e.sources().map(|e| format!(": {e}")).collect()
+ }
+ 
++#[cfg(any(unix, windows))]
+ fn attempt_load_dylib(path: &Path) -> Result<libloading::Library, libloading::Error> {
+     #[cfg(target_os = "aix")]
+     if let Some(ext) = path.extension()
+@@ -40,6 +42,7 @@ fn attempt_load_dylib(path: &Path) -> Result<libloading::Library, libloading::Er
+ // proc-macro DLL with `Error::LoadLibraryExW`. It is suspected that something in the
+ // system still holds a lock on the file, so we retry a few times before calling it
+ // an error.
++#[cfg(any(unix, windows))]
+ fn load_dylib(path: &Path, max_attempts: usize) -> Result<libloading::Library, String> {
+     assert!(max_attempts > 0);
+ 
+@@ -103,6 +106,7 @@ fn from(err: DylibError) -> CrateError {
+     }
+ }
+ 
++#[cfg(any(unix, windows))]
+ pub unsafe fn load_symbol_from_dylib<T: Copy>(
+     path: &Path,
+     sym_name: &str,
+@@ -123,6 +127,17 @@ pub unsafe fn load_symbol_from_dylib<T: Copy>(
+     Ok(*sym)
+ }
+ 
++#[cfg(not(any(unix, windows)))]
++pub unsafe fn load_symbol_from_dylib<T: Copy>(
++    path: &Path,
++    sym_name: &str,
++) -> Result<T, DylibError> {
++    Err(DylibError::DlOpen(
++        path.display().to_string(),
++        "dynamic library loading is not supported on this platform".to_string(),
++    ))
++}
++
+ pub(crate) fn dlsym_proc_macros(
+     path: &Path,
+     stable_crate_id: StableCrateId,

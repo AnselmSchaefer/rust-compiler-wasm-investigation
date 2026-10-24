@@ -2,6 +2,12 @@
 
 Fixed defaults (PLAN.md §1), plus decisions and findings recorded during work packages, newest first.
 
+## 2026-10-24 · WP-05: rustc for a Wasm host
+- **The rustc source changes are written by the project owner, not by Claude** (rust-lang's agent policy). They are A1 (driver as `lib`) and A2 (`libloading` only on unix/windows), in `toolchain/patches/rust/wasm-host.diff`. Claude reviews them, builds them, and handles everything outside the rust tree.
+- **The host link needs `-lc++abi` (operator new/delete) and `-ldl`.** rustc_llvm adds `-lc++` only. wasi-libc's libdl has stubs for LLVM's `DynamicLibrary.cpp`.
+- **Sysroot without a patch:** argv[0] = `/sysroot/bin/rustc` as a symlink, *plus* `lib/rustlib` visible from the working directory. `from_env_args_next` checks the relative path `lib/rustlib` against the cwd, not next to argv[0], which looks like an upstream bug. In the browser VFS this means: cwd `/` and a symlink `/lib` → `/sysroot/lib`.
+- **WP-06 links outside rustc:** the host runs `wasm-ld.wasm` with the link line. In-process lld would be an AI-authored change in `rustc_codegen_ssa` (banned).
+
 ## 2026-10-24 · WP-04: LLVM for a Wasm host
 - **The LLVM patch is YoWASP's WASI patch plus LLVM 23 fixes** (`toolchain/patches/llvm/0001`, 22 files, +178/−30). Notable: wasi-libc *declares* `posix_madvise` and `flock` but doesn't provide them, so header checks pass and the link fails.
 - **Explicit `CMAKE_*_FLAGS` override the toolchain file's `_INIT` flags.** That silently dropped `-pthread` and `--import-memory`. A threaded tool with a non-imported memory crashes as soon as it spawns a thread. `build-llvm.sh` now passes both explicitly.

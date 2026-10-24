@@ -83,9 +83,11 @@ linker = "$ROOT/toolchain/bin/wasi-threads-clang"
 wasi-root = "$WASI_SDK/share/wasi-sysroot"
 # Flags for rustc.wasm itself (never the wasm32-wasip1 target spec users see): link against
 # wasi-sdk's libc/libc++ (what LLVM was built against) instead of rustup's self-contained copy;
-# LLVM uses mmap (emulated), needs up to 4 GiB of memory and a big stack.
+# LLVM uses mmap (emulated), needs up to 4 GiB of memory and a big stack. rustc_llvm's build
+# script adds -lc++ but not -lc++abi, which holds operator new/delete in wasi-sdk.
+# LLVM's DynamicLibrary.cpp calls dlopen & co.; wasi-libc's libdl provides stubs that fail cleanly.
 # Here rather than in RUSTFLAGS_BOOTSTRAP, which bootstrap.py also applies to its own native build.
-rustflags = ["-Clink-self-contained=no", "-Clink-arg=-lwasi-emulated-mman",
+rustflags = ["-Clink-self-contained=no", "-Clink-arg=-lc++abi", "-Clink-arg=-ldl", "-Clink-arg=-lwasi-emulated-mman",
              "-Clink-arg=-Wl,--max-memory=4294967296", "-Clink-arg=-Wl,-z,stack-size=8388608"]
 EOF
 echo "wrote $OUT/bootstrap.toml"
