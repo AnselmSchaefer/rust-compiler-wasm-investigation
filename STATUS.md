@@ -86,6 +86,8 @@
 - [ ] **Possible upstream rustc bug** (user to report, if wanted): `filesearch.rs` `from_env_args_next` checks `lib/rustlib` relative to the *working directory*, not next to argv[0] (see `~/Projects/rustc-wasm-host-source-changes.md` §6).
 
 ## Human actions needed
+- [x] **Scope (2026-10-24):** v1 targets agentic development; human-only browser-IDE WPs moved to the PLAN.md Appendix.
+- [ ] **[H] at WP-38 start:** where agents run first: in the browser, headless (server/CI), or both.
 - [x] **[H] WP-14 user trial:** done 2026-10-24, the user reports it works fine.
 - [x] **WP-09 decision (2026-10-24):** re-scope the target to 2.5× (option B). A cross-session metadata cache stays a possible human-written rustc change for later (WP-22).
 - [x] **WP-06:** resolved 2026-10-24: the user applied bjorn3's existing `get_linker` fix instead of writing a std change. A proper std `join_paths`/`split_paths` for WASI is still an optional upstream fix the user could write.
@@ -122,14 +124,16 @@
 | 20 | Proc macros inside rustc.wasm | blocked | 0 | |
 | 21 | Build scripts | blocked | 0 | |
 | 22 | Ecosystem matrix (M1) | blocked | 0 | |
-| 23 | rust-analyzer in Wasm | blocked | 0 | |
-| 24 | Editor integration | blocked | 0 | |
-| 25 | Projects, persistence, offline | blocked | 0 | |
+| 23 | rust-analyzer in Wasm | deferred | 0 | Appendix (human-only), 2026-10-24 |
+| 24 | Editor integration | deferred | 0 | Appendix (human-only) |
+| 25 | Projects and workspaces | blocked | 0 | re-scoped for agents 2026-10-24 |
 | 26 | Tests, Clippy, rustfmt | blocked | 0 | |
-| 27 | Incremental + check-on-idle | blocked | 0 | |
-| 28 | First-visit performance | blocked | 0 | |
-| 29 | Deploy v1 (M2) | blocked | 0 | |
-| 30–35 | v2 features | deferred | 0 | |
+| 27 | Incremental compilation | blocked | 0 | check-on-idle moved to the Appendix |
+| 28 | First-visit performance | deferred | 0 | Appendix (human-only) |
+| 38 | Agent tool API | blocked | 0 | new 2026-10-24; [H] at start: where agents run |
+| 29 | Deploy v1 (M2) | blocked | 0 | now depends on WP-22 + WP-38 |
+| 30, 32, 34 | v2 features | deferred | 0 | agent-useful; 34 = HTTP handlers via the tool API |
+| 31, 33, 35 | Web preview, debugger UI, collaboration | deferred | 0 | Appendix (human-only) |
 | 36 | Upstream proposals | blocked | 0 | |
 | 37 | Release-train rebase | blocked | 0 | recurring |
 

@@ -2,6 +2,8 @@
 
 *Created 2026-10-23 · Companion to `REPORT.md` (research) and `PROPOSAL.md` (design) · Progress lives in `STATUS.md`*
 
+*Re-scoped 2026-10-24 (user decision): v1 targets **agentic development**: an AI agent writes, builds, tests and fixes Rust through a tool API (WP-38). Everything useful only to humans editing in the browser moved to the **Appendix: some day later** (§4, end). PROPOSAL.md still describes the full human IDE; where it disagrees, this plan wins.*
+
 Claude is the sole developer, and work happens in separate sessions, not continuously. The project is therefore cut into **work packages (WPs)** that run one after another. Each WP:
 
 - fits in **1–4 sessions**
@@ -16,6 +18,7 @@ Claude is the sole developer, and work happens in separate sessions, not continu
 1. **Orient** (≤ 5 min).
    - Read `CLAUDE.md` and `STATUS.md`.
    - Pick the **lowest-numbered WP marked `ready`** whose dependencies are `done`. If a WP is `in-progress`, continue it.
+   - WPs in the **Appendix** are `deferred`: never pick them unless the user moves them back.
 2. **Plan the session.** Write 3–6 bullet goals under "Current session" in `STATUS.md`.
 3. **Work.**
    - Long builds run in the background with logs in `build-logs/<wp>/`.
@@ -50,10 +53,11 @@ These are taken as defaults so work can start. Changing one later only affects t
 
 | Decision | Choice | Affects |
 |---|---|---|
-| Editor | CodeMirror 6 | WP-14, WP-24 |
+| Primary user (2026-10-24) | AI agents, through a tool API (WP-38). Human-only IDE features are in the Appendix. Where agents run (browser, headless, both) is the [H] decision at the start of WP-38 | WP-25–29, WP-38 |
+| Editor | CodeMirror 6 | WP-14, WP-24 (Appendix) |
 | Compiler host ABI | `wasm32-wasip1-threads` (WASI) | WP-04–WP-10 |
 | User program target | `wasm32-wasip1` first (WP-13), `wasm32-wasip3` components later (WP-30) | WP-13, WP-30 |
-| Hosting | Static CDN (Cloudflare Pages + R2 or GitHub Pages). No server-side compiling | WP-16, WP-29 |
+| Hosting | Static CDN (Cloudflare Pages + R2 or GitHub Pages). No server-side compiling, unless WP-38 chooses headless agents (then the same rustc.wasm runs under a Node/wasmtime host) | WP-16, WP-29, WP-38 |
 | Base rustc version | Latest stable at WP-03; rebased every 6 weeks (WP-37) | all toolchain WPs |
 | Language for host glue | TypeScript (workers, UI); Rust → Wasm for VFS, resolver, cache, planner | — |
 | Target browsers | **Chromium-based only** (user decision 2026-10-24). Firefox runs where it's free but is never a gate. Safari/WebKit are out of scope | all browser WPs |
@@ -84,10 +88,11 @@ These are taken as defaults so work can start. Changing one later only affects t
 | B. Own toolchain | 03–10 | Our own rustc.wasm + lld + sysroot, compile-server mode, packaged releases | 14–22 |
 | C. Browser runtime | 11–14 | VFS, workers, run sandbox, minimal UI → **Milestone M1a: offline single-file playground** | 7–10 |
 | D. Dependencies | 15–22 | crates.io, cache, proc macros, build scripts, ecosystem matrix → **M1: playground with crates** | 18–28 |
-| E. IDE (v1) | 23–29 | rust-analyzer, multi-file projects, tests, clippy/rustfmt, perf passes, deploy → **M2: v1 release** | 16–24 |
-| F. v2 features | 30–35 | wasip3 components, web preview, clang, debugging, HTTP server preview, collaboration | 16–26 |
+| E. Agent-ready v1 | 25–27, 38, 29 | Workspaces, tests/Clippy/rustfmt, incremental check, **agent tool API**, deploy → **M2: v1 for agentic development** | 8–11 |
+| F. v2 features | 30, 32, 34 | wasip3 components, clang for `cc` build scripts, HTTP handler runs | 6–9 |
+| Appendix: some day later | 23, 24, 28, 31, 33, 35 + parts of 25–27 | Human-only browser IDE: rust-analyzer + editor UI, first-visit perf, web preview, debugger UI, collaboration | — |
 | G. Upstream & upkeep | 36–37 | Upstream proposals; recurring rebase | ongoing |
-| **Total to v1** | | | **~60–90 sessions** |
+| **Total to v1** | | | **~51–77 sessions** (was ~60–90 with the human IDE) |
 
 ---
 
@@ -329,72 +334,56 @@ These are taken as defaults so work can start. Changing one later only affects t
   - Each session fixes the largest failure class.
 - **Done when:** ≥ 90% of the top 100 pass (M1). The ≥ 95% top-500 target is tracked through Phase E.
 
-### Phase E: IDE (v1)
+### Phase E: Agent-ready v1
 
-#### WP-23 rust-analyzer in Wasm
-- **Depends:** WP-11, WP-20 · **Est.:** 2–3 sessions
+#### WP-25 Projects and workspaces
+- **Depends:** WP-17, WP-16 · **Est.:** 2 sessions
 - **Tasks**
-  - Build rust-analyzer for `wasm32-wasip1-threads`. Patch it to:
-    - use the in-process proc-macro components instead of the `proc-macro-srv` process
-    - drop file watching, using VFS change events instead
-  - LSP over a worker message channel.
-- **Done when:** in a headless test, hover, completion and go-to-definition work on a project with serde, and derive output is expanded.
-
-#### WP-24 Editor integration
-- **Depends:** WP-23, WP-14 · **Est.:** 2–3 sessions
-- **Tasks**
-  - CodeMirror LSP client: diagnostics, inlay hints, completion, rename, code actions, semantic tokens.
-  - File tree, tabs, multi-file editing, search.
-- **Done when:** e2e tests cover rename across files and a code action, and keystroke → diagnostics takes < 300 ms (bench).
-
-#### WP-25 Projects, persistence, offline
-- **Depends:** WP-24, WP-16 · **Est.:** 2 sessions
-- **Tasks**
-  - Workspaces, `Cargo.toml` editing with resolver feedback, zip import/export, GitHub public repo import.
-  - Service worker for offline use.
-  - Project list in OPFS.
-- **Done when:** an imported workspace survives a reload and builds offline.
+  - Workspaces (members, path dependencies between them) in the build planner and resolver.
+  - `Cargo.toml` edits with resolver feedback as structured results (what changed in the lockfile, or the error).
+  - Zip import/export; import of a public GitHub repo (archive download).
+  - Projects persisted in OPFS (the WP-11 persister).
+- **Done when:** an imported workspace with ≥ 2 members survives a reload and builds.
 
 #### WP-26 Tests, Clippy, rustfmt
-- **Depends:** WP-24 · **Est.:** 2–3 sessions
+- **Depends:** WP-25 · **Est.:** 2–3 sessions
 - **Tasks**
-  - `cargo test` (libtest JSON output) feeding a test explorer, plus doc tests.
-  - Build Clippy (a rustc driver, so it uses the same patches) and rustfmt for Wasm.
-- **Done when:** the test explorer runs and reruns a single test, and Clippy lints and rustfmt work in e2e tests.
+  - `cargo test`: build the test harnesses, run them in the sandbox, parse libtest's JSON output into per-test results (status, output, duration); run one test by name; doc tests.
+  - Build Clippy (a rustc driver, so it uses the same patches) and rustfmt for Wasm; JSON diagnostics.
+- **Done when:** an e2e test runs a crate's tests, reruns a single failing test by name with structured results, and Clippy lints and rustfmt formats a file.
 
-#### WP-27 Incremental compilation and check-on-idle
-- **Depends:** WP-24 · **Est.:** 2 sessions
+#### WP-27 Incremental compilation
+- **Depends:** WP-25 · **Est.:** 2 sessions
 - **Tasks**
   - Persist rustc's incremental directory in OPFS.
-  - Run `check` automatically when the editor goes idle.
-  - Profile pass against the PROPOSAL §6 budgets.
+  - Profile pass against the PROPOSAL §6 budgets. An agent iterates edit → check many times, so warm latency matters most.
 - **Done when:** a warm `check` of the user crate takes < 1 s and warm edit → run < 2 s on the 500-line benchmark, in Chromium.
 
-#### WP-28 First-visit performance
-- **Depends:** WP-27 · **Est.:** 1–2 sessions
+#### WP-38 Agent tool API
+- **Depends:** WP-26, WP-27 · **Est.:** 1–2 sessions
 - **Tasks**
-  - Load assets by priority, using streaming compilation and cached compiled modules.
-  - Trim the asset size (LLVM WebAssembly target only, strip, brotli level 11).
-- **Done when:** the full toolchain is under ~80 MB brotli and full IDE features are ready in < 15 s cold on a 100 Mbit link (throttled bench).
+  - **[H]** At the start, the user decides where agents run first: in the user's browser (an in-page tool layer, e.g. an assistant panel), headless on a server or in CI (the same rustc.wasm, linker and resolver under a Node/wasmtime host), or both.
+  - A typed tool API over the orchestrator: list/read/write/delete files; resolve dependencies; check; build; run (stdin, timeout, exit code, output); test (all or one, structured results); Clippy; rustfmt. Every result is JSON, with rustc diagnostics in their JSON form.
+  - An MCP adapter for the chosen host(s).
+  - Guardrails: per-call time and memory limits; user programs run only in the sandbox (WP-13), without network.
+- **Done when:** a scripted agent session (a fixture of tool calls), through the API alone, creates a project with a `serde` dependency, fixes a seeded compile error from the diagnostics, makes a failing test pass, and passes Clippy and rustfmt.
 
 #### WP-29 Deploy v1 → **M2**
-- **Depends:** WP-22 (top-500 ≥ 95%), WP-28 · **Est.:** 1–2 sessions
+*Needed when agents run in the browser (and for the L2 CDN / prebuilt crates, which headless agents can use too).*
+- **Depends:** WP-22 (top-500 ≥ 95%), WP-38 · **Est.:** 1–2 sessions
 - **Tasks**
   - **[H]** The user approves hosting, domain and accounts.
   - Static deploy with COOP/COEP headers and a CDN for L2.
   - Prebuild the top ~2,000 crates.
 - **Done when:** the public URL passes the e2e smoke suite in Chromium, and the user signs off.
 
-### Phase F: v2 features (in order; each can be deferred)
+### Phase F: v2 features (in order; each can be deferred; all useful to agents too)
 
 | WP | Package | Depends | Est. | Done when |
 |---|---|---|---|---|
 | WP-30 | `wasm32-wasip3` component output. `wasm-component-ld` and jco run in the browser | WP-29 | 2–3 | async `wasip3` program runs in the sandbox via jco |
-| WP-31 | Web preview pane: `wasm-bindgen` CLI compiled to Wasm, iframe preview from a separate origin, hot reload | WP-30 | 3–4 | A Leptos counter app previews and reloads on edit |
 | WP-32 | clang-in-Wasm (YoWASP/oligamiq builds) for `cc`-crate build scripts | WP-21 | 2–3 | Crates with small C parts (e.g. `zstd-sys` vendored) build |
-| WP-33 | Debugging: DWARF in Wasm, a DAP adapter, breakpoint UI | WP-29 | 3–4 | Breakpoint, step, inspect locals on a test program |
-| WP-34 | HTTP server preview: `wasi:http` incoming-handler apps (axum-style) served through a Service Worker | WP-30 | 2–3 | `GET /hello` from the preview pane hits the user's Rust handler |
-| WP-35 | Collaboration: Yjs CRDT, shared terminal, read-only share links | WP-29 | 3–4 | Two browsers edit the same file live |
+| WP-34 | HTTP handler apps: `wasi:http` incoming-handler apps (axum-style) run in the sandbox and take requests through the tool API (a browser preview pane for humans stays in the Appendix) | WP-30, WP-38 | 2–3 | `GET /hello` sent through the tool API hits the user's Rust handler |
 
 ### Phase G: Upstream and upkeep
 
@@ -412,6 +401,46 @@ These are taken as defaults so work can start. Changing one later only affects t
   - Follow `docs/rebase.md`, rebuild, then run every `scripts/verify/*` and the ecosystem sample.
 - **Done when:** all verify scripts pass on the new rustc version, and `RUSTC_ID` is bumped (which invalidates the cache).
 
+### Appendix: some day later (only for humans developing in the browser)
+
+*Moved here 2026-10-24 when v1 was re-scoped to agentic development. Status `deferred`; the session protocol never picks these. Kept as written, so they can be moved back unchanged. Dependencies on Phase E WPs still hold.*
+
+Parts taken out of kept WPs:
+- From WP-25: service worker for offline use; the project list UI.
+- From WP-26: the test explorer UI (the structured test results it would show stay in WP-26).
+- From WP-27: running `check` automatically when the editor goes idle.
+- From WP-34: serving the handler to a browser preview pane through a Service Worker.
+- From WP-14 (done): nothing; the minimal UI stays as the demo and test bed.
+
+#### WP-23 rust-analyzer in Wasm
+- **Depends:** WP-11, WP-20 · **Est.:** 2–3 sessions
+- **Tasks**
+  - Build rust-analyzer for `wasm32-wasip1-threads`. Patch it to:
+    - use the in-process proc-macro components instead of the `proc-macro-srv` process
+    - drop file watching, using VFS change events instead
+  - LSP over a worker message channel.
+- **Done when:** in a headless test, hover, completion and go-to-definition work on a project with serde, and derive output is expanded.
+
+#### WP-24 Editor integration
+- **Depends:** WP-23, WP-14 · **Est.:** 2–3 sessions
+- **Tasks**
+  - CodeMirror LSP client: diagnostics, inlay hints, completion, rename, code actions, semantic tokens.
+  - File tree, tabs, multi-file editing, search.
+- **Done when:** e2e tests cover rename across files and a code action, and keystroke → diagnostics takes < 300 ms (bench).
+
+#### WP-28 First-visit performance
+- **Depends:** WP-27 · **Est.:** 1–2 sessions
+- **Tasks**
+  - Load assets by priority, using streaming compilation and cached compiled modules.
+  - Trim the asset size (LLVM WebAssembly target only, strip, brotli level 11).
+- **Done when:** the full toolchain is under ~80 MB brotli and full IDE features are ready in < 15 s cold on a 100 Mbit link (throttled bench).
+
+| WP | Package | Depends | Est. | Done when |
+|---|---|---|---|---|
+| WP-31 | Web preview pane: `wasm-bindgen` CLI compiled to Wasm, iframe preview from a separate origin, hot reload | WP-30 | 3–4 | A Leptos counter app previews and reloads on edit |
+| WP-33 | Debugging: DWARF in Wasm, a DAP adapter, breakpoint UI | WP-29 | 3–4 | Breakpoint, step, inspect locals on a test program |
+| WP-35 | Collaboration: Yjs CRDT, shared terminal, read-only share links | WP-29 | 3–4 | Two browsers edit the same file live |
+
 ---
 
 ## 5. Critical path and parallelism
@@ -423,8 +452,9 @@ WP-00 → 01 → 02
           └→ 11 (fill-in while builds run) ───────┴→ 12 → 13 → 14 (M1a)
              11 → 15 → 16                12 ─┐
                    15 ───────────────────────┴→ 17 → 18 ─┐
-                          06 → 19 ───────────────────────┴→ 20 → 21 → 22 (M1)
-                                                      20 → 23 → 24 → 25/26/27 → 28 → 29 (M2)
+                          06 → 19 ───────────────────────┴→ 20 → 21 → 22 (M1) ─┐
+                                 17 + 16 → 25 → 26 ┬→ 38 (agent API) ───────────┴→ 29 (M2)
+                                            25 → 27 ┘
 ```
 
 Because sessions run one at a time, "parallel" here means **switching to a WP whose dependencies are met while a long build runs in the background**. The best candidates are WP-11, WP-15 and WP-19.
