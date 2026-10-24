@@ -29,6 +29,6 @@ mapfile -t flags < <(sed -n '/^rustflags = \[/,/\]$/p' "$OUT/bootstrap.toml" | g
 RUSTC_BOOTSTRAP=1 "$OUT/stage0/bin/rustc" --edition=2024 --crate-type bin --crate-name rustc_multi \
   --target wasm32-wasip1-threads -C opt-level=3 -C linker="$ROOT/toolchain/bin/wasi-threads-clang" \
   "${flags[@]}" "${deps[@]}" "${native[@]}" \
-  --extern rustc_driver="$DRIVER" --extern rustc_session="$(lib rustc_session)" \
+  --extern rustc_driver="$DRIVER" --extern rustc_session="$(lib rustc_session)" --extern serde_json="$(lib serde_json)" \
   "$ROOT/toolchain/rustc-multi/main.rs" -o "$OUT/rustc-multi.wasm"
 ls -la "$OUT/rustc-multi.wasm"

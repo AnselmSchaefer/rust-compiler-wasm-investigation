@@ -262,6 +262,17 @@ export class Vfs {
     });
   }
 
+  /** Append to a file (created if missing), in one locked write: a reader never sees half of it. */
+  appendFile(path: string, data: Uint8Array | string) {
+    const bytes = typeof data === 'string' ? enc.encode(data) : data;
+    this.locked(() => {
+      const ino = this.check(this.rawCreate(ROOT, path, false, false), 'appendFile', path);
+      const s = this.rawStat(ino);
+      if (typeof s === 'number') throw new VfsError(-s, 'appendFile', path);
+      this.check(this.rawWrite(ino, s.size, bytes), 'appendFile', path);
+    });
+  }
+
   readdir(path: string): DirEntry[] {
     return this.locked(() => {
       const dir = this.check(this.rawLookup(ROOT, path), 'readdir', path);

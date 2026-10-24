@@ -1,5 +1,7 @@
 // Run a WASI (wasip1-threads) program on the shared VFS: the main thread in one worker, each
-// `wasi.thread-spawn` in another (WP-11; WP-12 adds a worker pool and the compile server).
+// `wasi.thread-spawn` in another (WP-11). A worker whose thread has finished is kept, with its
+// instance, and runs the process's next thread (WP-09): rustc starts a thread per compilation, and
+// a new worker means instantiating the whole compiler again.
 //
 // Thread creation: a thread that calls thread-spawn usually blocks right after (join), and a
 // blocked worker cannot start a nested worker. So spawn requests go through a ring buffer in a
@@ -8,8 +10,9 @@
 import { createProcess, freeProcess, type ProcessSpec } from './wasi';
 import type { Vfs, VfsHandle } from '../vfs/vfs';
 
-// Channel layout (Int32Array): [SEQ, NEXT_TID, CLAIM, pad, READY × N, (tid, arg) × N]
-const SEQ = 0, NEXT_TID = 1, CLAIM = 2, READY = 4, N = 256, DATA = READY + N;
+// Channel layout (Int32Array): [SEQ, NEXT_TID, CLAIM, OUT_SEQ, READY × N, (tid, arg) × N].
+// OUT_SEQ counts writes to stdout, so the page can wait for output instead of polling.
+const SEQ = 0, NEXT_TID = 1, CLAIM = 2, OUT_SEQ = 3, READY = 4, N = 256, DATA = READY + N;
 export const CHANNEL_INTS = DATA + 2 * N;
 
 /** Called from any thread of the process: queue a thread and return its id (wasi-threads ABI). */
@@ -25,6 +28,12 @@ export function requestThread(ch: Int32Array, startArg: number): number {
   return tid;
 }
 
+/** Called by the process's threads after a write to stdout. */
+export function stdoutWritten(ch: Int32Array) {
+  Atomics.add(ch, OUT_SEQ, 1);
+  Atomics.notify(ch, OUT_SEQ);
+}
+
 /** Message to process-worker.ts. */
 export type StartMessage = {
   vfs: VfsHandle; module: WebAssembly.Module; memory: WebAssembly.Memory; channel: Int32Array;
@@ -32,7 +41,13 @@ export type StartMessage = {
   thread?: { tid: number; arg: number };
 };
 
-export type RunResult = { code: number; error?: string; threads: number; ms: number };
+/** Message to an idle process-worker.ts: run another thread of the same process. */
+export type ThreadMessage = { thread: { tid: number; arg: number } };
+
+/** Message from process-worker.ts: the process exited, or a spawned thread finished (`idle`). */
+export type WorkerMessage = { exit: number; error?: string } | { idle: true };
+
+export type RunResult = { code: number; error?: string; threads: number; workers: number; ms: number };
 
 /** Memory limits from a module's `env.memory` import (wasm binary import section). */
 export function importedMemoryLimits(bytes: Uint8Array): { initial: number; maximum: number } {
@@ -62,18 +77,19 @@ export function importedMemoryLimits(bytes: Uint8Array): { initial: number; maxi
 
 /**
  * Start `module` as a process with `spec` and wait for it to exit. `vfs` is the caller's own
- * attachment (the page's); `handle` is passed to the workers.
+ * attachment (the page's); `handle` is passed to the workers. `onStdout` is called (on the page)
+ * after the process has written to stdout, at most once per page task.
  */
 export async function runProcess(
   vfs: Vfs, handle: VfsHandle, module: WebAssembly.Module, memory: WebAssembly.Memory, spec: ProcessSpec,
-  workerUrl: string | URL,
+  workerUrl: string | URL, onStdout?: () => void,
 ): Promise<RunResult> {
   const t0 = performance.now();
   const pid = createProcess(vfs, spec);
   const channel = new Int32Array(new SharedArrayBuffer(CHANNEL_INTS * 4));
   channel[NEXT_TID] = 1;
   const base: StartMessage = { vfs: handle, module, memory, channel, pid, args: spec.args, env: spec.env };
-  const workers: Worker[] = [];
+  const workers: Worker[] = [], idle: Worker[] = [];
   let done = false, threads = 0;
 
   const result = new Promise<RunResult>(resolve => {
@@ -82,13 +98,19 @@ export async function runProcess(
       done = true;
       for (const w of workers) w.terminate();
       freeProcess(vfs, pid);
-      resolve({ code, error, threads, ms: Math.round(performance.now() - t0) });
+      resolve({ code, error, threads, workers: workers.length, ms: Math.round(performance.now() - t0) });
     };
     const start = (thread?: StartMessage['thread']) => {
+      const reuse = thread && idle.pop();
+      if (reuse) {
+        reuse.postMessage({ thread } satisfies ThreadMessage);
+        return;
+      }
       const w = new Worker(workerUrl, { type: 'module' });
       workers.push(w);
-      w.onmessage = e => {
+      w.onmessage = (e: MessageEvent<WorkerMessage>) => {
         if ('exit' in e.data) finish(e.data.exit, e.data.error);
+        else idle.push(w);
       };
       w.onerror = e => finish(-1, `worker error: ${e.message}`);
       w.postMessage({ ...base, thread } satisfies StartMessage);
@@ -109,6 +131,17 @@ export async function runProcess(
         const w = Atomics.waitAsync(channel, SEQ, seen, 1000);
         if (w.async) await w.value;
         seen = Atomics.load(channel, SEQ);
+      }
+    })();
+
+    if (onStdout) (async () => {
+      let seen = 0;
+      while (!done) {
+        const w = Atomics.waitAsync(channel, OUT_SEQ, seen, 1000);
+        if (w.async) await w.value;
+        const now = Atomics.load(channel, OUT_SEQ);
+        if (now !== seen && !done) onStdout();
+        seen = now;
       }
     })();
 

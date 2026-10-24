@@ -3,11 +3,17 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** none. Next is **WP-09** (ready): compile-server mode.
-- **Last session:** 2026-10-24 (session 10). WP-08 done: the packaged sysroot (`toolchain/package-sysroot.mjs`, meta/link groups) works in Chromium, and hello peaks at 102 MiB (check) / 139 MiB (codegen), without any metadata patch.
+- **Active WP:** **WP-09** (in-progress, 1 session used, **waiting on a user decision**, see Blocker).
+- **Last session:** 2026-10-24 (session 11). The compile server works (`rustc-multi --server`): 10 sequential requests in one Chromium instance, all correct. Warm check-hello 21.9–22.5 ms vs cold (new instance per compile) 65–68 ms = 2.9–3.0×, right at the 3× target, so `tests/e2e/compile-server.spec.ts` passes or fails by chance.
 - **Rule for rustc source:** rust-lang's agent policy (`build/rust/AGENTS.md`) applies. Claude does not write or edit rustc source, and does not draft rust-lang issues, PRs or Zulip posts. The user writes those, or applies existing **human-written** patches (bjorn3/oligamiq), which the user prefers whenever one exists. **danlapid 0005–0007 are LLM-generated** (Claude co-author trailers), so they don't qualify even if the user applies them; design reference only (`docs/patches.md`). Claude reviews, builds and explains. Everything outside `build/rust` is Claude's, including out-of-tree drivers using `rustc_driver` (`toolchain/rustc-multi`).
-- **Next step:** WP-09. Grow `toolchain/rustc-multi` into a compile server: requests over a WASI fd or a host import (JSON in/out). Measure cold vs warm; target: warm check-hello ≥ 3× faster than cold, 10 sequential compiles in one instance. Check `toolchain/patches/rust/available/bjorn3-ice-path-pid.diff` first if the server uses `-Z` flags. Open question: what state survives between `run_compiler` calls (sysroot metadata is re-read each time today; caching it may need rustc changes, so look for existing human-written work first).
+- **Blocker (WP-09):** the ~20 ms of a warm request is mostly rustc reloading std's metadata per session (`-Ztime-passes`: expand_crate 14–15 ms, which is where `std` and its deps get loaded). `.rmeta` files are read by `get_rmeta_metadata_section` → `Mmap::map`, which on wasm32 is `read_to_end`; it bypasses the codegen backend's `MetadataLoader`, so an out-of-tree driver can't cache them. No human-written cache exists in bjorn3/oligamiq (checked). Options: (A) keep the 3× goal: the user writes a change that keeps metadata blobs across sessions (rustc_metadata, user-authored only); (B) re-scope: accept ~3× (e.g. check 2.5×, record the numbers), since the server's other gains (no re-instantiation, worker reuse) are in; (C) other ideas from the user.
+- **Next step:** after the decision: set the spec's threshold (or rebuild with the user's change), write `scripts/verify/wp-09.sh` (wasmtime: 10 requests via stdin; Chromium: the spec), record numbers in `bench/`.
 - **Running background jobs:** none
+
+## Current session (2026-10-24, session 11)
+- `toolchain/rustc-multi/main.rs`: `--server [--follow]` mode, with JSON requests on stdin, answers on stdout, and a `\x1e<id>` marker on stderr; uses the compiler's own `serde_json`. Under wasmtime: 10 checks of hello at ~21 ms each after the first.
+- `web/wasi/process.ts` + `process-worker.ts`: a worker whose thread has finished keeps its instance and runs the next thread (rustc spawns a thread per compile). Plus `OUT_SEQ` stdout-write notification (`onStdout` callback) so hosts wait instead of polling. `web/vfs/vfs.ts`: `appendFile`.
+- `tests/e2e/rustc-host/main.ts`: `startServer()`; `tests/e2e/compile-server.spec.ts`. WP-07/08/11 specs still pass with the worker pool.
 
 ## Current session (2026-10-24, session 10): done
 - Baseline before any change: hello peaks at 102 MiB (check) / 139 MiB (codegen) of rustc memory in Chromium, so the 300 MB target is met without paged metadata.
@@ -35,6 +41,7 @@
 - [ ] **Possible upstream rustc bug** (user to report, if wanted): `filesearch.rs` `from_env_args_next` checks `lib/rustlib` relative to the *working directory*, not next to argv[0] (see `~/Projects/rustc-wasm-host-source-changes.md` §6).
 
 ## Human actions needed
+- [ ] **WP-09 decision:** (A) the user writes a metadata cache in rustc, (B) re-scope the 3× target, or (C) something else. See Blocker.
 - [x] **WP-06:** resolved 2026-10-24: the user applied bjorn3's existing `get_linker` fix instead of writing a std change. A proper std `join_paths`/`split_paths` for WASI is still an optional upstream fix the user could write.
 - [x] **WP-05 decision (2026-10-24):** resolved: the user wrote A1/A2. the rust checkout's AGENTS.md forbids AI-authored rustc changes without a named reviewer, and bans them in codegen/metadata. The minimum changes (A1 driver `lib`, A2 dlopen guards) need to be written by the user or reviewed. B1/B2 can avoid rustc changes (VFS symlink, external wasm-ld). Details: `~/Projects/rustc-wasm-host-source-changes.md`.
 - [x] Plan confirmed; commits at end of each session approved (2026-10-23).
@@ -54,7 +61,7 @@
 | 06 | In-process linking | done | 1 | `scripts/verify/wp-06.sh` passes. Linked outside rustc by wasm-ld.wasm (`toolchain/rustc-wasm.ts`); stat shim; bjorn3's `get_linker` fix applied by the user |
 | 07 | Unwinding build and error recovery | done | 1 | `scripts/verify/wp-07.sh` passes. panic=unwind + exnref via config (unwind host std as stage 0); `rustc-multi` driver; no rust-tree change |
 | 08 | Sysroots and lazy metadata | done | 1 | `scripts/verify/wp-08.sh` passes. Packaged sysroot (meta/link groups); hello peaks 139 MiB, no metadata patch needed (D-0007 is LLM-generated anyway) |
-| 09 | Compile-server mode | ready | 0 | |
+| 09 | Compile-server mode | in-progress | 1 | server works; warm/cold = 2.9–3.0× (target 3×): needs a decision, see Blocker |
 | 10 | Toolchain release packaging | blocked | 0 | |
 | 11 | Virtual filesystem | done | 2 | `scripts/verify/wp-11.sh` passes. Shared-memory VFS + OPFS + WASI p1 adapter; design in `docs/vfs.md` |
 | 12 | Orchestrator and worker pool | blocked | 0 | |
@@ -92,6 +99,7 @@
 - Smoke: hello world runs on wasip1, wasip2, wasip3 (wasmtime 50) and wasip1-threads with a real thread (wasmtime 46.0.3).
 
 ## Session log
+- 2026-10-24 (session 11): WP-09 started. Compile server mode, worker reuse for threads, stdout wake-up. Warm/cold 3.0× at best; the remaining cost is rustc reloading std metadata per session (not cacheable out of tree).
 - 2026-10-24 (session 10): **WP-08 done.** Hello peaks well under 300 MB without paged metadata. danlapid 0005–0007 found to be LLM-generated (not usable). Sysroot packaging with meta/link groups and a sha256 manifest; page and spec load from it; numbers in `bench/sysroot.md`.
 - 2026-10-24 (session 9): **WP-07 done.** panic=unwind host via build config only: an unwind host std built with -Zbuild-std as bootstrap's stage 0 (bootstrap links stage 1 against stage 0's std). Out-of-tree `rustc-multi` driver catches errors and ICEs; error, ICE and success work in one instance in wasmtime and Chromium. Found the `process::id()` panic in `ice_path` under RUSTC_BOOTSTRAP (hangs the instance; RUSTC_ICE=0 avoids it). Chromium sees no EH overhead; wasmtime ~25%.
 - 2026-10-24 (session 8): **WP-06 done.** Object emission works. Fixed wasi-libc's stat modes with a link-time shim. Host-side linker driver + link-args parser. The `get_linker` `join_paths().unwrap()` panic (std's WASI paths are unsupported) is fixed by bjorn3's existing hunk, applied by the user. Verify passes: hello/medium build and run, rebuild over an existing output, E0308 reported, no leftovers.

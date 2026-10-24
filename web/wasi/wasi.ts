@@ -61,7 +61,11 @@ const sleepCell = new Int32Array(new SharedArrayBuffer(4));
 export class WasiProcess {
   private memory!: WebAssembly.Memory;
 
-  constructor(private readonly vfs: Vfs, readonly pid: number, private readonly args: string[], private readonly env: string[]) {}
+  /** `onWrite` is called after each successful fd_write (the host's process runner uses it for stdout). */
+  constructor(
+    private readonly vfs: Vfs, readonly pid: number, private readonly args: string[], private readonly env: string[],
+    private readonly onWrite?: (fd: number) => void,
+  ) {}
 
   /** Call once the instance exists (the guest's memory is imported or exported). */
   setMemory(memory: WebAssembly.Memory) { this.memory = memory; }
@@ -165,6 +169,7 @@ export class WasiProcess {
         }
         this.vfs.rawFdSetPos(this.pid, fd, pos);
         this.dv.setUint32(nwritten, total, true);
+        this.onWrite?.(fd);
         return 0;
       });
     },

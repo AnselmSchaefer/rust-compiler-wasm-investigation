@@ -57,8 +57,55 @@ async function rustc(name: string, args: string[], env: string[] = []) {
   return res;
 }
 
+/**
+ * A compile server (rustc-multi --server --follow, WP-09) in one long-lived instance. Requests are
+ * appended to its stdin file as JSON lines; each answer is a JSON line on stdout, and "\x1e<id>"
+ * on stderr ends that request's diagnostics.
+ */
+function startServer(name: string, env: string[] = []) {
+  const { module, limits } = modules[name];
+  const n = ++runs, stdin = `/proc/${n}.in`, out = `/proc/${n}.out`, err = `/proc/${n}.err`;
+  vfs.writeFile(stdin, '');
+  const memory = new WebAssembly.Memory({ ...limits, shared: true });
+  let wake: (() => void) | undefined;
+  const done = runProcess(vfs, handle, module, memory, {
+    args: ['/sysroot/bin/rustc', '--server', '--follow'], env: ['RUST_MIN_STACK=16777216', ...env],
+    stdin, stdout: out, stderr: err, preopens: [['/', '/']],
+  }, new URL('process-worker.js', location.href), () => wake?.());
+  let nextId = 0, outPos = 0, errPos = 0;
+  const wait = async (id: number) => {
+    for (;;) {
+      const text = vfs.readText(out);
+      const nl = text.indexOf('\n', outPos);
+      if (nl >= 0) {
+        const line = text.slice(outPos, nl);
+        outPos = nl + 1; // lines that aren't this answer are rustc's own stdout (e.g. -V)
+        if (line.startsWith('{') && JSON.parse(line).id === id) return JSON.parse(line);
+        continue;
+      }
+      // Woken by the server's next stdout write; the timeout only guards against a lost wake-up.
+      await new Promise<void>(r => { wake = r; setTimeout(r, 50); });
+    }
+  };
+  return {
+    async request(args: string[]) {
+      const id = ++nextId, t0 = performance.now();
+      vfs.appendFile(stdin, JSON.stringify({ id, args }) + '\n');
+      const answer = await wait(id);
+      const e = vfs.readText(err), mark = `\x1e${id}\n`, at = e.indexOf(mark, errPos);
+      const stderr = e.slice(errPos, at);
+      errPos = at + mark.length;
+      return { ...answer, hostMs: Math.round((performance.now() - t0) * 10) / 10, stderr, memBytes: memory.buffer.byteLength };
+    },
+    async quit() {
+      vfs.appendFile(stdin, JSON.stringify({ id: ++nextId, quit: true }) + '\n');
+      return { ...(await done), memBytes: memory.buffer.byteLength };
+    },
+  };
+}
+
 const writeFile = (path: string, text: string) => vfs.writeFile(path, text);
 const ls = (path: string) => vfs.readdir(path).map(e => e.name);
 
-(window as any).rustcHost = { load, loadSysroot, rustc, writeFile, ls, vfsBytes: () => handle.memory.buffer.byteLength };
+(window as any).rustcHost = { load, loadSysroot, rustc, startServer, writeFile, ls, vfsBytes: () => handle.memory.buffer.byteLength };
 (window as any).rustcHostReady = true;
