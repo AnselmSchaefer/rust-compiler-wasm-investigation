@@ -4,14 +4,18 @@
 //! (<dir>/<case>/{index/,Cargo.toml,src/lib.rs,ours.lock}) so tests/resolver/check-scenarios.sh can
 //! run native cargo on it and compare.
 
-use resolver::{Registry, generate_lockfile, index::index_path};
+use resolver::index::{IndexFile, index_path};
+use resolver::{Registry, generate_lockfile};
 use std::collections::HashMap;
 
 struct MemRegistry(HashMap<String, Vec<String>>);
 
 impl Registry for MemRegistry {
-    fn index_file(&self, name: &str) -> Result<Option<Vec<u8>>, String> {
-        Ok(self.0.get(name).map(|lines| lines.join("\n").into_bytes()))
+    fn index_file(&self, name: &str) -> Result<IndexFile, String> {
+        Ok(match self.0.get(name) {
+            Some(lines) => IndexFile::Found(lines.join("\n").into_bytes()),
+            None => IndexFile::NotFound,
+        })
     }
 }
 

@@ -8,7 +8,7 @@ export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 120_000,
   use: { baseURL: `http://localhost:${port}` },
-  webServer: { command: `PORT=${port} node scripts/serve.mjs tests/e2e/fixtures /www=build/www /vendor=build/vendor /release=build/release`, port, reuseExistingServer: true },
+  webServer: { command: `PORT=${port} node scripts/serve.mjs tests/e2e/fixtures /www=build/www /vendor=build/vendor /release=build/release /index=build/wp-15/index`, port, reuseExistingServer: true },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },

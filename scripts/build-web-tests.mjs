@@ -13,6 +13,10 @@ const pages = {
     entries: { main: 'main', 'orchestrator-worker': '../../../web/orchestrator/orchestrator-worker', 'process-worker': '../../../web/wasi/process-worker', 'sandbox-worker': '../../../web/sandbox/sandbox-worker' },
     assets: { 'vfs.wasm': 'build/www/vfs/vfs.wasm' },
   },
+  // WP-16: resolver + crate download; the index is the WP-15 snapshot, mounted at /index/.
+  'deps-test': {
+    src: 'tests/e2e/deps', entries: { main: 'main' }, assets: { 'vfs.wasm': 'build/www/vfs/vfs.wasm', 'resolver.wasm': 'build/www/resolver/resolver.wasm' },
+  },
   // WP-07; the big assets come from scripts/prep-rustc-host-page.sh.
   'rustc-host': {
     src: 'tests/e2e/rustc-host', entries: { main: 'main', 'process-worker': '../../../web/wasi/process-worker' }, assets: { 'vfs.wasm': 'build/www/vfs/vfs.wasm' },

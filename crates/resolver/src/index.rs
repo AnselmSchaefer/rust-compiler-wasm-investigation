@@ -13,12 +13,19 @@ use std::rc::Rc;
 /// The index schema version cargo 1.99 understands (without `-Zbindeps`).
 const INDEX_V_MAX: u32 = 2;
 
-/// Where the resolver gets index files from: the snapshot directory in tests, the VFS/HTTP
-/// cache in the browser (WP-16).
+/// Where the resolver gets index files from: the snapshot directory in tests, files fetched by
+/// JS in the browser (WP-16).
 pub trait Registry {
-    /// The raw index file of `name` (lowercased path as in the sparse index), or `None` if the
-    /// package doesn't exist.
-    fn index_file(&self, name: &str) -> Result<Option<Vec<u8>>, String>;
+    fn index_file(&self, name: &str) -> Result<IndexFile, String>;
+}
+
+pub enum IndexFile {
+    Found(Vec<u8>),
+    /// The package doesn't exist.
+    NotFound,
+    /// Not loaded yet. The resolve goes on without it (as cargo does while its index requests are
+    /// in flight) and reports itself incomplete; the caller fetches the file and resolves again.
+    Pending,
 }
 
 /// The path of a package's file in the index, e.g. `se/rd/serde`, `3/s/syn`, `2/cc`.
@@ -36,10 +43,10 @@ pub fn index_path(name: &str) -> String {
 pub struct DirRegistry(pub PathBuf);
 
 impl Registry for DirRegistry {
-    fn index_file(&self, name: &str) -> Result<Option<Vec<u8>>, String> {
+    fn index_file(&self, name: &str) -> Result<IndexFile, String> {
         match std::fs::read(self.0.join(index_path(name))) {
-            Ok(b) => Ok(Some(b)),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Ok(b) => Ok(IndexFile::Found(b)),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(IndexFile::NotFound),
             Err(e) => Err(format!("reading the index file of `{name}`: {e}")),
         }
     }
@@ -47,7 +54,7 @@ impl Registry for DirRegistry {
 
 /// One index line.
 pub struct IndexEntry {
-    pub summary: Summary,
+    pub summary: std::rc::Rc<Summary>,
     pub yanked: bool,
 }
 
@@ -111,5 +118,5 @@ fn parse_line(line: &[u8]) -> Option<IndexEntry> {
     )
     .ok()?;
     summary.checksum = Some(pkg.cksum);
-    Some(IndexEntry { summary, yanked })
+    Some(IndexEntry { summary: Rc::new(summary), yanked })
 }

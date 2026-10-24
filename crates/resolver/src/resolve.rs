@@ -14,7 +14,7 @@
 //! the global conflict cache, conflict generalization, and the "just for error messages" mode.
 //! Also left out: `[patch]`, `[replace]`, lockfile preferences, minimal versions, publish age.
 
-use crate::index::{Registry, parse_index_file};
+use crate::index::{IndexEntry, IndexFile, Registry, parse_index_file};
 use crate::manifest::{ResolveBehavior, RootManifest};
 use crate::summary::{Dependency, FeatureValue, Source, Summary};
 use cargo_util_schemas::core::PartialVersion;
@@ -81,9 +81,14 @@ impl From<&Version> for Compat {
 
 type ActivationsKey = (Rc<str>, Compat, Source);
 
+/// Parsed index files, kept across resolves (the browser re-runs the resolve after fetching
+/// missing files, and parsing is most of the work).
+#[derive(Default)]
+pub struct IndexCache(HashMap<Rc<str>, Rc<Vec<IndexEntry>>>);
+
 /// Every summary the resolve has seen: the root, then each index entry as its file is loaded.
 struct Pool {
-    summaries: Vec<Summary>,
+    summaries: Vec<Rc<Summary>>,
     yanked: Vec<bool>,
     by_name: HashMap<Rc<str>, Vec<PkgId>>,
 }
@@ -300,35 +305,56 @@ type BuiltDeps = Rc<(HashSet<Rc<str>>, Rc<Vec<DepInfo>>)>;
 /// dependency" (sorted by preference), and caches each package's dependency list per feature set.
 struct Queryer<'a> {
     registry: &'a dyn Registry,
+    cache: &'a mut IndexCache,
     pool: Pool,
     rust_versions: Vec<PartialVersion>,
     query_cache: HashMap<(Rc<str>, semver::VersionReq), Rc<Vec<PkgId>>>,
     deps_cache: HashMap<(Option<PkgId>, PkgId, ResolveOpts), BuiltDeps>,
+    /// Some index file was pending: this resolve is incomplete.
+    pending: bool,
 }
 
 impl Queryer<'_> {
-    fn load(&mut self, name: &Rc<str>) -> Result<(), String> {
+    /// Loads `name`'s index entries into the pool; `false` if its file is still pending.
+    fn load(&mut self, name: &Rc<str>) -> Result<bool, String> {
         if self.pool.by_name.contains_key(name) {
-            return Ok(());
+            return Ok(true);
         }
-        let mut ids = Vec::new();
-        if let Some(data) = self.registry.index_file(name)? {
-            for e in parse_index_file(&data) {
-                ids.push(self.pool.summaries.len() as PkgId);
-                self.pool.summaries.push(e.summary);
-                self.pool.yanked.push(e.yanked);
+        let entries = match self.cache.0.get(name) {
+            Some(e) => e.clone(),
+            None => {
+                let parsed = match self.registry.index_file(name)? {
+                    IndexFile::Found(data) => parse_index_file(&data),
+                    IndexFile::NotFound => Vec::new(),
+                    IndexFile::Pending => {
+                        self.pending = true;
+                        return Ok(false);
+                    }
+                };
+                let e = Rc::new(parsed);
+                self.cache.0.insert(name.clone(), e.clone());
+                e
             }
+        };
+        let mut ids = Vec::new();
+        for e in entries.iter() {
+            ids.push(self.pool.summaries.len() as PkgId);
+            self.pool.summaries.push(e.summary.clone());
+            self.pool.yanked.push(e.yanked);
         }
         self.pool.by_name.insert(name.clone(), ids);
-        Ok(())
+        Ok(true)
     }
 
-    fn query(&mut self, dep: &Dependency) -> Result<Rc<Vec<PkgId>>, String> {
+    /// The candidates for `dep`, best first; `None` while its index file is pending.
+    fn query(&mut self, dep: &Dependency) -> Result<Option<Rc<Vec<PkgId>>>, String> {
         let key = (dep.package.clone(), dep.req.clone());
         if let Some(c) = self.query_cache.get(&key) {
-            return Ok(c.clone());
+            return Ok(Some(c.clone()));
         }
-        self.load(&dep.package)?;
+        if !self.load(&dep.package)? {
+            return Ok(None);
+        }
         let pool = &self.pool;
         let mut c: Vec<PkgId> = pool.by_name[&dep.package]
             .iter()
@@ -347,7 +373,7 @@ impl Queryer<'_> {
         c.sort_unstable_by(|&a, &b| compat(b).cmp(&compat(a)).then_with(|| pool.get(b).version.cmp(&pool.get(a).version)));
         let c = Rc::new(c);
         self.query_cache.insert(key, c.clone());
-        Ok(c)
+        Ok(Some(c))
     }
 
     fn build_deps(&mut self, parent: Option<PkgId>, candidate: PkgId, opts: &ResolveOpts) -> Result<BuiltDeps, ActivateError> {
@@ -355,17 +381,23 @@ impl Queryer<'_> {
         if let Some(out) = self.deps_cache.get(&key) {
             return Ok(out.clone());
         }
-        let (used_features, deps) = resolve_features(parent, candidate, self.pool.get(candidate), opts)?;
-        let mut deps = deps
-            .into_iter()
-            .map(|(dep, features)| {
-                let c = self.query(&dep).map_err(ActivateError::Fatal)?;
-                Ok((dep, c, features))
-            })
-            .collect::<Result<Vec<DepInfo>, ActivateError>>()?;
-        deps.sort_by_key(|(_, c, _)| c.len());
-        let out = Rc::new((used_features, Rc::new(deps)));
-        self.deps_cache.insert(key, out.clone());
+        let summary = self.pool.summaries[candidate as usize].clone();
+        let (used_features, deps) = resolve_features(parent, candidate, &summary, opts)?;
+        // Pending dependencies are left out for now (dep_cache.rs does the same); such a result
+        // isn't cached, so the next, complete resolve recomputes it.
+        let mut all_ready = true;
+        let mut ready = Vec::with_capacity(deps.len());
+        for (dep, features) in deps {
+            match self.query(&dep).map_err(ActivateError::Fatal)? {
+                Some(c) => ready.push((dep, c, features)),
+                None => all_ready = false,
+            }
+        }
+        ready.sort_by_key(|(_, c, _)| c.len());
+        let out = Rc::new((used_features, Rc::new(ready)));
+        if all_ready {
+            self.deps_cache.insert(key, out.clone());
+        }
         Ok(out)
     }
 }
@@ -512,6 +544,12 @@ pub struct Resolve {
 }
 
 pub fn resolve(root: RootManifest, registry: &dyn Registry) -> Result<Resolve, String> {
+    resolve_cached(root, registry, &mut IndexCache::default())?.ok_or_else(|| "the registry left index files pending".into())
+}
+
+/// Like `resolve`, reusing parsed index files from `cache`. `Ok(None)`: some index file was
+/// pending (the registry knows which); supply them and resolve again.
+pub fn resolve_cached(root: RootManifest, registry: &dyn Registry, cache: &mut IndexCache) -> Result<Option<Resolve>, String> {
     let RootManifest { summary, behavior, rust_version } = root;
     let rust_versions = if behavior >= ResolveBehavior::V3 {
         vec![match &rust_version {
@@ -526,12 +564,19 @@ pub fn resolve(root: RootManifest, registry: &dyn Registry) -> Result<Resolve, S
     };
     let mut q = Queryer {
         registry,
-        pool: Pool { summaries: vec![summary], yanked: vec![false], by_name: HashMap::new() },
+        cache,
+        pool: Pool { summaries: vec![Rc::new(summary)], yanked: vec![false], by_name: HashMap::new() },
         rust_versions,
         query_cache: HashMap::new(),
         deps_cache: HashMap::new(),
+        pending: false,
     };
-    let cx = activate_deps_loop(&mut q)?;
+    let cx = activate_deps_loop(&mut q);
+    if q.pending {
+        // An error may just be the missing constraints' fault; either way, fetch and retry.
+        return Ok(None);
+    }
+    let cx = cx?;
 
     let pool = &q.pool;
     let mut ids: Vec<PkgId> = cx.activations.values().map(|&(id, _)| id).collect();
@@ -556,7 +601,7 @@ pub fn resolve(root: RootManifest, registry: &dyn Registry) -> Result<Resolve, S
             }
         })
         .collect();
-    Ok(Resolve { packages, rust_version })
+    Ok(Some(Resolve { packages, rust_version }))
 }
 
 fn activate(

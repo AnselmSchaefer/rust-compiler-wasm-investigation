@@ -80,3 +80,52 @@ fn golden_lockfiles() {
         assert!(failed.is_empty());
     }
 }
+
+/// The browser's protocol: index files arrive only between resolves (as JS fetches what the
+/// last round reported pending). Must end at the same lockfile, in about graph-depth rounds.
+#[test]
+fn fetch_rounds() {
+    use resolver::index::IndexFile;
+    use resolver::resolve::{IndexCache, resolve_cached};
+    use std::cell::RefCell;
+    use std::collections::HashSet;
+
+    struct Rounds<'a> {
+        dir: &'a DirRegistry,
+        fetched: HashSet<String>,
+        pending: RefCell<HashSet<String>>,
+    }
+    impl resolver::Registry for Rounds<'_> {
+        fn index_file(&self, name: &str) -> Result<IndexFile, String> {
+            if self.fetched.contains(name) {
+                self.dir.index_file(name)
+            } else {
+                self.pending.borrow_mut().insert(name.to_string());
+                Ok(IndexFile::Pending)
+            }
+        }
+    }
+
+    let root = repo();
+    let dir = DirRegistry(std::env::var_os("RESOLVER_INDEX").map(PathBuf::from).unwrap_or_else(|| root.join("build/wp-15/index")));
+    for name in ["serde_json", "tokio", "reqwest", "bevy", "nu"] {
+        let manifest = std::fs::read_to_string(root.join(format!("tests/resolver/manifests/{name}.toml"))).unwrap();
+        let expected = std::fs::read_to_string(root.join(format!("tests/resolver/golden/{name}.lock"))).unwrap();
+        let mut reg = Rounds { dir: &dir, fetched: HashSet::new(), pending: RefCell::default() };
+        let mut cache = IndexCache::default();
+        let t = Instant::now();
+        let mut rounds = 0;
+        let resolve = loop {
+            rounds += 1;
+            let root_manifest = resolver::parse_manifest(&manifest).unwrap();
+            if let Some(r) = resolve_cached(root_manifest, &reg, &mut cache).unwrap() {
+                break r;
+            }
+            let p = std::mem::take(&mut *reg.pending.borrow_mut());
+            assert!(!p.is_empty());
+            reg.fetched.extend(p);
+        };
+        assert_eq!(resolver::write_lockfile(&resolve), expected, "{name}");
+        println!("  rounds {name}: {rounds} rounds, {} index files, {:.0} ms", reg.fetched.len(), t.elapsed().as_secs_f64() * 1000.0);
+    }
+}

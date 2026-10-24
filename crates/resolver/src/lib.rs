@@ -6,6 +6,8 @@ pub mod lockfile;
 pub mod manifest;
 pub mod resolve;
 pub mod summary;
+#[cfg(target_family = "wasm")]
+pub mod wasm;
 
 pub use index::{DirRegistry, Registry};
 pub use lockfile::write_lockfile;

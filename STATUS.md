@@ -3,15 +3,18 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** **WP-16** (in-progress, session 18). WP-14 done (user trial passed 2026-10-24), WP-15 done in session 17.
-- **Last session:** 2026-10-24 (session 17). `crates/resolver` reproduces all 50 golden Cargo.lock files byte for byte, natively and as wasm32-wasip1 under wasmtime; 13 synthetic scenarios match native cargo.
+- **Active WP:** **WP-17** (ready, next). WP-16 done in session 18 (on the snapshot index; deployed index host = open [H]). WP-14 done (user trial passed 2026-10-24).
+- **Last session:** 2026-10-24 (session 18). In Chromium, serde + serde_json resolve, download from static.crates.io (sha256-checked), unpack into the VFS, and work offline after a reload.
 - **Rule for rustc source:** rust-lang's agent policy (`build/rust/AGENTS.md`) applies. Claude does not write or edit rustc source, and does not draft rust-lang issues, PRs or Zulip posts. The user writes those, or applies existing **human-written** patches (bjorn3/oligamiq), which the user prefers whenever one exists. **danlapid 0005–0007 are LLM-generated** (Claude co-author trailers), so they don't qualify even if the user applies them; design reference only (`docs/patches.md`). Claude reviews, builds and explains. Everything outside `build/rust` is Claude's, including out-of-tree drivers using `rustc_driver` (`toolchain/rustc-multi`).
-- **Next step:** WP-16 (index and crate download). Start by checking CORS on `index.crates.io` and `static.crates.io` from a Chromium page (Playwright, a real fetch with an Origin). If either lacks CORS, stop at the **[H]** checkpoint (CORS mirror Worker needs an account + deploy approval). Then: a browser `Registry` impl for `crates/resolver` (sparse index over fetch, cached in OPFS), `.crate` download + sha256 check against the index `cksum`, tar.gz unpack in Wasm into the VFS. Proper User-Agent, no bulk fetching.
+- **Next step:** WP-17 (build planner). Read WP-17 in PLAN.md. Input: `resolveManifest`/`fetchDependencies` results (`web/deps/deps.ts`: packages with unified features + dep edges, sources under `/deps/<name>-<version>/`). First: record `cargo build -v` invocations natively for `serde_json` (itoa, memchr, ryu, serde) as the golden reference, then derive the unit graph and rustc args (`--extern`, `-L`, `--cfg feature=`, edition, `-C metadata`). Note the v2 feature resolver: build features differ from the resolver's unified set (dev/build/target splits).
 - **Running background jobs:** none
 
-## Current session (2026-10-24, session 18): in progress
-- Goals: WP-16. CORS check; browser `Registry` for `crates/resolver` over a configurable index URL; `.crate` download + sha256 check; unpack into the VFS; OPFS cache so a second load works offline.
+## Current session (2026-10-24, session 18): done
+- Goals (met): WP-16. CORS check; browser `Registry` for `crates/resolver` over a configurable index URL; `.crate` download + sha256 check; unpack into the VFS; OPFS cache so a second load works offline.
 - **CORS result (Chromium, real fetch from http://localhost):** `index.crates.io` sends **no** `Access-Control-Allow-Origin`, so the sparse index is blocked cross-origin. `static.crates.io` sends `Access-Control-Allow-Origin: *`, so `.crate` downloads work directly. The index therefore needs a same-origin reverse proxy or a CORS mirror: **[H]** decision + account/deploy (not done). Dev and tests serve the pinned snapshot from our own server meanwhile.
+- `crates/resolver`: index files can be `Pending`. A round skips them, like cargo does while index requests are in flight, and reports what it needs. Parsed files are cached across rounds (`IndexCache`). Test `fetch_rounds`: serde_json 6 rounds, tokio 9, bevy 9 (738 files), all golden-identical. `src/wasm.rs`: C-ABI exports (add_index / resolve → JSON). Built as **wasm32-wasip1** (`scripts/build-resolver.sh`; unknown-unknown fails because cargo-util-schemas uses `Url::from_file_path`), 2.6 MiB / 431 KiB br.
+- `web/deps/`: `resolver.ts` (8 WASI stubs), `index.ts` (sparse index, network-first + OPFS fallback), `cache.ts` (OPFS file cache), `crates.ts` (download, sha256, `DecompressionStream` gunzip, untar into the VFS), `deps.ts` (`resolveManifest`, `fetchDependencies`). `web/orchestrator/tar.ts` now reads GNU long names and pax paths.
+- `tests/e2e/deps.spec.ts` + `scripts/verify/wp-16.sh` pass: lockfile = native resolver's; cold 70 ms resolve + 667 ms download (11 crates, 962 KB); offline after reload 24 + 26 ms. Full Chromium suite: 13 passed. Design + hosting options: `docs/deps.md`.
 
 ## Current session (2026-10-24, session 17): done
 - Goals (all met): `crates/resolver` with `index.rs` (sparse-index lines → summaries, cargo's validity rules), `manifest.rs` (root Cargo.toml via cargo-util-schemas), `resolve.rs` (port of cargo's activation loop: most-constrained-first, candidate order incl. MSRV fallback, features, backtracking), `lockfile.rs` (cargo's exact text format).
@@ -89,7 +92,7 @@
 - [x] **WP-05 decision (2026-10-24):** resolved: the user wrote A1/A2. the rust checkout's AGENTS.md forbids AI-authored rustc changes without a named reviewer, and bans them in codegen/metadata. The minimum changes (A1 driver `lib`, A2 dlopen guards) need to be written by the user or reviewed. B1/B2 can avoid rustc changes (VFS symlink, external wasm-ld). Details: `~/Projects/rustc-wasm-host-source-changes.md`.
 - [x] Plan confirmed; commits at end of each session approved (2026-10-23).
 - [x] WP-00: cmake and ninja installed by the user.
-- [ ] **[H] WP-16 index hosting:** `index.crates.io` has no CORS. Choose how the deployed IDE reaches the index: a reverse proxy on the app's own origin (decided with the WP-29 deploy), or a CORS mirror Worker (needs an account + deploy approval).
+- [ ] **[H] WP-16 index hosting:** `index.crates.io` has no CORS. Choose how the deployed IDE reaches the index: a reverse proxy on the app's own origin (with the WP-29 deploy; recommended), or a CORS mirror Worker (needs an account + deploy approval). Not blocking until deploy. Options in `docs/deps.md`.
 - [ ] Optional [H]: approve reporting the `path_rename` no-op bug upstream to bjorn3/browser_wasi_shim (threads). The fix is in `patches/`.
 
 ## Work packages
@@ -112,7 +115,7 @@
 | 13 | Run sandbox | done | 1 | `scripts/verify/wp-13.sh` passes. Worker + own VFS per run, interactive stdin, streamed output, panic → 134, kill/timeout |
 | 14 | Minimal UI (M1a) | done | 1 | `scripts/verify/wp-14.sh` passes; user trial passed 2026-10-24 |
 | 15 | Cargo resolver | done | 2 | `scripts/verify/wp-15.sh` passes. Own `crates/resolver` (cargo crate can't build for WASI): 50/50 golden lockfiles identical, native and wasm32-wasip1; `bench/resolver.md` |
-| 16 | Index and crate download | ready | 0 | |
+| 16 | Index and crate download | done | 1 | `scripts/verify/wp-16.sh` passes (snapshot index at /index/; index.crates.io has no CORS → [H] host decision). `docs/deps.md` |
 | 17 | Build planner | ready | 0 | depends on WP-15, WP-12 (both done) |
 | 18 | Content-addressed cache | blocked | 0 | |
 | 19 | Proc-macro bridge prototype | blocked | 0 | |
@@ -131,6 +134,7 @@
 | 37 | Release-train rebase | blocked | 0 | recurring |
 
 ## Measurements
+- 2026-10-24 WP-16 (Chromium): serde+serde_json (12 pkgs): cold resolve 70 ms (5 rounds, 11 index files 1.5 MB from localhost) + download/unpack 667 ms (11 crates, 962 KB, static.crates.io); offline after reload 24 + 26 ms. Resolver wasm (wasip1) 2.6 MiB / 431 KiB br.
 - 2026-10-24 WP-15: golden 50/50 identical (native and wasm32-wasip1). Resolve time native / wasm: tokio 118 / 199 ms, sqlx 325 / 462 ms, nu (795 pkgs) 570 / 794 ms. Resolver wasm 2,584 KiB (423 KiB br). `bench/resolver.md`.
 - 2026-10-24 WP-14 (Chromium, cold context, localhost): editor interactive 187–200 ms (budget 2 s); toolchain ready 2.8 s; first Check 836–849 ms; first Run to the program's prompt 2.9 s (incl. lld + link group). main.js 857 KB minified.
 - 2026-10-24 WP-13 (Chromium): a sandboxed run of a small program (new worker + VFS + instantiate) 22–42 ms; kill while waiting for input 202 ms (200 ms delay + teardown); timeout precision ±4 ms.
