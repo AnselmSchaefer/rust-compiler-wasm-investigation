@@ -3,14 +3,18 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** none. Next is **WP-06** (ready): linking for `wasm32-wasip1` output, done **outside** rustc (host runs `wasm-ld.wasm`), since in-process linking would be an AI-authored codegen change.
-- **Last session:** 2026-10-24 (session 7). WP-05 done: rustc 1.99.1 runs as `build/rustc-wasm/build/wasm32-wasip1-threads/stage1/bin/rustc.wasm` (126.7 MiB). Rebuild: `toolchain/build-rustc.sh` with the user's changes from `toolchain/patches/rust/wasm-host.diff` applied *uncommitted* in `build/rust`.
+- **Active WP:** **WP-06** (in-progress, 1 session used, **blocked on a human decision**, see below).
+- **Last session:** 2026-10-24 (session 8). Host-side linking is written and the stat bug is fixed, but rustc on a WASI host panics before it gets to the link command.
 - **Rule for rustc source:** rust-lang's agent policy (`build/rust/AGENTS.md`) applies. Claude does not write or edit rustc source, and does not draft rust-lang issues, PRs or Zulip posts. The user writes those; Claude reviews, builds and explains. Everything outside `build/rust` is Claude's.
-- **Next step:** WP-06, linking outside rustc.
-  1. Get rustc.wasm to emit objects for hello world (`--emit=obj` or `-C save-temps`) and obtain the link line (`--print link-args`, or capture the failed linker spawn).
-  2. Run `build/llvm-wasm-install/bin/wasm-ld.wasm` under wasmtime-threads with that link line (crt1 from rustup's `wasm32-wasip1` self-contained dir, the user objects, the std rlibs).
-  3. Check `wasmtime hello.wasm` prints Hello, then put it into a script and `scripts/verify/wp-06.sh`.
+- **Blocker (WP-06):** in `rustc_codegen_ssa/src/back/linker.rs` `get_linker`, `env::join_paths(new_path).unwrap()` panics on WASI, because std's WASI target uses `library/std/src/sys/paths/unsupported.rs` (`join_paths` always returns `Err`). Every link panics before `--print link-args` is written. It can't be fixed on the host side. Options: (A) the user writes a small change in the rust tree, either in std (a real `join_paths` for WASI, `:`-separated like unix; it looks upstreamable) or in `get_linker` (don't unwrap). Our std for rustc.wasm is built from `build/rust/library`, so a std change takes effect. (B) Claude rebuilds rustc's link line outside rustc. That is fragile: `-Zno-link` hangs in rustc.wasm, and it means reimplementing crate/panic-runtime/native-lib selection.
+- **Next step:** after the decision (A): rebuild with `toolchain/build-rustc.sh` (~3 min incremental, but the whole compiler if std changes) and run `scripts/verify/wp-06.sh`. Expect more WASI-host issues after `get_linker`.
 - **Running background jobs:** none
+
+## Current session (2026-10-24, session 8)
+- Done: `--emit=obj` works (hello, 0.7 s).
+- Done: found and fixed the wasi-libc `stat` no-permission-bits bug, which made rustc treat every existing file as read-only ("output file ... is not writeable"). `toolchain/host-shims/wasi-stat-mode.c` is linked into rustc.wasm with `--wrap` (`build-rustc.sh` rustflags). Rebuilt; previous binary at `build/rustc-wasm/rustc-wp05.wasm`.
+- Done: `web/link/link-args.ts` (parses `--print link-args=FILE`, builds wasm-ld argv; checked against native 1.99.1 output), `toolchain/rustc-wasm.ts` (wasmtime driver: scratch output dir, runs wasm-ld.wasm, moves results, strips abort traps), `scripts/verify/wp-06.sh` (not yet passing).
+- Blocked: `join_paths` panic (above). `-Zno-link` (with RUSTC_BOOTSTRAP=1) hangs idle and writes nothing.
 
 ## Follow-ups (check these at the start of every session)
 - [ ] **browser_wasi_shim bug report** (user posting, 2026-10-24): `path_rename` no-op in the threads package. Draft: `~/Projects/browser_wasi_shim-path_rename-issue.md`. Check https://github.com/bjorn3/browser_wasi_shim/issues for a reply. If the fix is released upstream, drop `patches/@oligami__browser_wasi_shim-threads@0.5.0.patch`.
@@ -19,6 +23,7 @@
 - [ ] **Possible upstream rustc bug** (user to report, if wanted): `filesearch.rs` `from_env_args_next` checks `lib/rustlib` relative to the *working directory*, not next to argv[0] (see `~/Projects/rustc-wasm-host-source-changes.md` §6).
 
 ## Human actions needed
+- [ ] **WP-06 decision:** option A (the user writes a std or `get_linker` change) or option B (Claude rebuilds the link line outside rustc). See "Blocker" above.
 - [x] **WP-05 decision (2026-10-24):** resolved: the user wrote A1/A2. the rust checkout's AGENTS.md forbids AI-authored rustc changes without a named reviewer, and bans them in codegen/metadata. The minimum changes (A1 driver `lib`, A2 dlopen guards) need to be written by the user or reviewed. B1/B2 can avoid rustc changes (VFS symlink, external wasm-ld). Details: `~/Projects/rustc-wasm-host-source-changes.md`.
 - [x] Plan confirmed; commits at end of each session approved (2026-10-23).
 - [x] WP-00: cmake and ninja installed by the user.
@@ -34,7 +39,7 @@
 | 03 | Patch inventory and base version | done | 1 | `scripts/verify/wp-03.sh` passes. Base 1.99.1; series in `docs/patches.md` |
 | 04 | Build LLVM for a Wasm host | done | 1 | `scripts/verify/wp-04.sh` passes. llc.wasm 53 MiB (10.1 br), wasm-ld.wasm 63 MiB (11.7 br), 117 static libs (130 MB) |
 | 05 | rustc for a Wasm host: front end | done | 2 | `scripts/verify/wp-05.sh` passes. rustc 1.99.1 for wasm32-wasip1-threads (126.7 MiB), version identical to stable; A1/A2 written by the user (`toolchain/patches/rust/`) |
-| 06 | In-process linking | ready | 0 | re-scoped: link outside rustc (no rustc change), see PLAN |
+| 06 | In-process linking | in-progress | 1 | blocked: `join_paths` panic in `get_linker` on WASI needs a human-written rust-tree change (see Current) |
 | 07 | Unwinding build and error recovery | blocked | 0 | |
 | 08 | Sysroots and lazy metadata | blocked | 0 | |
 | 09 | Compile-server mode | blocked | 0 | |
@@ -72,6 +77,7 @@
 - Smoke: hello world runs on wasip1, wasip2, wasip3 (wasmtime 50) and wasip1-threads with a real thread (wasmtime 46.0.3).
 
 ## Session log
+- 2026-10-24 (session 8): WP-06 started. Object emission works; fixed wasi-libc stat modes with a link-time shim; wrote the host-side linker driver. Blocked at `get_linker`'s `join_paths().unwrap()` (std WASI paths are unsupported).
 - 2026-10-24 (session 7, cont.): **WP-05 done.** With the user's A1/A2 changes, rustc 1.99.1 builds for wasm32-wasip1-threads. Fixed on our side: `-lc++abi` and `-ldl` (wasi-libc stubs) on the host link. `rustc.wasm -V` is identical to stable; type-checking hello and a library works with rustup's wasm32-wasip1 std (medium.rs as a lib: 690 ms in wasmtime). Sysroot detection works without a rustc change (argv[0] symlink + `lib/rustlib` visible from the cwd, because of an apparent upstream bug).
 - 2026-10-24 (session 7, cont.): The user wrote A1. The build now compiles 241 crates (no A3 dependency failures so far) and stops at the expected A2 errors in `rustc_metadata/src/host_dylib.rs`. Fixed on our side: the `cc` crate passes the old `--target=wasm32-wasi`, so `toolchain/bin/wasi-threads-clang{,++}` rewrite it.
 - 2026-10-24 (session 7): WP-05 prep without touching rustc. `build-rustc.sh` (pinned rustup 1.99.1 as stage 0, per-target rustflags because `RUSTFLAGS_BOOTSTRAP` leaks into bootstrap.py's native build), native `llvm-config` installed into the wasm LLVM prefix, VFS + WASI symlinks with an e2e test. Discovery build: bootstrap + std OK, stops at A1 (rustc_driver dylib-only). Drafted and verified the browser_wasi_shim bug report.
