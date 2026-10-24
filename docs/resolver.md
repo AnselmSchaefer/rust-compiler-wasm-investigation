@@ -1,6 +1,6 @@
 # Cargo resolver for the browser (WP-15)
 
-*2026-10-24. Status: spike done, golden corpus recorded; next: implement `crates/resolver`.*
+*2026-10-24. Status: done. `crates/resolver` reproduces all 50 golden lockfiles byte for byte, natively and as wasm32-wasip1 (`scripts/verify/wp-15.sh`, numbers in `bench/resolver.md`).*
 
 ## Spike: Cargo's own resolver in Wasm? No
 
@@ -39,3 +39,22 @@ From the cargo 1.99 resolver and lockfile code (`cargo` 0.100.0, unpacked for re
 - `tests/golden.rs`: unpack the snapshot, resolve each corpus crate, diff against `golden/<name>.lock`, report matches and diffs.
 
 Not in WP-15: git and path dependencies other than the root, workspaces (published crates have none; WP-17's planner will need them), `[patch]`/`[replace]`, alternative registries, and updating an existing lockfile minimally (`cargo update -p`). Fresh resolution is what the golden tests cover.
+
+## Implementation (session 17)
+
+`crates/resolver` follows the design above. `resolve.rs` is a port of cargo's `activate_deps_loop` with the same data flow, so it reaches the same graph:
+
+- Work list: an ordered set of frames (one per activated package), the frame whose next dependency has the fewest candidates first, ties by insertion time. A package's dependency list is sorted by candidate count (stable).
+- Candidates: matching non-yanked versions; with resolver v3, MSRV-compatible first (the root's `rust-version`, else rustc 1.99.1, which is what cargo falls back to), then highest version.
+- Choice points are saved whenever another candidate exists (persistent maps from `im-rc`, as cargo uses, so a save is cheap). On a dead end, saved frames newer than the conflict are skipped (cargo's `find_candidate`).
+- Left out, since they only prune work or improve error messages: the global conflict cache, conflict generalization, "just for error messages" mode. Out of scope: `[patch]`, `[replace]`, previous-lockfile preferences, `-Zminimal-versions`, publish age, workspaces, git/path dependencies.
+- Index lines: parsed with cargo-util-schemas' own `IndexPackage`; entries that cargo would mark invalid (feature-map errors, bad requirement or `cfg`, schema `v` > 2) are never candidates.
+- `generate-lockfile` resolves the root with **all features** and its dev-dependencies, which is why optional dependencies of the root are always in the lockfile.
+
+Findings while testing:
+
+- **Weak features enable optional dependencies in the lockfile.** In the dependency resolver, `dep?/feat` counts as a request for `dep` (cargo's `dep_cache.rs`: "Weak features are always activated in the dependency resolver"). The feature resolver narrows them only at build time. Checked against native cargo (`weak-plain` scenario).
+- Edition 2024 requires `rust-version` ≥ 1.85, so testing MSRV fallback with an old `rust-version` needs edition 2021 + `resolver = "3"`.
+- A lockfile can hold the root and a registry package with the same name and version (`serde_json` 1.0.154 is both in its own corpus lockfile, through a dev-dependency cycle). Then dependency entries carry the source as well; the writer handles it.
+
+For WP-16/17: the `Registry` trait (`index_file(name)`) is all the browser has to provide; `resolve()` returns the packages with their unified features and edges, which the build planner (WP-17) can use directly.

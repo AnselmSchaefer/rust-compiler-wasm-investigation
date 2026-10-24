@@ -3,11 +3,20 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** **WP-15** (in-progress, session 16), while **WP-14 waits on the [H] user trial** (everything automated is done).
-- **Last session:** 2026-10-24 (session 15). The IDE (`app/`) works: CodeMirror 6 editor, xterm.js terminal, Check with inline diagnostics, Run with the terminal as stdin/stdout, Stop. Cold load: editor interactive at ~200 ms, toolchain ready at ~2.8 s (localhost).
+- **Active WP:** **WP-16** (ready, next), while **WP-14 waits on the [H] user trial** (everything automated is done). WP-15 done in session 17.
+- **Last session:** 2026-10-24 (session 17). `crates/resolver` reproduces all 50 golden Cargo.lock files byte for byte, natively and as wasm32-wasip1 under wasmtime; 13 synthetic scenarios match native cargo.
 - **Rule for rustc source:** rust-lang's agent policy (`build/rust/AGENTS.md`) applies. Claude does not write or edit rustc source, and does not draft rust-lang issues, PRs or Zulip posts. The user writes those, or applies existing **human-written** patches (bjorn3/oligamiq), which the user prefers whenever one exists. **danlapid 0005–0007 are LLM-generated** (Claude co-author trailers), so they don't qualify even if the user applies them; design reference only (`docs/patches.md`). Claude reviews, builds and explains. Everything outside `build/rust` is Claude's, including out-of-tree drivers using `rustc_driver` (`toolchain/rustc-multi`).
-- **Next step:** WP-15 implementation, following `docs/resolver.md` "Design". Start with `index.rs` + `lockfile.rs` (writer, byte-identical) and a golden harness (`crates/resolver/tests/golden.rs`, unpacking `tests/resolver/index-snapshot.tar.zst`). Then `resolve.rs` without features (small crates: smallvec, once_cell, sha2), then features/optional/weak deps, MSRV fallback, links, and the big ones. Cargo's code for reference: `build/wp-15/cargo-src/cargo-0.100.0/src/resolver/` (re-unpack from `~/.cargo/registry/cache/*/cargo-0.100.0.crate`).
+- **Next step:** WP-16 (index and crate download). Start by checking CORS on `index.crates.io` and `static.crates.io` from a Chromium page (Playwright, a real fetch with an Origin). If either lacks CORS, stop at the **[H]** checkpoint (CORS mirror Worker needs an account + deploy approval). Then: a browser `Registry` impl for `crates/resolver` (sparse index over fetch, cached in OPFS), `.crate` download + sha256 check against the index `cksum`, tar.gz unpack in Wasm into the VFS. Proper User-Agent, no bulk fetching.
 - **Running background jobs:** none
+
+## Current session (2026-10-24, session 17): done
+- Goals (all met): `crates/resolver` with `index.rs` (sparse-index lines → summaries, cargo's validity rules), `manifest.rs` (root Cargo.toml via cargo-util-schemas), `resolve.rs` (port of cargo's activation loop: most-constrained-first, candidate order incl. MSRV fallback, features, backtracking), `lockfile.rs` (cargo's exact text format).
+- Golden harness `crates/resolver/tests/golden.rs` over the 50 corpus crates; root manifests committed under `tests/resolver/manifests/`.
+- `scripts/verify/wp-15.sh` (≥ 48/50 identical); document any mismatch in `docs/resolver.md`.
+- Result: **50/50 identical** natively (6.6 s for all; bevy/nu ~0.57 s) and **50/50 under wasmtime** (2.6 MiB wasm, 423 KiB brotli; nu 0.79 s). `scripts/verify/wp-15.sh` passes.
+- `resolve.rs` ports cargo's activation loop (most-constrained-first work list, candidate order with MSRV fallback, feature requirements incl. weak deps, backtracking with `find_candidate`'s skip rule, `im-rc` persistent state). Conflict cache/generalization left out (they only prune). `index.rs` uses cargo-util-schemas' `IndexPackage` and cargo's invalid-entry rules; `lockfile.rs` writes v1–v4.
+- `tests/scenarios.rs` (8 tests, 13 cases on a synthetic index) + `tests/resolver/check-scenarios.sh`, which serves each case through `index-proxy.mjs` and runs native cargo: all 13 identical. Finding: weak `dep?/feat` puts the optional dep into the lockfile (cargo does the same).
+- Root manifests of the corpus are committed in `tests/resolver/manifests/` (484 KB), so the golden test needs no downloads.
 
 ## Current session (2026-10-24, session 16): done
 - **WP-15 spike: no.** The `cargo` crate needs curl, libgit2, libssh2 and gix even without default features; their C parts need sockets and OpenSSL, which WASI lacks. Removing them means patching cargo (a rust-lang project), which we don't do. So: our own `crates/resolver`. cargo-util-schemas 0.14.3, cargo-platform 0.3.3, semver and toml build for wasm32-wasip1 (checked under wasmtime).
@@ -97,9 +106,9 @@
 | 12 | Orchestrator and worker pool | done | 1 | `scripts/verify/wp-12.sh` passes. Orchestrator worker compiles + links + runs hello/medium from the release; Cache Storage on reload |
 | 13 | Run sandbox | done | 1 | `scripts/verify/wp-13.sh` passes. Worker + own VFS per run, interactive stdin, streamed output, panic → 134, kill/timeout |
 | 14 | Minimal UI (M1a) | in-progress | 1 | automated part done (`scripts/verify/wp-14.sh`); waiting on the [H] user trial (`pnpm demo`) |
-| 15 | Cargo resolver | in-progress | 1 | spike: the cargo crate can't build for WASI, so our own resolver; golden corpus of 50 recorded (`docs/resolver.md`) |
-| 16 | Index and crate download | blocked | 0 | |
-| 17 | Build planner | blocked | 0 | |
+| 15 | Cargo resolver | done | 2 | `scripts/verify/wp-15.sh` passes. Own `crates/resolver` (cargo crate can't build for WASI): 50/50 golden lockfiles identical, native and wasm32-wasip1; `bench/resolver.md` |
+| 16 | Index and crate download | ready | 0 | |
+| 17 | Build planner | ready | 0 | depends on WP-15, WP-12 (both done) |
 | 18 | Content-addressed cache | blocked | 0 | |
 | 19 | Proc-macro bridge prototype | blocked | 0 | |
 | 20 | Proc macros inside rustc.wasm | blocked | 0 | |
@@ -117,6 +126,7 @@
 | 37 | Release-train rebase | blocked | 0 | recurring |
 
 ## Measurements
+- 2026-10-24 WP-15: golden 50/50 identical (native and wasm32-wasip1). Resolve time native / wasm: tokio 118 / 199 ms, sqlx 325 / 462 ms, nu (795 pkgs) 570 / 794 ms. Resolver wasm 2,584 KiB (423 KiB br). `bench/resolver.md`.
 - 2026-10-24 WP-14 (Chromium, cold context, localhost): editor interactive 187–200 ms (budget 2 s); toolchain ready 2.8 s; first Check 836–849 ms; first Run to the program's prompt 2.9 s (incl. lld + link group). main.js 857 KB minified.
 - 2026-10-24 WP-13 (Chromium): a sandboxed run of a small program (new worker + VFS + instantiate) 22–42 ms; kill while waiting for input 202 ms (200 ms delay + teardown); timeout precision ±4 ms.
 - 2026-10-24 WP-12 (Chromium, localhost, orchestrator + release 1.99.1-f501aa64fd28): init (fetch + brotli + sha256 + compile rustc, meta sysroot) 2.6 s first visit, 0.84 s from Cache Storage. Build hello (compile + link) first 2.3 s (incl. lld + link group), warm 318 ms (rustc 228 ms, wasm-ld 89 ms); check hello 50 ms; build medium 1.64 s.
