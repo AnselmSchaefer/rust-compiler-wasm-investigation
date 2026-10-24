@@ -5,7 +5,7 @@ import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 // Bench (not a done-check): memory of the IDE (app/) while working in it, in Chromium. Per step:
 // PSS of all browser processes (shared pages counted once), the VFS and the compile server's rustc
 // instance (orchestrator `stats`), and Chromium's own measureUserAgentSpecificMemory where it
-// answers. Writes bench/results/<date>-<commit>-app-memory.json; summary in bench/app-memory.md.
+// answers. Writes bench/results/<date>-<commit>-app-memory.json; summary in bench/app-footprint.md.
 
 // PSS of every process below this test worker: the browser and its renderers, GPU and utility processes.
 function treePss(): number {
