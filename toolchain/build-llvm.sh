@@ -46,7 +46,9 @@ stage_configure() {
   # can need a lot of memory and stack. Threads stay on: rustc runs LLVM from several threads.
   # -pthread is repeated here because explicit CMAKE_*_FLAGS replace the toolchain file's *_INIT flags.
   local cflags="-pthread -D_WASI_EMULATED_MMAN"
-  local ldflags="-lwasi-emulated-mman -Wl,--max-memory=4294967296 -Wl,-z,stack-size=8388608 -Wl,--stack-first"
+  # --import-memory/--export-memory: threads must share one imported memory (the toolchain file's
+  # *_INIT linker flags are replaced by this explicit value, like -pthread above).
+  local ldflags="-Wl,--import-memory -Wl,--export-memory -lwasi-emulated-mman -Wl,--max-memory=4294967296 -Wl,-z,stack-size=8388608 -Wl,--stack-first"
   cmake -G Ninja -S "$SRC/llvm" -B "$WASM" \
     -DCMAKE_TOOLCHAIN_FILE="$ROOT/toolchain/wasi-threads.cmake" \
     -DWASI_SDK_PREFIX="$WASI_SDK" \
@@ -80,8 +82,9 @@ stage_build() {
 stage_install() {
   ninja -C "$WASM" install >/dev/null
   mkdir -p "$INSTALL/bin"
-  cp "$WASM/bin/llc.wasm" "$INSTALL/bin/llc.wasm"
-  cp "$WASM/bin/lld.wasm" "$INSTALL/bin/wasm-ld.wasm" # multicall lld; the wasm-ld flavor is picked via argv[0] or -flavor wasm
+  # LLVM names its executables without a suffix even for a wasm host.
+  cp "$WASM/bin/llc" "$INSTALL/bin/llc.wasm"
+  cp "$WASM/bin/lld" "$INSTALL/bin/wasm-ld.wasm" # multicall lld; pick the wasm flavor with `-flavor wasm`
 }
 
 stages=("$@"); [ ${#stages[@]} -gt 0 ] || stages=(source native configure build install)

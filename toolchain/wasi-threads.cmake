@@ -8,6 +8,7 @@ set(triple wasm32-wasip1-threads)
 set(CMAKE_C_FLAGS_INIT "-pthread")
 set(CMAKE_CXX_FLAGS_INIT "-pthread")
 # wasi-threads needs an imported (shared) memory, and WASI needs it exported.
+# Note: these *_INIT flags only apply when the caller does not set CMAKE_*_FLAGS itself.
 set(CMAKE_EXE_LINKER_FLAGS_INIT "-Wl,--import-memory -Wl,--export-memory")
 set(CMAKE_EXECUTABLE_SUFFIX .wasm)
 list(APPEND CMAKE_MODULE_PATH "${WASI_SDK_PREFIX}/share/cmake")

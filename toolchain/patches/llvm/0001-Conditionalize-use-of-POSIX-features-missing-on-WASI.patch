@@ -1,4 +1,4 @@
-From 0c2094a23cda12223f0c35841159a910a10dc83c Mon Sep 17 00:00:00 2001
+From 0e6e04baebc1e290ae5bbf6d13ad8696c4990958 Mon Sep 17 00:00:00 2001
 From: Anselm Benedikt Schaefer <anselmschaefer91@gmail.com>
 Date: Sat, 24 Oct 2026 10:51:48 +0200
 Subject: [PATCH] Conditionalize use of POSIX features missing on
@@ -8,30 +8,34 @@ Ported from YoWASP/llvm-project 97196c8eeb (llvmorg-22.1.0+wasm) onto
 rust-lang/llvm-project rustc/23.1-2026-07-22 (1b9c0d5ff9). clang/ and libcxx/
 hunks dropped (not built); CrashRecoveryContext, InitLLVM, Unix/Path.inc and
 Unix/Process.inc hunks re-applied by hand. For LLVM 23: AddSignalHandler's new
-parameter, no-op WASI stubs for the remaining sys:: signal functions, and an
-explicit <cstdlib> include in CrashRecoveryContext.
+parameter, no-op WASI stubs for the remaining sys:: signal functions, the new
+installExceptionOrSignalHandlers parameter, an explicit <cstdlib> include in
+CrashRecoveryContext, and no posix_madvise/flock on WASI (wasi-libc declares
+them but does not provide them) in Support, lld/MachO and the new CAS library.
 ---
  lld/Common/Filesystem.cpp                     |  2 +-
+ lld/MachO/Driver.cpp                          |  5 ++-
  llvm/cmake/config-ix.cmake                    |  1 +
  llvm/cmake/modules/HandleLLVMOptions.cmake    |  4 ++
  llvm/include/llvm/ADT/bit.h                   |  3 +-
  llvm/include/llvm/Config/config.h.cmake       |  4 ++
  llvm/include/llvm/Support/Compiler.h          |  2 +-
+ llvm/lib/CAS/OnDiskCommon.cpp                 |  3 +-
  .../Interpreter/ExternalFunctions.cpp         |  6 +++
- llvm/lib/Support/CrashRecoveryContext.cpp     | 31 ++++++++++++--
+ llvm/lib/Support/CrashRecoveryContext.cpp     | 32 ++++++++++++--
  llvm/lib/Support/InitLLVM.cpp                 |  2 +
  llvm/lib/Support/Jobserver.cpp                |  3 +-
  llvm/lib/Support/LockFileManager.cpp          |  4 +-
  llvm/lib/Support/ProgramStack.cpp             |  4 +-
  llvm/lib/Support/Signals.cpp                  | 25 +++++++++--
  llvm/lib/Support/Unix/Memory.inc              |  5 +++
- llvm/lib/Support/Unix/Path.inc                | 41 +++++++++++++++++--
+ llvm/lib/Support/Unix/Path.inc                | 43 ++++++++++++++++---
  llvm/lib/Support/Unix/Process.inc             | 24 +++++++++--
  llvm/lib/Support/Unix/Program.inc             | 25 +++++++++--
  llvm/lib/Support/Unix/Unix.h                  |  3 ++
  llvm/lib/Support/Unix/Watchdog.inc            |  4 +-
  llvm/lib/Support/raw_socket_stream.cpp        |  4 ++
- 20 files changed, 170 insertions(+), 27 deletions(-)
+ 22 files changed, 178 insertions(+), 30 deletions(-)
 
 diff --git a/lld/Common/Filesystem.cpp b/lld/Common/Filesystem.cpp
 index c2d364419..c2c97c482 100644
@@ -46,6 +50,22 @@ index c2d364419..c2c97c482 100644
    if (parallel::strategy.ThreadsRequested == 1)
      return;
  
+diff --git a/lld/MachO/Driver.cpp b/lld/MachO/Driver.cpp
+index 4857ab143..9b8f920e3 100644
+--- a/lld/MachO/Driver.cpp
++++ b/lld/MachO/Driver.cpp
+@@ -379,7 +379,10 @@ void multiThreadedPageInBackground(DeferredFiles &deferred) {
+ #define DEBUG_TYPE "lld-madvise"
+     auto aligned =
+         llvm::alignDown(reinterpret_cast<uintptr_t>(buff.data()), pageSize);
+-#if defined(POSIX_MADV_WILLNEED)
++#if defined(__wasi__)
++    // wasi-libc declares posix_madvise but does not provide it.
++    if (false)
++#elif defined(POSIX_MADV_WILLNEED)
+     if (posix_madvise((void *)aligned, buff.size(), POSIX_MADV_WILLNEED) < 0)
+ #else
+     if (madvise((void *)aligned, buff.size(), MADV_WILLNEED) < 0)
 diff --git a/llvm/cmake/config-ix.cmake b/llvm/cmake/config-ix.cmake
 index aca87f154..ff1e8cd0b 100644
 --- a/llvm/cmake/config-ix.cmake
@@ -115,6 +135,20 @@ index cffab778d..04a304665 100644
  #define LLVM_ABI __attribute__((visibility("default")))
  #define LLVM_TEMPLATE_ABI
  #define LLVM_EXPORT_TEMPLATE
+diff --git a/llvm/lib/CAS/OnDiskCommon.cpp b/llvm/lib/CAS/OnDiskCommon.cpp
+index 281f3ddfe..951c21ab1 100644
+--- a/llvm/lib/CAS/OnDiskCommon.cpp
++++ b/llvm/lib/CAS/OnDiskCommon.cpp
+@@ -17,7 +17,8 @@
+ 
+ #if __has_include(<sys/file.h>)
+ #include <sys/file.h>
+-#ifdef LOCK_SH
++// wasi-libc declares flock (and LOCK_SH) but does not provide it.
++#if defined(LOCK_SH) && !defined(__wasi__)
+ #define HAVE_FLOCK 1
+ #else
+ #define HAVE_FLOCK 0
 diff --git a/llvm/lib/ExecutionEngine/Interpreter/ExternalFunctions.cpp b/llvm/lib/ExecutionEngine/Interpreter/ExternalFunctions.cpp
 index 9fe748981..5c8b94e44 100644
 --- a/llvm/lib/ExecutionEngine/Interpreter/ExternalFunctions.cpp
@@ -142,7 +176,7 @@ index 9fe748981..5c8b94e44 100644
  }
  
 diff --git a/llvm/lib/Support/CrashRecoveryContext.cpp b/llvm/lib/Support/CrashRecoveryContext.cpp
-index 493ba951f..302b135d4 100644
+index 493ba951f..5fb16559a 100644
 --- a/llvm/lib/Support/CrashRecoveryContext.cpp
 +++ b/llvm/lib/Support/CrashRecoveryContext.cpp
 @@ -13,8 +13,16 @@
@@ -194,7 +228,7 @@ index 493ba951f..302b135d4 100644
  
      // Otherwise let the caller decide of the outcome of the crash. Currently
      // this occurs when using SEH on Windows with MSVC or clang-cl.
-@@ -335,7 +345,16 @@ static void uninstallExceptionOrSignalHandlers() {
+@@ -335,7 +345,17 @@ static void uninstallExceptionOrSignalHandlers() {
    }
  }
  
@@ -205,14 +239,15 @@ index 493ba951f..302b135d4 100644
 +//
 +// WASI traps are always fatal, and recovery is not possible. Do nothing.
 +
-+static void installExceptionOrSignalHandlers() {}
++static void
++installExceptionOrSignalHandlers(bool NeedsPOSIXUtilitySignalHandling) {}
 +static void uninstallExceptionOrSignalHandlers() {}
 +
 +#else // !_WIN32 && !__wasi__
  
  // Generic POSIX implementation.
  //
-@@ -431,10 +450,12 @@ bool CrashRecoveryContext::RunSafely(function_ref<void()> Fn) {
+@@ -431,10 +451,12 @@ bool CrashRecoveryContext::RunSafely(function_ref<void()> Fn) {
      CrashRecoveryContextImpl *CRCI = new CrashRecoveryContextImpl(this);
      Impl = CRCI;
  
@@ -225,7 +260,7 @@ index 493ba951f..302b135d4 100644
    }
  
    Fn();
-@@ -481,7 +502,9 @@ bool CrashRecoveryContext::isCrash(int RetCode) {
+@@ -481,7 +503,9 @@ bool CrashRecoveryContext::isCrash(int RetCode) {
  bool CrashRecoveryContext::throwIfCrash(int RetCode) {
    if (!isCrash(RetCode))
      return false;
@@ -374,7 +409,7 @@ index bac208a7d..2fa9db84c 100644
    if (M.Address == nullptr || M.AllocatedSize == 0)
      return std::error_code();
 diff --git a/llvm/lib/Support/Unix/Path.inc b/llvm/lib/Support/Unix/Path.inc
-index d01967330..feeac99bb 100644
+index d01967330..0cf21f3c2 100644
 --- a/llvm/lib/Support/Unix/Path.inc
 +++ b/llvm/lib/Support/Unix/Path.inc
 @@ -31,7 +31,9 @@
@@ -469,6 +504,15 @@ index d01967330..feeac99bb 100644
    // If we don't have madvise, or it isn't beneficial, treat this as a no-op.
  #elif defined(POSIX_MADV_WILLNEED)
    ::posix_madvise(Mapping, Size, POSIX_MADV_WILLNEED);
+@@ -948,7 +963,7 @@ void mapped_file_region::randomAccessImpl() {
+   assert(Mode == mapped_file_region::readonly);
+   if (!Mapping)
+     return;
+-#if defined(__MVS__) || defined(_AIX)
++#if defined(__MVS__) || defined(_AIX) || defined(__wasi__)
+   // If we don't have madvise, or it isn't beneficial, treat this as a no-op.
+ #elif defined(POSIX_MADV_RANDOM)
+   ::posix_madvise(Mapping, Size, POSIX_MADV_RANDOM);
 @@ -1318,6 +1333,9 @@ Expected<size_t> readNativeFileSlice(file_t FD, MutableArrayRef<char> Buf,
  
  std::error_code tryLockFile(int FD, std::chrono::milliseconds Timeout,

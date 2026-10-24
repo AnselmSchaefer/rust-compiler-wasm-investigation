@@ -2,6 +2,11 @@
 
 Fixed defaults (PLAN.md §1), plus decisions and findings recorded during work packages, newest first.
 
+## 2026-10-24 · WP-04: LLVM for a Wasm host
+- **The LLVM patch is YoWASP's WASI patch plus LLVM 23 fixes** (`toolchain/patches/llvm/0001`, 22 files, +178/−30). Notable: wasi-libc *declares* `posix_madvise` and `flock` but doesn't provide them, so header checks pass and the link fails.
+- **Explicit `CMAKE_*_FLAGS` override the toolchain file's `_INIT` flags.** That silently dropped `-pthread` and `--import-memory`. A threaded tool with a non-imported memory crashes as soon as it spawns a thread. `build-llvm.sh` now passes both explicitly.
+- **Release (-O3) build, no LTO, no size optimizations yet:** llc 53 MiB, wasm-ld 63 MiB (10–12 MiB brotli). Size work happens in WP-10/WP-28.
+
 ## 2026-10-24 · WP-11: VFS design (details: docs/vfs.md)
 - **The VFS lives in one shared `WebAssembly.Memory`, managed by `crates/vfs` (no_std Rust).** Every worker instantiates it on that memory and accesses it synchronously under a lock word. There is no filesystem server thread.
 - **WASI fd tables are kept in the VFS, per pid**, so threads in different workers share them.
