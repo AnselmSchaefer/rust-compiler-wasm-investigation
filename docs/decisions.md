@@ -2,6 +2,14 @@
 
 Fixed defaults (PLAN.md §1), plus decisions and findings recorded during work packages, newest first.
 
+## 2026-10-24 · WP-03: base version and patch strategy (details: docs/patches.md)
+- **Base rustc tag: `1.99.1`** (latest stable, released 2026-10-13, commit 58cf8f9c3). Bundled LLVM: rust-lang/llvm-project `rustc/23.1-2026-07-22` @ `1b9c0d5ff9`. wasi-sdk-34 (clang 23.1) matches that LLVM major version.
+- **Build rustc as a `local-rebuild` from stable 1.99.1, with the version string pinned to stable's** (danlapid's technique). rustc.wasm then accepts rustup's prebuilt `rust-std-wasm32-wasip1` 1.99.1, which already ships separate `.rmeta` files. We don't build std for user programs.
+- **Patch base:** the danlapid/Cloudflare series (rust 1.98.1) is the primary base: one concern per patch, gated on `target_family = "wasm"`/runtime. oligamiq/bjorn3 supply the WASI-host specifics. LLVM carries YoWASP's single WASI patch, rebased to 23.1.
+- **LLVM is built standalone** (`toolchain/build-llvm.sh`, YoWASP flags) and bootstrap uses it via `llvm-config`, instead of carrying oligamiq's ~180-line bootstrap `llvm.rs` patch.
+- **The host must be `panic=unwind` with exnref EH.** This isn't optional: rustc reports fatal errors by unwinding, so an abort host traps on every compile error.
+- **The Emscripten host stays the documented fallback** (danlapid proves 1.98.1 works) if WP-05 trips the PLAN §7 risk trigger.
+
 ## 2026-10-24 · WP-02 findings (details: bench/baseline.md)
 - Baseline in Chromium: check-hello 447 ms (12× native), build-medium 1.9 s (5.9×), build-medium-O 4.0 s (4.8×). Load is 41.9 MB brotli (3.4 s at 100 Mbit).
 - **Most of the cost for small crates is per-invocation sysroot metadata loading** (~350 ms). This confirms the priority of WP-08 (lazy metadata) and WP-09 (compile server).
@@ -35,6 +43,6 @@ Fixed defaults (PLAN.md §1), plus decisions and findings recorded during work p
 | Compiler host ABI | `wasm32-wasip1-threads` |
 | User program target | `wasm32-wasip1` first, `wasm32-wasip3` components later |
 | Hosting | Static CDN, no server-side compiling |
-| Base rustc version | Chosen in WP-03; rebased every 6 weeks |
+| Base rustc version | **1.99.1** (chosen in WP-03); rebased every 6 weeks |
 | Host glue | TypeScript; Rust → Wasm for VFS, resolver, cache, planner |
 | Browser automation | Playwright: Chromium required, Firefox best-effort |

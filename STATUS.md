@@ -3,10 +3,13 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** none. Next is **WP-03** (ready): patch inventory and base rustc version. WP-11 is also ready.
-- **Last session:** 2026-10-24 (session 4). WP-02 done: `pnpm bench` plus baseline numbers in `bench/baseline.md`.
-- **Scope change (user, 2026-10-24):** only Chromium-based browsers must work. Firefox is best-effort, Safari is out of scope (PLAN §1, CLAUDE.md).
-- **Next step:** WP-03. Catalogue the patches from bjorn3's `compile_rustc_for_wasm*` branch, oligamiq/rust (the fork behind rust_wasm), and danlapid/rust-playground `toolchain/rustc-patches` into `docs/patches.md`. Choose the base rustc tag (latest stable, 1.99.x) and record it in `docs/decisions.md`. Include the WP-01/02 findings as requirements: exnref EH, temp dir/TMPDIR, cleanup, no linker-line on stdout, errors exit instead of trapping.
+- **Active WP:** none. Next is **WP-04** (ready): build LLVM for a Wasm host. WP-11 is also ready.
+- **Last session:** 2026-10-24 (session 5). WP-03 done: `docs/patches.md` (21 concerns, planned series), base tag **1.99.1** recorded in `docs/decisions.md`.
+- **Scope (user, 2026-10-24):** only Chromium-based browsers must work. Firefox is best-effort, Safari is out of scope.
+- **Next step:** WP-04.
+  1. Sparse-fetch rust-lang/llvm-project @ `1b9c0d5ff9` (`llvm lld cmake third-party`) into `build/llvm-project`.
+  2. Rebase YoWASP `97196c8eeb` (fetched by `scripts/fetch-patch-sources.sh`) onto it and save it as `toolchain/patches/llvm/0001-*.patch`.
+  3. Write a resumable `toolchain/build-llvm.sh`: native tblgen, then a wasm32-wasip1-threads build with wasi-sdk-34, YoWASP flags, lld, ninja, sccache, `-j10`, `LLVM_PARALLEL_LINK_JOBS=1`. Run it in the background (≤ 2 h chunks) with logs in `build-logs/wp-04/`.
 - **Running background jobs:** none
 
 ## Human actions needed
@@ -21,8 +24,8 @@
 | 00 | Repository bootstrap and tooling | done | 1 | `scripts/verify/wp-00.sh` passes. wasi-threads needs wasmtime v46 (`wasmtime-threads`) |
 | 01 | Reproduce existing baseline | done | 1 | `scripts/verify/wp-01.sh` passes. Notes in `docs/baseline-notes.md` |
 | 02 | Benchmark harness | done | 1 | `scripts/verify/wp-02.sh` passes. Numbers in `bench/baseline.md` |
-| 03 | Patch inventory and base version | ready | 0 | |
-| 04 | Build LLVM for a Wasm host | blocked | 0 | |
+| 03 | Patch inventory and base version | done | 1 | `scripts/verify/wp-03.sh` passes. Base 1.99.1; series in `docs/patches.md` |
+| 04 | Build LLVM for a Wasm host | ready | 0 | |
 | 05 | rustc for a Wasm host: front end | blocked | 0 | |
 | 06 | In-process linking | blocked | 0 | |
 | 07 | Unwinding build and error recovery | blocked | 0 | |
@@ -59,6 +62,7 @@
 - Smoke: hello world runs on wasip1, wasip2, wasip3 (wasmtime 50) and wasip1-threads with a real thread (wasmtime 46.0.3).
 
 ## Session log
+- 2026-10-24 (session 5): WP-03. Reviewed bjorn3 (wasm20, Cranelift), oligamiq (wasm17, the v3 build), YoWASP LLVM WASI patch (not upstream), and danlapid/Cloudflare (7 patches, rust 1.98.1). Chose danlapid as the primary base and rustc 1.99.1, version-pinned so rustup's std can be reused. Pinned sources are fetched by `scripts/fetch-patch-sources.sh`.
 - 2026-10-24 (session 4): WP-02. Turned the baseline page into a harness API. Added `bench/run.ts`/`compare.ts`/`measure.py`, a 563-line benchmark program, native rustc 1.83.0, and browser RSS sampling. Fixed the shim `path_rename` bug (pnpm patch). Scope is now Chromium only.
 - 2026-10-24 (session 3): WP-01. Fetch script, threaded browser harness using browser_wasi_shim-threads, `baseline.spec.ts`, and verify script. Found 11 issues (see `docs/baseline-notes.md`), the main ones being: errors trap the abort build, the unwind build uses legacy EH, and the temp dir is hard-wired to `/`.
 - 2026-10-23 (session 2): WP-00. Installed nightly + Wasm targets, pnpm, jco, wasmtime 50 + 46, wasm-tools, sccache, wasi-sdk-34, Playwright. Found wasi-threads removed in wasmtime 47. WebKit can't run on Arch, so it's opt-in.

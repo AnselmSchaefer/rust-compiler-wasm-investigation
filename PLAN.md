@@ -148,8 +148,11 @@ These are taken as defaults so work can start. Changing one later only affects t
 #### WP-04 Build LLVM for a Wasm host
 - **Depends:** WP-00, WP-03 · **Est.:** 2–3 sessions (build time dominated)
 - **Tasks**
+  - Source: rust-lang/llvm-project `rustc/23.1-2026-07-22` @ `1b9c0d5ff9` (the LLVM of rustc 1.99.1) plus `toolchain/patches/llvm/0001`, YoWASP's WASI patch rebased from `llvmorg-22.1.0+wasm` (see `docs/patches.md` #11).
   - Write `toolchain/build-llvm.sh`, staged and resumable:
     - wasi-sdk-34 sysroot, `wasm32-wasip1-threads`
+    - YoWASP-style flags: `-D_WASI_EMULATED_MMAN`/`-lwasi-emulated-mman`, `--max-memory=4 GiB`, `-z stack-size`, `--stack-first`
+    - an `llvm-config` that bootstrap can use (`[target.wasm32-wasip1-threads] llvm-config`), so no bootstrap `llvm.rs` patch is needed
     - `LLVM_TARGETS_TO_BUILD=WebAssembly`
     - lld enabled
     - `LLVM_PARALLEL_LINK_JOBS=1` (15 GB RAM)
@@ -161,18 +164,15 @@ These are taken as defaults so work can start. Changing one later only affects t
 #### WP-05 rustc for a Wasm host: front end
 - **Depends:** WP-04 · **Est.:** 2–4 sessions
 - **Tasks**
-  - Apply or port the patches for:
-    - single-thread fallback and `wasip1-threads` thread spawning
-    - statically linked LLVM codegen backend (no dlopen)
-    - sysroot and `current_exe` detection via an env var or flag
-    - no process spawning in the driver
-  - Build rustc for `wasm32-wasip1-threads` with `x.py` and a custom `bootstrap.toml`.
+  - Apply or port the patches (series in `docs/patches.md`): `0001` threads (danlapid 0001), `0003` rustc_driver rlib, `0004` WASI sysroot + dlopen stub + misc host fixes. Static LLVM backend and host link flags are build config.
+  - Build rustc 1.99.1 for `wasm32-wasip1-threads` with `x.py` and a custom `bootstrap.toml`: `local-rebuild` from stable 1.99.1 with the version string pinned to stable's (danlapid's `build-rustc.sh` technique), so rustup's std is accepted.
 - **Done when:** under wasmtime, `rustc.wasm --version` works, and `rustc.wasm --emit=metadata hello.rs` produces an `.rmeta` file.
 
 #### WP-06 In-process linking
 - **Depends:** WP-05 · **Est.:** 1–2 sessions
 - **Tasks**
-  - Patch the linker invocation so it calls lld's `wasm-ld` entry point in-process instead of spawning a process. bjorn3's PR #8 on his fork is the reference.
+  - Patch the linker invocation so it calls lld's `wasm-ld` entry point in-process instead of spawning a process: series `0002` (danlapid 0002, which returns an `Output` rather than `exit()`ing like the oligamiq build).
+  - Check that no temp dirs or `.o` files are left behind (WP-01 finding #4).
 - **Done when:** under wasmtime, `rustc.wasm hello.rs --target wasm32-wasip1 -o hello.wasm` builds a binary, and `wasmtime hello.wasm` prints `Hello`.
 
 #### WP-07 Unwinding build and error recovery
@@ -185,9 +185,9 @@ These are taken as defaults so work can start. Changing one later only affects t
 #### WP-08 Sysroots and lazy metadata
 - **Depends:** WP-06 · **Est.:** 2–3 sessions
 - **Tasks**
-  - Build std for the output targets `wasm32-wasip1` (now) and `wasm32-wasip3` (later), matching our rustc exactly.
+  - Use rustup's 1.99.1 `rust-std-wasm32-wasip1` as the `wasm32-wasip1` sysroot (it matches our version-pinned rustc and already has separate `.rmeta` files). Build std ourselves only for `wasm32-wasip3` (later).
   - Package the sysroots as brotli assets.
-  - Port Cloudflare's patch that reads metadata a page at a time instead of mmapping it (std's metadata alone is 75 MiB).
+  - Port Cloudflare's patch that reads metadata a page at a time (series `0005`, danlapid 0007). On wasm32, rustc reads every `.rmeta` fully into memory, and 1.99.1's libcore.rmeta alone is 45 MB (~350 ms per invocation in WP-02).
   - Measure peak memory before and after.
 - **Done when:** compiling hello in Chromium peaks below 300 MB (target to confirm), and the numbers are in `bench/`.
 
