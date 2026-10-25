@@ -1,0 +1,33 @@
+// The proc-macro bridge between a compiler and a proc-macro crate compiled to Wasm (WP-19).
+// Bytes-level: the messages are `proc_macro::bridge` buffers, encoded and decoded by the
+// `proc_macro` crate of the sysroot on both sides, so both must come from the same Rust version
+// (the RUSTC_ID). Typed resources (token streams, spans as WIT resources) can come later.
+//
+// A guest is a wasm32-wasip1 reactor (cdylib) whose core exports are this world's canonical-ABI
+// lowering: `rust:proc-macro/client@0.1.0#macros`, `...#expand` (+ `cabi_post_...#expand`),
+// `cabi_realloc`, and the import `dispatch` from module `rust:proc-macro/server@0.1.0`.
+// See crates/pm-bridge/guest and docs/proc-macro.md.
+package rust:proc-macro@0.1.0;
+
+/// Implemented by the compiler: the bridge server.
+interface server {
+  /// Answer one bridge request (an encoded `proc_macro::bridge` API call) with its encoded reply.
+  dispatch: func(request: list<u8>) -> list<u8>;
+}
+
+/// Implemented by the proc-macro crate: the bridge client.
+interface client {
+  /// The crate's macros in declaration order, as JSON:
+  /// [{"kind": "derive" | "attr" | "bang", "name": "Serialize", "attributes": ["serde"]}, ...]
+  macros: func() -> string;
+
+  /// Run macro `index` on the bridge's input buffer (expansion globals and input token
+  /// stream(s), encoded by the server). Returns the client's output buffer. During the call the
+  /// client calls `server.dispatch` for every proc_macro API call.
+  expand: func(index: u32, input: list<u8>, force-show-panics: bool) -> list<u8>;
+}
+
+world proc-macro {
+  import server;
+  export client;
+}

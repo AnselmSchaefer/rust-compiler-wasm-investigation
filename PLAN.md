@@ -307,6 +307,7 @@ These are taken as defaults so work can start. Changing one later only affects t
   - Wrap it in a WIT world `rust:proc-macro` (bytes-level first; typed resources are an optional later step).
   - Measure expansion time against the native `.so`.
 - **Done when:** a wasmtime-hosted expansion of `#[derive(Serialize)]` matches native output token for token, and the overhead is recorded (target ≤ 2× per call).
+  - *2026-10-25 (done, session 21):* serde_derive compiled to wasm32-wasip1 (as a cdylib: rustc drops `proc-macro` on wasm targets) expands byte-identically to the native `.so` (`-Zunpretty=expanded`; hygiene contexts identical too). Overhead with proc macros optimized: ~2.0–2.1× measured end to end in the native prototype, ~1.7× estimated without its proxy server hop, which rustc.wasm won't have. No rustc change. WP-20 needs one (proc-macro loading in `rustc_metadata`; the user writes it). See `docs/proc-macro.md`, `bench/proc-macro.md`.
 
 #### WP-20 Proc macros inside rustc.wasm
 - **Depends:** WP-19, WP-18 · **Est.:** 2–3 sessions

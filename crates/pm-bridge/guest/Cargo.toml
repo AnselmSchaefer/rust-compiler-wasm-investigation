@@ -1,0 +1,8 @@
+[package]
+name = "pm_guest"
+version = "0.1.0"
+edition = "2021"
+description = "Wasm side of the proc-macro bridge: exports a proc-macro crate's macros as the rust:proc-macro world"
+
+[lib]
+path = "src/lib.rs"

@@ -1,0 +1,11 @@
+[package]
+name = "pm_host"
+version = "0.1.0"
+edition = "2021"
+description = "Native host of the rust:proc-macro world: runs a Wasm proc macro under wasmtime against a bridge server"
+
+[dependencies]
+wasmtime = "50"
+wasmtime-wasi = "50"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

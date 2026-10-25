@@ -1,0 +1,11 @@
+[package]
+name = "pm-shim-serde"
+version = "0.1.0"
+edition = "2021"
+description = "A native proc macro with serde_derive's macros, expanded by serde_derive compiled to Wasm (WP-19 test host)"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+pm_host = { path = "../host" }

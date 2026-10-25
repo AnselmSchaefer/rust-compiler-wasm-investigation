@@ -1,0 +1,40 @@
+{
+  "n": 100,
+  "calls": 400,
+  "expand_ms": {
+    "dev-none": 4.0,
+    "dev-native": 534.0,
+    "dev-wasm": 3045.0,
+    "opt3-none": 4.0,
+    "opt3-native": 340.0,
+    "opt3-wasm": 721.0
+  },
+  "profiles": {
+    "dev": {
+      "native_ms": 530.0,
+      "wasm_ms": 3041.0,
+      "wasm_load_ms": 19.4,
+      "native_us_per_call": 1325,
+      "wasm_us_per_call": 7554,
+      "ratio_per_call": 5.7,
+      "ratio_incl_load": 5.74,
+      "dispatches_per_call": 556,
+      "server_share": 0.36,
+      "proxy_us_per_call": 1983,
+      "est_ratio_without_proxy": 4.2
+    },
+    "opt3": {
+      "native_ms": 336.0,
+      "wasm_ms": 717.0,
+      "wasm_load_ms": 4.6,
+      "native_us_per_call": 840,
+      "wasm_us_per_call": 1781,
+      "ratio_per_call": 2.12,
+      "ratio_incl_load": 2.13,
+      "dispatches_per_call": 556,
+      "server_share": 0.51,
+      "proxy_us_per_call": 341,
+      "est_ratio_without_proxy": 1.71
+    }
+  }
+}

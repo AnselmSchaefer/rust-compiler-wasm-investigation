@@ -1,6 +1,8 @@
 [workspace]
 resolver = "3"
 members = ["vfs", "resolver"]
+# Its own workspace: native proc macros and wasmtime, unwinding (WP-19).
+exclude = ["pm-bridge"]
 
 [profile.release]
 opt-level = 3

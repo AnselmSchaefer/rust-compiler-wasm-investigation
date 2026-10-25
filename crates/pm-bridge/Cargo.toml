@@ -1,0 +1,6 @@
+# The proc-macro bridge for Wasm proc macros (WP-19). Its own workspace, all native. The guest
+# (pm_guest) is built only for wasm32-wasip1, as a path dependency of rewritten macro crates.
+[workspace]
+resolver = "3"
+members = ["rewrite", "host", "shim-serde"]
+exclude = ["guest"]
