@@ -1,6 +1,11 @@
 //! pm-rewrite (WP-19): turn a proc-macro crate into a guest of the `rust:proc-macro` world.
 //!
-//!   pm-rewrite <crate dir> <out dir> <pm_guest dir>
+//!   pm-rewrite [--raw] <crate dir> <out dir> <pm_guest dir>
+//!
+//! `--raw` (WP-20 experiment): instead of pm_guest, append only what rustc's proc-macro harness
+//! generates, an exported `static __rustc_proc_macro_decls_raw__: &[Client]`, so the module
+//! looks like what rustc would emit for a proc-macro crate on wasm. Needs
+//! `-Zcrate-attr=feature(proc_macro_internals)` (and RUSTC_BOOTSTRAP for the crate).
 //!
 //! rustc drops the `proc-macro` crate type on wasm targets (they're `only_cdylib`), and the
 //! `#[proc_macro*]` attributes are only allowed in proc-macro crates. So the crate becomes a
@@ -20,9 +25,11 @@ use serde_json::json;
 use syn::{Attribute, Item, Meta};
 
 fn main() {
-    let args: Vec<String> = std::env::args().collect();
+    let mut args: Vec<String> = std::env::args().collect();
+    let raw = args.iter().any(|a| a == "--raw");
+    args.retain(|a| a != "--raw");
     if args.len() != 4 {
-        eprintln!("usage: pm-rewrite <crate dir> <out dir> <pm_guest dir>");
+        eprintln!("usage: pm-rewrite [--raw] <crate dir> <out dir> <pm_guest dir>");
         std::process::exit(2);
     }
     let (src, out, guest) = (Path::new(&args[1]), Path::new(&args[2]), fs::canonicalize(&args[3]).unwrap());
@@ -34,7 +41,7 @@ fn main() {
     let _ = fs::remove_file(out.join("Cargo.lock"));
     let manifest = fs::read_to_string(out.join("Cargo.toml")).unwrap();
     let lib = lib_path(&manifest);
-    let (cargo, macros) = (rewrite_manifest(&manifest, &guest), rewrite_lib(&out.join(&lib)));
+    let (cargo, macros) = (rewrite_manifest(&manifest, (!raw).then_some(guest.as_path())), rewrite_lib(&out.join(&lib), raw));
     fs::write(out.join("Cargo.toml"), cargo).unwrap();
     println!("{}", serde_json::to_string(&macros).unwrap());
 }
@@ -70,7 +77,7 @@ fn lib_path(manifest: &str) -> String {
     "src/lib.rs".into()
 }
 
-fn rewrite_manifest(manifest: &str, guest: &Path) -> String {
+fn rewrite_manifest(manifest: &str, guest: Option<&Path>) -> String {
     let mut out = String::new();
     let mut has_lib = false;
     let mut dev = false;
@@ -93,12 +100,15 @@ fn rewrite_manifest(manifest: &str, guest: &Path) -> String {
     if !has_lib {
         out.push_str("\n[lib]\ncrate-type = [\"cdylib\"]\n");
     }
-    out.push_str(&format!("\n[dependencies.pm_guest]\npath = {:?}\n\n[workspace]\n", guest.display().to_string()));
+    if let Some(guest) = guest {
+        out.push_str(&format!("\n[dependencies.pm_guest]\npath = {:?}\n", guest.display().to_string()));
+    }
+    out.push_str("\n[workspace]\n");
     out
 }
 
 /// Blank the `#[proc_macro*]` attributes of the root's functions; append the export.
-fn rewrite_lib(path: &Path) -> serde_json::Value {
+fn rewrite_lib(path: &Path, raw: bool) -> serde_json::Value {
     let text = fs::read_to_string(path).unwrap();
     let file = syn::parse_file(&text).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
     let lines: Vec<usize> = std::iter::once(0).chain(text.match_indices('\n').map(|(i, _)| i + 1)).collect();
@@ -129,11 +139,22 @@ fn rewrite_lib(path: &Path) -> serde_json::Value {
     }
     let mut text = String::from_utf8(bytes).expect("attributes are ASCII");
     let list = serde_json::Value::Array(macros);
-    text.push_str(&format!(
-        "\n// Added by pm-rewrite (WP-19): the proc macros above, as a rust:proc-macro guest.\n::pm_guest::export_proc_macros!({:?}; {});\n",
-        list.to_string(),
-        exports.join(", ")
-    ));
+    if raw {
+        let clients: Vec<String> = exports.iter().map(|e| {
+            let (kind, f) = e.split_once(' ').unwrap();
+            format!("::proc_macro::bridge::client::Client::{kind}({f})")
+        }).collect();
+        text.push_str(&format!(
+            "\n// Added by pm-rewrite --raw (WP-20 experiment): the decls rustc's proc-macro harness would emit.\n#[doc(hidden)]\n#[unsafe(no_mangle)]\n#[used]\n#[allow(deprecated)]\npub static __rustc_proc_macro_decls_raw__: &[::proc_macro::bridge::client::Client] = &[{}];\n",
+            clients.join(", ")
+        ));
+    } else {
+        text.push_str(&format!(
+            "\n// Added by pm-rewrite (WP-19): the proc macros above, as a rust:proc-macro guest.\n::pm_guest::export_proc_macros!({:?}; {});\n",
+            list.to_string(),
+            exports.join(", ")
+        ));
+    }
     fs::write(path, text).unwrap();
     list
 }

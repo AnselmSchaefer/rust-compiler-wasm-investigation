@@ -21,6 +21,7 @@
 extern crate proc_macro;
 
 pub mod proxy;
+pub mod raw;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -74,7 +75,7 @@ pub type Dispatch<'a> = dyn FnMut(&[u8], &mut dyn FnMut(&[u8])) + 'a;
 
 /// wasmtime wants `Send` store data; the callback is only used on the expanding thread.
 #[derive(Clone, Copy)]
-struct Callback(*mut Dispatch<'static>);
+pub(crate) struct Callback(pub(crate) *mut Dispatch<'static>);
 unsafe impl Send for Callback {}
 
 struct HostState {
@@ -86,6 +87,37 @@ struct HostState {
     exports: Option<(Memory, TypedFunc<(u32, u32, u32, u32), u32>)>,
     /// A request's bytes, copied out of guest memory (reused).
     scratch: Vec<u8>,
+}
+
+/// A loaded Wasm proc macro: a pm_guest module, or a raw one (raw.rs).
+pub enum AnyGuest {
+    Glue(Guest),
+    Raw(raw::RawGuest),
+}
+
+impl AnyGuest {
+    pub fn load(path: &Path) -> wasmtime::Result<AnyGuest> {
+        let module = load_module(path)?;
+        Ok(if raw::RawGuest::is_raw(&module) { AnyGuest::Raw(raw::RawGuest::load(engine(), &module, path)?) } else { AnyGuest::Glue(Guest::instantiate(&module)?) })
+    }
+    pub fn macros(&self) -> &[MacroDecl] {
+        match self {
+            AnyGuest::Glue(g) => &g.macros,
+            AnyGuest::Raw(g) => &g.macros,
+        }
+    }
+    pub fn expand(&mut self, index: u32, input: &[u8], force_show_panics: bool, dispatch: &mut Dispatch<'_>) -> Result<Vec<u8>, String> {
+        match self {
+            AnyGuest::Glue(g) => g.expand(index, input, force_show_panics, dispatch),
+            AnyGuest::Raw(g) => g.expand(index, input, force_show_panics, dispatch),
+        }
+    }
+    pub fn dispatches(&self) -> u64 {
+        match self {
+            AnyGuest::Glue(g) => g.dispatches(),
+            AnyGuest::Raw(g) => g.dispatches(),
+        }
+    }
 }
 
 pub struct Guest {
@@ -124,14 +156,17 @@ fn load_module(path: &Path) -> wasmtime::Result<Module> {
 
 impl Guest {
     pub fn load(path: &Path) -> wasmtime::Result<Guest> {
-        let module = load_module(path)?;
+        Guest::instantiate(&load_module(path)?)
+    }
+
+    fn instantiate(module: &Module) -> wasmtime::Result<Guest> {
         let mut linker: Linker<HostState> = Linker::new(engine());
         p1::add_to_linker_sync(&mut linker, |s: &mut HostState| &mut s.wasi)?;
         linker.func_wrap("rust:proc-macro/server@0.1.0", "dispatch", host_dispatch)?;
         let stderr = MemoryOutputPipe::new(1 << 20);
         let wasi = WasiCtxBuilder::new().stderr(stderr.clone()).build_p1();
         let mut store = Store::new(engine(), HostState { wasi, dispatch: None, dispatches: 0, exports: None, scratch: Vec::new() });
-        let instance: Instance = linker.instantiate(&mut store, &module)?;
+        let instance: Instance = linker.instantiate(&mut store, module)?;
         instance.get_typed_func::<(), ()>(&mut store, "_initialize")?.call(&mut store, ())?;
         let memory = instance.get_memory(&mut store, "memory").expect("guest exports memory");
         let macros_fn = instance.get_typed_func::<(), u32>(&mut store, "rust:proc-macro/client@0.1.0#macros")?;
@@ -255,7 +290,7 @@ struct BridgeConfig {
 }
 
 struct Current {
-    guest: *mut Guest,
+    guest: *mut AnyGuest,
     index: u32,
     error: Option<String>,
     server: Duration,
@@ -263,7 +298,7 @@ struct Current {
 
 thread_local! {
     static CURRENT: RefCell<Option<Current>> = const { RefCell::new(None) };
-    static GUESTS: RefCell<HashMap<PathBuf, Box<Guest>>> = RefCell::new(HashMap::new());
+    static GUESTS: RefCell<HashMap<PathBuf, Box<AnyGuest>>> = RefCell::new(HashMap::new());
     pub static STATS: RefCell<Stats> = RefCell::new(Stats::default());
 }
 
@@ -323,15 +358,15 @@ extern "C" fn trampoline(config: BridgeConfig) -> Buffer {
 /// `path` with the Proxy server. `input2` is the item for attribute macros.
 pub fn expand(path: &Path, kind: &str, name: &str, input: proc_macro::TokenStream, input2: Option<proc_macro::TokenStream>) -> proc_macro::TokenStream {
     let t0 = Instant::now();
-    let guest: *mut Guest = GUESTS.with_borrow_mut(|g| {
+    let guest: *mut AnyGuest = GUESTS.with_borrow_mut(|g| {
         let t = Instant::now();
         let guest = g.entry(path.to_path_buf()).or_insert_with(|| {
-            Box::new(Guest::load(path).unwrap_or_else(|e| panic!("loading the Wasm proc macro {}: {e:?}", path.display())))
+            Box::new(AnyGuest::load(path).unwrap_or_else(|e| panic!("loading the Wasm proc macro {}: {e:?}", path.display())))
         });
         STATS.with_borrow_mut(|s| s.load += t.elapsed());
-        &mut **guest as *mut Guest
+        &mut **guest as *mut AnyGuest
     });
-    let index = unsafe { &*guest }.macros.iter().position(|m| m.kind == kind && m.name == name)
+    let index = unsafe { &*guest }.macros().iter().position(|m| m.kind == kind && m.name == name)
         .unwrap_or_else(|| panic!("{} has no {kind} macro `{name}`", path.display())) as u32;
     let before = unsafe { &*guest }.dispatches();
     CURRENT.with_borrow_mut(|c| *c = Some(Current { guest, index, error: None, server: Duration::ZERO }));
