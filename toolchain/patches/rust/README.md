@@ -54,3 +54,16 @@ Apply (the user):
     git -C build/rust checkout compiler/rustc_session/src/output.rs   # drop the hand-made change 1
     git -C build/rust apply ../../toolchain/patches/rust/available/bjorn3-160981-wasm-proc-macro-locating.diff
     # then in compiler/rustc_session/src/session.rs: "wasm32-wasip2" → "wasm32-wasip1"
+
+## wasm-host-wp20.diff (WP-20 state of build/rust)
+
+The complete working-tree diff of `build/rust` after WP-20, saved by the user (`git -C build/rust
+diff`): A1/A2 (as in wasm-host.diff), bjorn3's rust-lang/rust#160981 (available/, applied by the
+user) with the wasm proc-macro tuple set to `wasm32-wasip1` in session.rs, and the user's loader
+hook in rustc_metadata (`register_wasm_proc_macro_loader`, `host_dylib.rs`, `lib.rs`). `git diff`
+leaves out untracked files: the one new file of #160981,
+`src/doc/unstable-book/src/compiler-flags/print-wasm-proc-macro-tuple.md`, is only in the
+available/ patch. To restore on an unmodified 1.99.1 tree:
+
+    git -C build/rust apply ../../toolchain/patches/rust/wasm-host-wp20.diff
+    git -C build/rust apply --include='src/doc/*' ../../toolchain/patches/rust/available/bjorn3-160981-wasm-proc-macro-locating.diff
