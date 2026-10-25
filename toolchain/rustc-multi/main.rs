@@ -16,11 +16,24 @@
 // Each invocation goes through the same catch_with_exit_code that rustc_driver::main uses, plus a
 // catch_unwind for ICEs, which catch_with_exit_code re-raises. Built out of tree against
 // rustc_driver (like clippy-driver) by toolchain/build-rustc-multi.sh.
-#![feature(rustc_private)]
+//
+// Wasm proc macros (WP-20): every invocation runs with `-Zwasm-proc-macros` turned on, and the
+// loader in pm.rs is registered, so proc-macro crates built for wasm32-wasip1 load through the
+// JS host (web/wasi/proc-macro.ts). With `--cfg rust_pm_stub` (the wasmtime build of
+// build-rustc-multi.sh) pm.rs is left out: no `rust_pm` imports, which wasmtime's CLI can't
+// provide to spawned threads, and proc macros can't be loaded.
+#![feature(rustc_private, proc_macro_internals)]
+#![allow(internal_features)]
 
 extern crate rustc_driver;
+extern crate rustc_interface;
+extern crate rustc_metadata;
+extern crate rustc_proc_macro;
 extern crate rustc_session;
 extern crate serde_json;
+
+#[cfg(not(rust_pm_stub))]
+mod pm;
 
 use std::io::{BufRead, Write};
 use std::process::ExitCode;
@@ -33,7 +46,12 @@ use serde_json::{Value, json};
 rustc_driver::override_c_allocator_in_binary!();
 
 struct Callbacks;
-impl rustc_driver::Callbacks for Callbacks {}
+impl rustc_driver::Callbacks for Callbacks {
+    fn config(&mut self, config: &mut rustc_interface::Config) {
+        // Proc macros are wasm32-wasip1 modules here (pm.rs); no `-Z` flag or RUSTC_BOOTSTRAP needed.
+        config.opts.unstable_opts.wasm_proc_macros = true;
+    }
+}
 
 /// Runs one rustc invocation; `argv[0]` is the program name. Returns 0, 1 (errors) or 101 (ICE).
 fn compile(argv: &[String]) -> u8 {
@@ -130,6 +148,8 @@ fn main() -> ExitCode {
     let early_dcx = EarlyDiagCtxt::new(ErrorOutputType::default());
     rustc_driver::init_rustc_env_logger(&early_dcx);
     rustc_driver::install_ice_hook(rustc_driver::DEFAULT_BUG_REPORT_URL, |_| ());
+    #[cfg(not(rust_pm_stub))]
+    pm::register();
 
     let args = rustc_driver::args::raw_args(&early_dcx);
     if args.get(1).map(String::as_str) == Some("--server") {

@@ -148,7 +148,9 @@ async function slot<T>(f: () => Promise<T>): Promise<T> {
 
 function diskHost(): BuildHost {
   const fs = new DiskFs(root);
-  const rustcWasm = releaseFile(manifest.rustc);
+  // rustc-multi without the browser's proc-macro host imports (release.sh; WP-20): the wasmtime CLI
+  // can't give spawned threads imports it doesn't know. Same source and compiler crates.
+  const rustcWasm = releaseFile((manifest as Manifest & { rustcWasmtime?: Manifest['rustc'] }).rustcWasmtime ?? manifest.rustc);
   const lldWasm = releaseFile(manifest.lld);
   return {
     vfs: fs, rustcId: RUSTC_ID, workers: jobs,

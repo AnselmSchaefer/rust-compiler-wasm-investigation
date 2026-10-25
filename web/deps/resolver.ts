@@ -30,6 +30,8 @@ export interface PlanInput {
   features?: string[]; default_features?: boolean; target_flag_for_host?: boolean;
   profile?: { name?: string; opt_level?: string; debuginfo?: number; debug_assertions?: boolean; overflow_checks?: boolean; incremental?: boolean };
   tools?: { cargo?: string; rustc?: string; rustdoc?: string; jobs?: number };
+  /** Extra rustc arguments for proc-macro units (WP-20). */
+  proc_macro_args?: string[];
 }
 export type UnitKind = 'lib' | 'bin' | 'custom-build' | 'run-custom-build';
 export interface PlanUnit {

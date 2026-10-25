@@ -2,6 +2,8 @@
 # Build toolchain/rustc-multi (WP-07) for the wasm32-wasip1-threads host, against the compiler
 # crates of the last toolchain/build-rustc.sh run: the way bootstrap links rustc-main, with the
 # same stage-0 rustc, flags and libraries, but our own main. Output: build/rustc-wasm/rustc-multi.wasm
+# (and rustc-multi-wasmtime.wasm, for the wasmtime CLI; see main.rs)
+# WP-20: the function table is exported (the proc-macro host calls back through it; pm.rs).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${RUSTC_WASM_OUT:-$ROOT/build/rustc-wasm}" # another dir: a second, independent build (WP-10 reproducibility)
@@ -26,9 +28,17 @@ done
 # The host rustflags, exactly as build-rustc.sh gave them to bootstrap.
 mapfile -t flags < <(sed -n '/^rustflags = \[/,/\]$/p' "$OUT/bootstrap.toml" | grep -o '"[^"]*"' | tr -d '"')
 
-RUSTC_BOOTSTRAP=1 "$OUT/stage0/bin/rustc" --edition=2024 --crate-type bin --crate-name rustc_multi \
-  --target wasm32-wasip1-threads -C opt-level=3 -C linker="$ROOT/toolchain/bin/wasi-threads-clang" \
-  "${flags[@]}" "${deps[@]}" "${native[@]}" \
-  --extern rustc_driver="$DRIVER" --extern rustc_session="$(lib rustc_session)" --extern serde_json="$(lib serde_json)" \
-  "$ROOT/toolchain/rustc-multi/main.rs" -o "$OUT/rustc-multi.wasm"
-ls -la "$OUT/rustc-multi.wasm"
+# Two builds of the same source: the browser's (rustc-multi.wasm) and wasmtime's
+# (rustc-multi-wasmtime.wasm: --cfg rust_pm_stub, no proc-macro host imports; see main.rs).
+build() {
+  RUSTC_BOOTSTRAP=1 "$OUT/stage0/bin/rustc" --edition=2024 --crate-type bin --crate-name rustc_multi \
+    --target wasm32-wasip1-threads -C opt-level=3 -C linker="$ROOT/toolchain/bin/wasi-threads-clang" \
+    "${flags[@]}" "${deps[@]}" "${native[@]}" \
+    --extern rustc_driver="$DRIVER" --extern rustc_session="$(lib rustc_session)" --extern serde_json="$(lib serde_json)" \
+    --extern rustc_interface="$(lib rustc_interface)" --extern rustc_metadata="$(lib rustc_metadata)" \
+    --extern rustc_proc_macro="$(lib rustc_proc_macro)" \
+    -C link-arg=-Wl,--export-table --check-cfg 'cfg(rust_pm_stub)' "$@"
+}
+build "$ROOT/toolchain/rustc-multi/main.rs" -o "$OUT/rustc-multi.wasm"
+build --cfg rust_pm_stub "$ROOT/toolchain/rustc-multi/main.rs" -o "$OUT/rustc-multi-wasmtime.wasm"
+ls -la "$OUT/rustc-multi.wasm" "$OUT/rustc-multi-wasmtime.wasm"

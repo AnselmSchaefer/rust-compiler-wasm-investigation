@@ -1,0 +1,10 @@
+{
+ "date": "2026-10-25",
+ "commit": "741ac6d",
+ "browser": "chromium",
+ "cold": true,
+ "editorMs": 298,
+ "readyMs": 4352,
+ "checkMs": 913,
+ "runToPromptMs": 5016
+}

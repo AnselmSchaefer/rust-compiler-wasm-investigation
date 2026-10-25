@@ -5,7 +5,8 @@
 # crates) and $TARGET (target dir):
 #   cargo-vv.jsonl                every `Running` entry as {"env", "program", "args"}, one per line
 #   crates/<name>-<ver>/Cargo.toml, files.txt   each registry package's manifest and file list
-#   build-output/<name>-<ver>.txt                what its build script printed (target builds)
+#   build-output/<name>-<ver>.txt                what its build script printed (target builds;
+#                                                .host.txt: host-side builds)
 # Usage: tests/planner/record.sh <case>
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -43,5 +44,12 @@ for o in "$W"/root/target/wasm32-wasip1/debug/build/*/output; do
   pkg=$(basename "$(dirname "$o")"); pkg=${pkg%-*}
   ver=$(grep -o "\$REG/$pkg-[0-9][^/\" ]*" "$SRC/cargo-vv.jsonl" | head -1 | sed "s#\$REG/##")
   norm < "$o" > "$SRC/build-output/$ver.txt"
+done
+# Host-side runs (build scripts of build dependencies and proc macros): target/debug/build/.
+for o in "$W"/root/target/debug/build/*/output; do
+  [ -f "$o" ] || continue
+  pkg=$(basename "$(dirname "$o")"); pkg=${pkg%-*}
+  ver=$(grep -o "\$REG/$pkg-[0-9][^/\" ]*" "$SRC/cargo-vv.jsonl" | head -1 | sed "s#\$REG/##")
+  norm < "$o" > "$SRC/build-output/$ver.host.txt"
 done
 echo "recorded $CASE: $(wc -l < "$SRC/cargo-vv.jsonl") invocations, $(ls "$SRC/crates" | wc -l) crates, $(ls "$SRC/build-output" | wc -l) build-script outputs"

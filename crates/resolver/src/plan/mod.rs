@@ -54,6 +54,11 @@ pub struct PlanInput {
     pub target_flag_for_host: bool,
     #[serde(default)]
     pub tools: Tools,
+    /// Extra rustc arguments for proc-macro units. In the browser, proc macros are wasm32-wasip1
+    /// modules that the host drives (WP-20): reactor crt, exported table and allocator,
+    /// `-C save-temps` (the orchestrator links after rustc exits).
+    #[serde(default)]
+    pub proc_macro_args: Vec<String>,
 }
 
 fn yes() -> bool {
@@ -447,7 +452,9 @@ impl Builder<'_> {
         deps.sort();
         deps.dedup();
         let hash = self.hash(pkg, host, kind, &target.name, &features, &deps);
-        let is_lib = kind == UnitKind::Lib;
+        let proc_macro = kind == UnitKind::Lib && target.crate_types.iter().any(|t| t == "proc-macro");
+        // A lib's dependents only need its metadata (pipelining); a proc macro is linked.
+        let is_lib = kind == UnitKind::Lib && !proc_macro;
         let layout = self.layout(host);
         let out_dir = match kind {
             UnitKind::CustomBuild => format!("{layout}/build/{}-{hash}", p.name()),
@@ -463,6 +470,9 @@ impl Builder<'_> {
             push(&["--crate-type", t]);
         }
         push(&[if is_lib { "--emit=dep-info,metadata,link" } else { "--emit=dep-info,link" }]);
+        if proc_macro {
+            push(&["-C", "prefer-dynamic"]);
+        }
         if prof.opt_level != "0" {
             push(&["-C", &format!("opt-level={}", prof.opt_level)]);
         }
@@ -505,11 +515,18 @@ impl Builder<'_> {
         for (name, d) in &externs {
             let dep = &self.units[*d];
             // A lib only needs its dependencies' metadata (pipelining); executables link them.
-            let file = if is_lib { &dep.outputs[1] } else { &dep.outputs[0] };
+            // A proc macro has only its dylib; other libs offer their rmeta to libs.
+            let file = if is_lib && dep.outputs.len() > 1 { &dep.outputs[1] } else { &dep.outputs[0] };
             push(&["--extern", &format!("{name}={file}")]);
+        }
+        if proc_macro {
+            push(&["--extern", "proc_macro"]);
         }
         if p.summary.source != Source::Path {
             push(&["--cap-lints", "allow"]);
+        }
+        if proc_macro {
+            a.extend(self.input.proc_macro_args.iter().cloned());
         }
 
         let mut env = self.pkg_env(pkg);
@@ -526,9 +543,11 @@ impl Builder<'_> {
             env.insert("CARGO_PRIMARY_PACKAGE".into(), "1".into());
         }
 
+        let info = self.info(host);
         let outputs = match kind {
+            UnitKind::Lib if proc_macro => vec![format!("{out_dir}/{}{}-{hash}{}", info.dll_prefix, target.crate_name, info.dll_suffix)],
             UnitKind::Lib => vec![format!("{out_dir}/lib{}-{hash}.rlib", target.crate_name), format!("{out_dir}/lib{}-{hash}.rmeta", target.crate_name)],
-            _ => vec![format!("{out_dir}/{}-{hash}{}", target.crate_name, self.info(host).exe_suffix)],
+            _ => vec![format!("{out_dir}/{}-{hash}{}", target.crate_name, info.exe_suffix)],
         };
         Unit {
             id: 0,

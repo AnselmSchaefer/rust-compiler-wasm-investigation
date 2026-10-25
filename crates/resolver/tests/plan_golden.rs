@@ -158,6 +158,7 @@ fn check_case(case: &Path, index: &Path) -> Vec<String> {
         rustc_id: "test".into(),
         target_flag_for_host: false,
         tools: Tools { jobs: 12, ..Tools::default() },
+        proc_macro_args: Vec::new(),
     };
     let p = plan(&input).unwrap_or_else(|e| panic!("{}: {e}", case.display()));
 
@@ -165,7 +166,8 @@ fn check_case(case: &Path, index: &Path) -> Vec<String> {
     let mut outputs = HashMap::new();
     for u in &p.units {
         if u.kind == UnitKind::RunCustomBuild {
-            let f = case.join("build-output").join(format!("{}-{}.txt", u.name, u.version));
+            let side = if u.host { ".host" } else { "" };
+            let f = case.join("build-output").join(format!("{}-{}{side}.txt", u.name, u.version));
             outputs.insert(u.id, std::fs::read_to_string(&f).unwrap_or_else(|_| panic!("no {}", f.display())));
         }
     }

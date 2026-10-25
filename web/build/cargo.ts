@@ -228,8 +228,21 @@ function planInput(vfs: BuildFs, opts: BuildOptions, deps: DepsResult, host: Bui
     rustc_id: host.rustcId, features: opts.features, default_features: opts.defaultFeatures ?? true,
     profile: { incremental: false, ...opts.profile },
     tools: { rustc: '/sysroot/bin/rustc', jobs: host.workers },
+    proc_macro_args: PROC_MACRO_ARGS,
   };
 }
+
+/**
+ * Proc macros are wasm32-wasip1 modules that web/wasi/proc-macro.ts drives inside rustc.wasm
+ * (WP-20). The host needs `_initialize` (crt1-reactor.o: rustc links no crt into this crate type),
+ * the function table and the allocator exported. `-C save-temps`: the module links rustc's
+ * metadata object from a temp dir, and the orchestrator links after rustc returned.
+ */
+const PROC_MACRO_ARGS = [
+  `link-arg=/sysroot/lib/rustlib/${TARGET}/lib/self-contained/crt1-reactor.o`,
+  'link-arg=--export=_initialize', 'link-arg=--export-table', 'link-arg=--growable-table',
+  'link-arg=--export=malloc', 'link-arg=--export=free', 'link-arg=--export=realloc', 'save-temps',
+].flatMap(a => ['-C', a]);
 
 /** Directories that a project walk skips: build output and hidden ones (.git, ...). */
 const skipDir = (name: string) => name === 'target' || name.startsWith('.');

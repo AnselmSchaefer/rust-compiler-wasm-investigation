@@ -64,17 +64,20 @@ pub struct TargetInfo {
     pub cfgs: Vec<Cfg>,
     /// Suffix of executables: `.wasm` for wasm targets.
     pub exe_suffix: &'static str,
+    /// How dylibs (and proc macros) are named: `lib<name>.so`, `<name>.wasm`.
+    pub dll_prefix: &'static str,
+    pub dll_suffix: &'static str,
 }
 
 impl TargetInfo {
     pub fn new(triple: &str) -> Result<TargetInfo, String> {
-        let (list, exe_suffix) = match triple {
-            "wasm32-wasip1" => (WASM32_WASIP1, ".wasm"),
-            "x86_64-unknown-linux-gnu" => (X86_64_LINUX_GNU, ""),
+        let (list, exe_suffix, dll_prefix, dll_suffix) = match triple {
+            "wasm32-wasip1" => (WASM32_WASIP1, ".wasm", "", ".wasm"),
+            "x86_64-unknown-linux-gnu" => (X86_64_LINUX_GNU, "", "lib", ".so"),
             _ => return Err(format!("unsupported target `{triple}`")),
         };
         let cfgs = list.lines().map(|l| Cfg::from_str(l).map_err(|e| e.to_string())).collect::<Result<_, _>>()?;
-        Ok(TargetInfo { triple: triple.into(), cfgs, exe_suffix })
+        Ok(TargetInfo { triple: triple.into(), cfgs, exe_suffix, dll_prefix, dll_suffix })
     }
 
     /// Whether a dependency's `target` (a `cfg(..)` expression or a triple) applies here.

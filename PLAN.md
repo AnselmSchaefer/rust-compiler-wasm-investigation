@@ -317,6 +317,7 @@ These are taken as defaults so work can start. Changing one later only affects t
   - Optional strict mode: a separate worker, with JSPI pausing rustc.
   - Cache macro artifacts in L1/L2.
 - **Done when:** in the browser, a program using `#[derive(Serialize, Deserialize)]` compiles and runs, and so does a second macro crate (`thiserror`).
+  - *2026-10-25 (done, session 21):* rustc side = bjorn3's rust-lang/rust#160981 (tuple wasm32-wasip1) + the user's loader hook in `rustc_metadata`; Claude's side = `toolchain/rustc-multi/pm.rs` (slot trampolines), `web/wasi/proc-macro.ts` (host in the rustc worker, same thread, no JSPI needed), planner proc-macro units. Macro modules are ordinary cached units (L1). Not yet: L2/prebuild for crates using proc macros (the wasmtime CLI can't provide the host), strict mode. See `docs/proc-macro.md`.
 
 #### WP-21 Build scripts
 - **Depends:** WP-20 · **Est.:** 2–3 sessions

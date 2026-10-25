@@ -1,0 +1,17 @@
+.cargo_vcs_info.json
+.github/workflows/ci.yml
+.gitignore
+Cargo.lock
+Cargo.toml
+Cargo.toml.orig
+LICENSE-MIT
+README.md
+benches/bench.rs
+build.rs
+src/lib.rs
+src/stdarch_x86.rs
+src/tests.rs
+src/traits.rs
+tests/exhaustive.rs
+tests/ryu_comparison.rs
+tests/test.rs

@@ -5,6 +5,8 @@
 #
 # Output, in <out-dir>/<RUSTC_ID>/:
 #   rustc.wasm.br                        rustc-multi.wasm: a drop-in rustc, plus --next and --server
+#   rustc-wasmtime.wasm.br               the same source without the browser's proc-macro host
+#                                        imports, for the wasmtime CLI (tools/prebuild; WP-20)
 #   lld.wasm.br                          wasm-ld.wasm (lld, run as wasm-ld)
 #   sysroot-wasm32-wasip1-meta.tar.br    rustup 1.99.1's std: the .rmeta files (check + codegen)
 #   sysroot-wasm32-wasip1-link.tar.br    the .rlib files, crt1 and libc (only the linker reads them)
@@ -18,11 +20,12 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="${1:-$ROOT/build/release}"
 B="${RUSTC_WASM_OUT:-$ROOT/build/rustc-wasm}"
 RUSTC="$B/rustc-multi.wasm"
+RUSTC_WT="$B/rustc-multi-wasmtime.wasm"
 LLD="$ROOT/build/llvm-wasm-install/bin/wasm-ld.wasm"
 . "$ROOT/toolchain/versions.env"
 VERSION=$RUST_TAG
 TARGET=wasm32-wasip1
-for f in "$RUSTC" "$LLD"; do [ -f "$f" ] || { echo "missing $f (build-rustc.sh, build-rustc-multi.sh, build-llvm.sh)" >&2; exit 1; }; done
+for f in "$RUSTC" "$RUSTC_WT" "$LLD"; do [ -f "$f" ] || { echo "missing $f (build-rustc.sh, build-rustc-multi.sh, build-llvm.sh)" >&2; exit 1; }; done
 
 ID="$VERSION-$(sha256sum "$RUSTC" | cut -c1-12)"
 D="$OUT_DIR/$ID"
@@ -30,6 +33,7 @@ rm -rf "$D.tmp"; mkdir -p "$D.tmp"
 br() { brotli -q 11 -c "$1" > "$2"; }
 
 br "$RUSTC" "$D.tmp/rustc.wasm.br" &
+br "$RUSTC_WT" "$D.tmp/rustc-wasmtime.wasm.br" &
 br "$LLD" "$D.tmp/lld.wasm.br" &
 
 # The sysroot: one deterministic tar per group (see toolchain/package-sysroot.mjs for the groups).
@@ -48,6 +52,7 @@ wait
 
 # Raw files the manifest describes (deleted afterwards; only .br files are shipped).
 ln -f "$RUSTC" "$D.tmp/rustc.wasm"
+ln -f "$RUSTC_WT" "$D.tmp/rustc-wasmtime.wasm"
 ln -f "$LLD" "$D.tmp/lld.wasm"
 node - "$D.tmp" "$ID" "$VERSION" "$TARGET" \
   "$(git -C "$ROOT/build/rust" rev-parse HEAD)" \
@@ -66,11 +71,12 @@ const manifest = {
   sources: { rust: rustCommit, rustWorkingTreeDiffSha256: rustDiff, llvm: llvmCommit, wasiSdk, repo },
   rustc: entry('rustc.wasm', { panic: 'unwind', eh: 'exnref' }),
   lld: entry('lld.wasm'),
+  rustcWasmtime: entry('rustc-wasmtime.wasm'),
   sysroot: { meta: sysroot('meta'), link: sysroot('link') },
 };
 fs.writeFileSync(`${dir}/manifest.json`, JSON.stringify(manifest, null, 1) + '\n');
 EOF
-rm "$D.tmp"/*.list "$D.tmp"/*.tar "$D.tmp/rustc.wasm" "$D.tmp/lld.wasm"
+rm "$D.tmp"/*.list "$D.tmp"/*.tar "$D.tmp/rustc.wasm" "$D.tmp/rustc-wasmtime.wasm" "$D.tmp/lld.wasm"
 rm -rf "$D"; mv "$D.tmp" "$D"
 echo "$D"
 ls -la "$D" | tail -n +2

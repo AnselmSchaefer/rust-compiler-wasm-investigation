@@ -4,6 +4,7 @@
 import { Vfs } from '../vfs/vfs';
 import { ProcExit, WasiProcess } from './wasi';
 import { requestThread, stdoutWritten, type StartMessage, type ThreadMessage, type WorkerMessage } from './process';
+import { procMacroImports } from './proc-macro';
 
 let thread: ((tid: number, arg: number) => void) | undefined;
 
@@ -13,10 +14,14 @@ onmessage = async (e: MessageEvent<StartMessage | ThreadMessage>) => {
   const { vfs: handle, module, memory, channel, pid, args, env } = e.data;
   const vfs = await Vfs.attach(handle);
   const wasi = new WasiProcess(vfs, pid, args, env, fd => { if (fd === 1) stdoutWritten(channel); });
-  const inst = await WebAssembly.instantiate(module, {
+  let inst!: WebAssembly.Instance;
+  const pm = WebAssembly.Module.imports(module).some(i => i.module === 'rust_pm');
+  inst = await WebAssembly.instantiate(module, {
     env: { memory },
     wasi_snapshot_preview1: wasi.imports,
     wasi: { 'thread-spawn': (arg: number) => requestThread(channel, arg) },
+    // rustc-multi's Wasm proc-macro host (WP-20), per thread: macros run on rustc's thread.
+    ...(pm ? { rust_pm: procMacroImports(vfs, memory, () => inst) } : {}),
   });
   wasi.setMemory(memory);
   const x = inst.exports as { _start(): void; wasi_thread_start(tid: number, arg: number): void };

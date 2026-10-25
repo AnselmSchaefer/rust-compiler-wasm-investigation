@@ -3,11 +3,18 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** **WP-20** (in progress): de-risking done, spec for the user's rustc changes written (`docs/wp20-rustc-changes.md`). Waiting on the user's changes (**[H]**). WP-26 is ready meanwhile. Done in session 21: WP-19, WP-25.
-- **Last session:** 2026-10-25 (session 21). WP-19, WP-25 done. WP-20: a stock proc-macro wasm module (only rustc's decls static, no glue) driven directly by the host expands byte-identically to native.
+- **Active WP:** WP-20 **done** (session 21). Next: **WP-21** (build scripts: the rest) on the way to M1, or WP-26 (tests, Clippy, rustfmt) on the way to M2.
+- **Last session:** 2026-10-25 (session 21). WP-19, WP-25, WP-20 done. Proc macros work in the browser: serde derive + thiserror build and run; edit → build after a reload 1.45 s with the macro modules from L1.
 - **Rule for rustc source:** rust-lang's agent policy (`build/rust/AGENTS.md`) applies. Claude does not write or edit rustc source, and does not draft rust-lang issues, PRs or Zulip posts. The user writes those, or applies existing **human-written** patches (bjorn3/oligamiq), which the user prefers whenever one exists. **danlapid 0005–0007 are LLM-generated** (Claude co-author trailers), so they don't qualify even if the user applies them; design reference only (`docs/patches.md`). Claude reviews, builds and explains. Everything outside `build/rust` is Claude's, including out-of-tree drivers using `rustc_driver` (`toolchain/rustc-multi`).
-- **Next step:** WP-20, Claude's side (no rust-tree edits): (1) `rustc-multi` registers a loader via `rustc_metadata::register_wasm_proc_macro_loader` at startup: const-generic slot trampolines → registry of (module, index), `repr(C)` mirrors as in `crates/pm-bridge/host`; it calls host imports to instantiate the module and run a client. (2) The JS host in the rustc worker (`web/wasi/process-worker.ts`): port of `crates/pm-bridge/host/src/raw.rs` (instantiate synchronously, table functions for reserve/drop/dispatch, re-entrant dispatch into a rustc export). (3) Planner: proc-macro units (`--crate-type proc-macro -Zwasm-proc-macros`, `RUSTC_BOOTSTRAP` for those units and their users, `-C save-temps`, link args from `scripts/build-pm-guest.sh --raw`, `--extern` of `<name>.wasm`), cache. (4) Release + browser e2e: serde derive, then thiserror (done-when).
+- **Next step:** WP-21: route build scripts' `Command::new(rustc)` (e.g. `rustc --version` probes) to the compile server, run scripts with the package dir as working directory, `DEP_<links>_*`, `-L` from dependencies' scripts, an override list; done-when: `autocfg`, `rustversion`, `libc`, `proc-macro2`-style build scripts build in the browser. Open WP-20 follow-ups: Wasm proc macros in prebuild/L2 (needs a Node host or wasmtime's API: the CLI can't give threads custom imports), caching compiled macro modules across page loads.
 - **Running background jobs:** none
+
+## Current session (2026-10-25, session 21, cont. 2): WP-20 done
+- Goals (met): (1) `toolchain/rustc-multi/pm.rs`: register a loader (`rustc_metadata::register_wasm_proc_macro_loader`); const-generic slot trampolines; host imports `rust_pm.load/expand`; callbacks through the exported function table (a command module's exported functions get ctor/dtor wrappers); turn on `wasm_proc_macros` in the driver's config (no `-Z`/RUSTC_BOOTSTRAP needed). (2) JS host in the rustc worker (`web/wasi/`): port of `crates/pm-bridge/host/src/raw.rs`. (3) Planner proc-macro units. (4) New release, browser e2e: serde derive, then thiserror.
+
+- **Done:** `toolchain/rustc-multi/pm.rs` (loader, 512 const-generic slots, callbacks through the exported table, `wasm_proc_macros` on in the driver config), `web/wasi/proc-macro.ts` (host per rustc thread worker; helper module to put host functions in the guest's table), planner proc-macro units (golden case `derive`: 28 units identical to cargo, lockfile too; host-side build-script outputs now recorded as `.host.txt`), `PlanInput.proc_macro_args` (reactor crt, exports, `-C save-temps`). Release **1.99.1-fda536abb2a3** ships `rustc-wasmtime.wasm` too: the wasmtime CLI gives spawned threads a linker without `--preload` modules or unknown-import stubs (both tried), so prebuild uses a `--cfg rust_pm_stub` build of the same source; WP-18's bit-identical check (51 units) passes across the two binaries.
+- **Measured:** Chromium, cold `cargo build` of `derive` (serde derive, serde_json, thiserror; 28 units) 21 s on 4 workers (serde_derive's compile ~6.5 s); after a reload with main.rs edited 1.45 s (1 unit built, 27 from L1, macro modules loaded from L1). Program output = native.
+- `scripts/verify/wp-20.sh` passes; WP-17, WP-18, WP-25 verify pass; full Chromium suite 16/17 with one flaky failure (`compile-server.spec.ts` warm/cold 2.3× under suite load; alone 3/3 passes at 3.4–4.4×).
 
 ## Current session (2026-10-25, session 21, cont.): WP-20 in progress
 - Asked by the user: assess the rustc work for WP-20, then "do all three": (1) de-risk the host side without a rustc change, (2) spec the rustc changes, (3) build and test once the user has written them.
@@ -169,8 +176,8 @@
 | 17 | Build planner | done | 1 | `scripts/verify/wp-17.sh` passes. Planner golden-identical to `cargo build -vv` (3 cases); build scripts in the sandbox; `docs/planner.md` |
 | 18 | Content-addressed cache | done | 1 | `scripts/verify/wp-18.sh` passes. L1 OPFS + L2 HTTP, `tools/prebuild` (wasmtime); browser = wasmtime bit for bit (51 units); `docs/cache.md` |
 | 19 | Proc-macro bridge prototype | done | 1 | `scripts/verify/wp-19.sh` passes. serde_derive in Wasm = native token for token; ~2.0–2.1× per call (~1.7× without the proxy hop); `docs/proc-macro.md` |
-| 20 | Proc macros inside rustc.wasm | in-progress | 1 | rustc side done (bjorn3 #160981 + user's loader hook, verified); next: rustc-multi loader, JS host, planner units |
-| 21 | Build scripts | blocked | 0 | |
+| 20 | Proc macros inside rustc.wasm | done | 1 | `scripts/verify/wp-20.sh` passes. serde derive + thiserror build and run in Chromium; bjorn3 #160981 + user's loader hook + rustc-multi slots + JS host; `docs/proc-macro.md` |
+| 21 | Build scripts | ready | 0 | basic path done in WP-17; rest: rustc probes, cwd, DEP_*, overrides |
 | 22 | Ecosystem matrix (M1) | blocked | 0 | |
 | 23 | rust-analyzer in Wasm | deferred | 0 | Appendix (human-only), 2026-10-24 |
 | 24 | Editor integration | deferred | 0 | Appendix (human-only) |
@@ -186,6 +193,7 @@
 | 37 | Release-train rebase | blocked | 0 | recurring |
 
 ## Measurements
+- 2026-10-25 WP-20 (Chromium, release 1.99.1-fda536abb2a3): cold `cargo build` of serde derive + serde_json + thiserror (28 units) 21 s on 4 workers, runs like native; reload + edit main.rs → build 1.45 s (macro modules from L1).
 - 2026-10-25 WP-25 (Chromium): workspace zip import (9 files) → reload restores 9 files from OPFS (init 0.5–1.3 s) → build 15 units ~7.5 s cold → runs; Cargo.toml edit + re-resolve with lockfile diff; GitHub import (trees API + raw) 16 files 1–3 s.
 - 2026-10-25 WP-19 (native rustc 1.99.1, wasmtime 50): serde derive per call, proc macros opt-level 3: native 840–870 µs, Wasm 1676–1781 µs (1.96–2.12×; ~1.7× est. without the proxy hop), 556 bridge calls per derive; guest load 465 ms cold / ~4 ms cached; serde_derive.wasm 1.56 MB. `bench/proc-macro.md`.
 - 2026-10-25 WP-18 (Chromium, 4 compile servers): second build after a reload, all L1: serde_json 120 ms, mix 219 ms, more 83 ms. Edit main.rs → run: 278 ms in session, 575 ms after a reload. Empty L1 + L2 (edited mains): 576–700 ms. Cold: 7.0 / 8.2 / 3.7 s. tools/prebuild (wasmtime, 4 jobs): 29 s for 3 cases, 47 bundles, 110 MB (17 MB brotli). Browser and wasmtime outputs are bit-identical for 51 units. `bench/cache.md`.
@@ -208,6 +216,7 @@
 - Smoke: hello world runs on wasip1, wasip2, wasip3 (wasmtime 50) and wasip1-threads with a real thread (wasmtime 46.0.3).
 
 ## Session log
+- 2026-10-25 (session 21, cont. 2): **WP-20 done.** Proc macros inside rustc.wasm: the user's rustc changes (bjorn3 #160981 + loader hook), rustc-multi slot trampolines, a JS host in the rustc worker, planner proc-macro units; serde derive and thiserror in the browser.
 - 2026-10-25 (session 21, cont.): **WP-25 done.** Workspaces (resolver + planner, golden vs cargo incl. lockfiles), projects in OPFS, zip and GitHub import, structured Cargo.toml edits.
 - 2026-10-25 (session 21): **WP-19 done.** Proc-macro bridge: serde_derive as a wasm32-wasip1 cdylib guest (rewrite + pm_guest), run under wasmtime against a proxy server inside native rustc; expansion byte-identical, ~2× per call. WP-20 needs a user-written rustc change (proc-macro loading).
 - 2026-10-25 (session 20): **WP-18 done.** Content-addressed build cache (L1 OPFS, L2 HTTP), `cargoBuild` over a host interface, `tools/prebuild` on wasmtime with the same rustc.wasm; browser and wasmtime builds are bit-identical. Shared `/target`.
