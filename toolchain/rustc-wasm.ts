@@ -9,7 +9,7 @@
 // `--out-dir` are rewritten, `--emit kind=path` is not.
 //
 // Env: RUSTC_WASM, WASM_LD_WASM (module paths), RUSTLIB (sysroot's lib/rustlib, default rustup
-// 1.99.1's), WASMTIME (default wasmtime-threads). RUSTC_BOOTSTRAP is passed on to rustc (with
+// 1.99.1's), WASMTIME (default wasmtime-threads). RUSTC_BOOTSTRAP and RUSTC_LOG are passed on to rustc (the former with
 // RUSTC_ICE=0: in nightly mode rustc would write an ICE file and hang on process::id()).
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, copyFileSync, rmSync, statSync, symlinkSync } from 'node:fs';
@@ -41,6 +41,7 @@ const mounts = ['--dir', '.::/', '--dir', `${scratch}::/tmp`, '--dir', `${scratc
 const wasmtime = (argv0: string, module: string, argv: string[], stderr: 'pipe' | 'inherit') =>
   spawnSync(WASMTIME, ['run', '-W', 'threads=y,shared-memory=y,exceptions=y', '-S', 'threads=y', '--env', 'TMPDIR=/tmp',
     ...(process.env.RUSTC_BOOTSTRAP ? ['--env', `RUSTC_BOOTSTRAP=${process.env.RUSTC_BOOTSTRAP}`, '--env', 'RUSTC_ICE=0'] : []),
+    ...(process.env.RUSTC_LOG ? ['--env', `RUSTC_LOG=${process.env.RUSTC_LOG}`] : []),
     ...mounts, '--argv0', argv0, module, ...argv], { stdio: ['inherit', 'inherit', stderr], encoding: 'utf8' });
 // wasmtime 46 warns about -Sthreads on every run, and blanks a line of its own. rustc.wasm is built with panic=abort, so every
 // fatal error ends in abort() and a wasm trap; its backtrace says nothing to the user (WP-07).

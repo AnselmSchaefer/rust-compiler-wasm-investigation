@@ -1,0 +1,358 @@
+diff --git a/compiler/rustc_driver_impl/src/lib.rs b/compiler/rustc_driver_impl/src/lib.rs
+index e2c9f3f909b8b..5419bfeb8eab9 100644
+--- a/compiler/rustc_driver_impl/src/lib.rs
++++ b/compiler/rustc_driver_impl/src/lib.rs
+@@ -659,6 +659,7 @@ fn print_crate_info(
+                 println_info!("{}", targets.join("\n"));
+             }
+             HostTuple => println_info!("{}", rustc_session::config::host_tuple()),
++            WasmProcMacroTuple => println_info!("{}", sess.wasm_proc_macro_tuple),
+             Sysroot => println_info!("{}", sess.opts.sysroot.path().display()),
+             TargetLibdir => println_info!("{}", sess.target_tlib_path.dir.display()),
+             TargetSpecJson => {
+diff --git a/compiler/rustc_metadata/src/creader.rs b/compiler/rustc_metadata/src/creader.rs
+index 880095236b415..9c0260f64b224 100644
+--- a/compiler/rustc_metadata/src/creader.rs
++++ b/compiler/rustc_metadata/src/creader.rs
+@@ -719,13 +719,21 @@ impl CStore {
+             // Load the proc macro crate for the host
+             proc_macro_locator.for_proc_macro(sess, path_kind);
+ 
+-            let Some(host_result) =
++            if let Some(host_result) =
+                 self.load(&mut proc_macro_locator, &mut CrateRejections::default())?
+-            else {
+-                return Ok(None);
+-            };
++            {
++                Ok(Some((host_result, None)))
++            } else if sess.opts.unstable_opts.wasm_proc_macros {
++                // Load the proc macro crate for wasm
++                proc_macro_locator.for_wasm_proc_macro(sess, path_kind);
+ 
+-            Ok(Some((host_result, None)))
++                match self.load(&mut proc_macro_locator, &mut CrateRejections::default())? {
++                    Some(host_result) => Ok(Some((host_result, None))),
++                    None => Ok(None),
++                }
++            } else {
++                Ok(None)
++            }
+         }
+     }
+ 
+diff --git a/compiler/rustc_metadata/src/locator.rs b/compiler/rustc_metadata/src/locator.rs
+index 5691b1c9eb399..23b51dfbf62c6 100644
+--- a/compiler/rustc_metadata/src/locator.rs
++++ b/compiler/rustc_metadata/src/locator.rs
+@@ -360,6 +360,14 @@ impl<'a> CrateLocator<'a> {
+         self.path_kind = path_kind;
+     }
+ 
++    pub(crate) fn for_wasm_proc_macro(&mut self, sess: &'a Session, path_kind: PathKind) {
++        self.is_proc_macro = true;
++        self.target = &sess.wasm_proc_macro_target;
++        self.tuple = sess.wasm_proc_macro_tuple.clone();
++        self.filesearch = sess.wasm_proc_macro_filesearch();
++        self.path_kind = path_kind;
++    }
++
+     pub(crate) fn maybe_load_library_crate(
+         &self,
+         crate_rejections: &mut CrateRejections,
+@@ -734,6 +742,8 @@ impl<'a> CrateLocator<'a> {
+         &self,
+         crate_rejections: &mut CrateRejections,
+     ) -> Result<Option<Library>, CrateError> {
++        debug!("find_commandline_library {}", self.crate_name);
++
+         // First, filter out all libraries that look suspicious. We only accept
+         // files which actually exist that have the correct naming scheme for
+         // rlibs/dylibs.
+diff --git a/compiler/rustc_session/src/config/print_request.rs b/compiler/rustc_session/src/config/print_request.rs
+index 65e25ab5e6006..8201e1bfdd9a7 100644
+--- a/compiler/rustc_session/src/config/print_request.rs
++++ b/compiler/rustc_session/src/config/print_request.rs
+@@ -48,6 +48,7 @@ pub enum PrintKind {
+     TargetSpecJson,
+     TargetSpecJsonSchema,
+     TlsModels,
++    WasmProcMacroTuple,
+     // tidy-alphabetical-end
+ }
+ 
+@@ -82,6 +83,7 @@ impl PrintKind {
+             TargetSpecJson => "target-spec-json",
+             TargetSpecJsonSchema => "target-spec-json-schema",
+             TlsModels => "tls-models",
++            WasmProcMacroTuple => "wasm-proc-macro-tuple",
+             // tidy-alphabetical-end
+         }
+     }
+@@ -118,6 +120,7 @@ impl PrintKind {
+             SupportedCrateTypes => false,
+             TargetSpecJson => false,
+             TargetSpecJsonSchema => false,
++            WasmProcMacroTuple => false,
+         }
+     }
+ 
+diff --git a/compiler/rustc_session/src/output.rs b/compiler/rustc_session/src/output.rs
+index e2eb46c4ca878..26c53258a0d59 100644
+--- a/compiler/rustc_session/src/output.rs
++++ b/compiler/rustc_session/src/output.rs
+@@ -137,6 +137,13 @@ pub fn invalid_output_for_target(sess: &Session, crate_type: CrateType) -> bool
+             return true;
+         }
+     }
++    if crate_type == CrateType::ProcMacro {
++        if sess.opts.target_triple == sess.wasm_proc_macro_tuple
++            && sess.opts.unstable_opts.wasm_proc_macros
++        {
++            return false;
++        }
++    }
+     if let CrateType::ProcMacro | CrateType::Dylib = crate_type
+         && sess.target.only_cdylib
+     {
+diff --git a/compiler/rustc_session/src/session.rs b/compiler/rustc_session/src/session.rs
+index 40679f12e5ef8..5026bb4ccddbd 100644
+--- a/compiler/rustc_session/src/session.rs
++++ b/compiler/rustc_session/src/session.rs
+@@ -327,6 +327,8 @@ impl PointerAuthConfig {
+ pub struct Session {
+     pub target: Target,
+     pub host: Target,
++    pub wasm_proc_macro_tuple: TargetTuple,
++    pub wasm_proc_macro_target: Target,
+     pub opts: config::Options,
+     pub target_tlib_path: SearchPath,
+     pub psess: ParseSess,
+@@ -395,6 +397,7 @@ pub struct Session {
+ 
+     target_filesearch: Arc<FileSearch>,
+     host_filesearch: Arc<FileSearch>,
++    wasm_proc_macro_filesearch: Option<Arc<FileSearch>>,
+ 
+     /// The names of intrinsics that the current codegen backend replaces
+     /// with its own implementations.
+@@ -664,6 +667,9 @@ impl Session {
+     pub fn host_filesearch(&self) -> &filesearch::FileSearch {
+         &self.host_filesearch
+     }
++    pub fn wasm_proc_macro_filesearch(&self) -> &filesearch::FileSearch {
++        self.wasm_proc_macro_filesearch.as_ref().expect("wasm_filesearch not set")
++    }
+ 
+     /// Returns a list of directories where target-specific tool binaries are located. Some fallback
+     /// directories are also returned, for example if `--sysroot` is used but tools are missing
+@@ -1295,6 +1301,19 @@ pub fn build_session(
+         dcx.handle().warn(warning)
+     }
+ 
++    let wasm_proc_macro_tuple = TargetTuple::from_tuple("wasm32-wasip2");
++    let (wasm_proc_macro_target, target_warnings) = Target::search(
++        &wasm_proc_macro_tuple,
++        sopts.sysroot.path(),
++        sopts.unstable_opts.unstable_options,
++    )
++    .unwrap_or_else(|e| {
++        dcx.handle().fatal(format!("Error loading wasm proc-macro target specification: {e}"))
++    });
++    for warning in target_warnings.warning_messages() {
++        dcx.handle().warn(warning)
++    }
++
+     let self_profiler = if let SwitchWithOptPath::Enabled(ref d) = sopts.unstable_opts.self_profile
+     {
+         let directory = if let Some(directory) = d { directory } else { std::path::Path::new(".") };
+@@ -1323,6 +1342,8 @@ pub fn build_session(
+     // FIXME use host sysroot?
+     let host_tlib_path = SearchPath::from_sysroot_and_triple(sopts.sysroot.path(), host_triple);
+     let target_tlib_path = SearchPath::from_sysroot_and_triple(sopts.sysroot.path(), target_triple);
++    let wasm_proc_macro_tlib_path =
++        SearchPath::from_sysroot_and_triple(sopts.sysroot.path(), wasm_proc_macro_tuple.tuple());
+ 
+     let prof = SelfProfilerRef::new(
+         self_profiler,
+@@ -1352,6 +1373,16 @@ pub fn build_session(
+             sopts.unstable_opts.implicit_sysroot_deps,
+         ))
+     };
++    let wasm_proc_macro_filesearch = if sopts.unstable_opts.wasm_proc_macros {
++        Some(Arc::new(FileSearch::new(
++            &sopts.search_paths,
++            &wasm_proc_macro_tlib_path,
++            &wasm_proc_macro_target,
++            sopts.unstable_opts.implicit_sysroot_deps,
++        )))
++    } else {
++        None
++    };
+ 
+     let timings = TimingSectionHandler::new(sopts.json_timings);
+ 
+@@ -1361,6 +1392,8 @@ pub fn build_session(
+     let sess = Session {
+         target,
+         host,
++        wasm_proc_macro_tuple,
++        wasm_proc_macro_target,
+         opts: sopts,
+         target_tlib_path,
+         psess,
+@@ -1384,6 +1417,7 @@ pub fn build_session(
+         file_depinfo: Default::default(),
+         target_filesearch,
+         host_filesearch,
++        wasm_proc_macro_filesearch,
+         replaced_intrinsics: FxHashSet::default(), // filled by `run_compiler`
+         fallback_intrinsics: FxHashSet::default(), // filled by `run_compiler`
+         thin_lto_supported: true,                  // filled by `run_compiler`
+diff --git a/src/doc/unstable-book/src/compiler-flags/print-wasm-proc-macro-tuple.md b/src/doc/unstable-book/src/compiler-flags/print-wasm-proc-macro-tuple.md
+new file mode 100644
+index 0000000000000..9fc4fdc2e404f
+--- /dev/null
++++ b/src/doc/unstable-book/src/compiler-flags/print-wasm-proc-macro-tuple.md
+@@ -0,0 +1,13 @@
++# `print=wasm-proc-macro-tuple`
++
++The tracking issue for this feature is: [#160389](https://github.com/rust-lang/rust/issues/160389).
++
++------------------------
++
++This option of the `--print` flag produces the target for which wasm proc-macros should be compiled.
++
++Intended to be used like this:
++
++```bash
++rustc --print=wasm-proc-macro-tuple -Zunstable-options
++```
+diff --git a/src/tools/compiletest/src/runtest.rs b/src/tools/compiletest/src/runtest.rs
+index 8f45e037d0fc9..a2387e63fa250 100644
+--- a/src/tools/compiletest/src/runtest.rs
++++ b/src/tools/compiletest/src/runtest.rs
+@@ -91,7 +91,7 @@ fn disable_error_reporting<F: FnOnce() -> R, R>(f: F) -> R {
+ }
+ 
+ /// The platform-specific library name
+-fn get_lib_name(name: &str, aux_type: AuxType) -> Option<String> {
++fn get_lib_name(name: &str, aux_type: AuxType, wasm_proc_macros: bool) -> Option<String> {
+     match aux_type {
+         AuxType::Bin => None,
+         // In some cases (e.g. MUSL), we build a static
+@@ -99,6 +99,8 @@ fn get_lib_name(name: &str, aux_type: AuxType) -> Option<String> {
+         // In this case, the only path we can pass
+         // with '--extern-meta' is the '.rlib' file
+         AuxType::Lib => Some(format!("lib{name}.rlib")),
++        // FIXME maybe use `rustc --print file-names` instead?
++        AuxType::ProcMacro if wasm_proc_macros => Some(format!("{name}.wasm")),
+         AuxType::Dylib | AuxType::ProcMacro => Some(dylib_name(name)),
+     }
+ }
+@@ -1248,7 +1250,8 @@ impl<'test> TestCx<'test> {
+                           aux_name: &str,
+                           aux_path: &str,
+                           aux_type: AuxType| {
+-            let lib_name = get_lib_name(&path_to_crate_name(aux_path), aux_type);
++            let lib_name =
++                get_lib_name(&path_to_crate_name(aux_path), aux_type, self.config.wasm_proc_macros);
+             if let Some(lib_name) = lib_name {
+                 let modifiers_and_name = match extern_modifiers {
+                     Some(modifiers) => format!("{modifiers}:{aux_name}"),
+@@ -1279,7 +1282,11 @@ impl<'test> TestCx<'test> {
+         // to `-Zcodegen-backend` when compiling the test file.
+         if let Some(aux_file) = &self.props.aux.codegen_backend {
+             let aux_type = self.build_auxiliary(aux_file, aux_dir, None);
+-            if let Some(lib_name) = get_lib_name(aux_file.trim_end_matches(".rs"), aux_type) {
++            if let Some(lib_name) = get_lib_name(
++                aux_file.trim_end_matches(".rs"),
++                aux_type,
++                self.config.wasm_proc_macros,
++            ) {
+                 let lib_path = aux_dir.join(&lib_name);
+                 rustc.arg(format!("-Zcodegen-backend={}", lib_path));
+             }
+diff --git a/tests/run-make/print-request-help-stable-unstable/help-diff.diff b/tests/run-make/print-request-help-stable-unstable/help-diff.diff
+index 828a98d96b563..8a9c3d0cf46c1 100644
+--- a/tests/run-make/print-request-help-stable-unstable/help-diff.diff
++++ b/tests/run-make/print-request-help-stable-unstable/help-diff.diff
+@@ -2,6 +2,6 @@
+  error: unknown print request: `xxx`
+    |
+ -  = help: valid print requests are: `calling-conventions`, `cfg`, `code-models`, `crate-name`, `deployment-target`, `file-names`, `host-tuple`, `link-args`, `native-static-libs`, `relocation-models`, `split-debuginfo`, `stack-protector-strategies`, `sysroot`, `target-cpus`, `target-features`, `target-libdir`, `target-list`, `tls-models`
+-+  = help: valid print requests are: `all-target-specs-json`, `backend-has-mnemonic`, `backend-has-zstd`, `calling-conventions`, `cfg`, `check-cfg`, `code-models`, `crate-name`, `crate-root-lint-levels`, `deployment-target`, `file-names`, `host-tuple`, `link-args`, `native-static-libs`, `relocation-models`, `split-debuginfo`, `stack-protector-strategies`, `supported-crate-types`, `sysroot`, `target-cpus`, `target-features`, `target-libdir`, `target-list`, `target-spec-json`, `target-spec-json-schema`, `tls-models`
+++  = help: valid print requests are: `all-target-specs-json`, `backend-has-mnemonic`, `backend-has-zstd`, `calling-conventions`, `cfg`, `check-cfg`, `code-models`, `crate-name`, `crate-root-lint-levels`, `deployment-target`, `file-names`, `host-tuple`, `link-args`, `native-static-libs`, `relocation-models`, `split-debuginfo`, `stack-protector-strategies`, `supported-crate-types`, `sysroot`, `target-cpus`, `target-features`, `target-libdir`, `target-list`, `target-spec-json`, `target-spec-json-schema`, `tls-models`, `wasm-proc-macro-tuple`
+    = help: for more information, see the rustc book: https://doc.rust-lang.org/rustc/command-line-arguments.html#--print-print-compiler-information
+  
+diff --git a/tests/run-make/print-request-help-stable-unstable/unstable-invalid-print-request-help.err b/tests/run-make/print-request-help-stable-unstable/unstable-invalid-print-request-help.err
+index d0e4c81f1de9d..06842577618c8 100644
+--- a/tests/run-make/print-request-help-stable-unstable/unstable-invalid-print-request-help.err
++++ b/tests/run-make/print-request-help-stable-unstable/unstable-invalid-print-request-help.err
+@@ -1,5 +1,5 @@
+ error: unknown print request: `xxx`
+   |
+-  = help: valid print requests are: `all-target-specs-json`, `backend-has-mnemonic`, `backend-has-zstd`, `calling-conventions`, `cfg`, `check-cfg`, `code-models`, `crate-name`, `crate-root-lint-levels`, `deployment-target`, `file-names`, `host-tuple`, `link-args`, `native-static-libs`, `relocation-models`, `split-debuginfo`, `stack-protector-strategies`, `supported-crate-types`, `sysroot`, `target-cpus`, `target-features`, `target-libdir`, `target-list`, `target-spec-json`, `target-spec-json-schema`, `tls-models`
++  = help: valid print requests are: `all-target-specs-json`, `backend-has-mnemonic`, `backend-has-zstd`, `calling-conventions`, `cfg`, `check-cfg`, `code-models`, `crate-name`, `crate-root-lint-levels`, `deployment-target`, `file-names`, `host-tuple`, `link-args`, `native-static-libs`, `relocation-models`, `split-debuginfo`, `stack-protector-strategies`, `supported-crate-types`, `sysroot`, `target-cpus`, `target-features`, `target-libdir`, `target-list`, `target-spec-json`, `target-spec-json-schema`, `tls-models`, `wasm-proc-macro-tuple`
+   = help: for more information, see the rustc book: https://doc.rust-lang.org/rustc/command-line-arguments.html#--print-print-compiler-information
+ 
+diff --git a/tests/run-make/rustc-help/help-v.stdout b/tests/run-make/rustc-help/help-v.stdout
+index 1531f61089e9a..3a6b1d270b405 100644
+--- a/tests/run-make/rustc-help/help-v.stdout
++++ b/tests/run-make/rustc-help/help-v.stdout
+@@ -43,7 +43,7 @@ Options:
+         --print <INFO>[=<FILE>]
+                         Compiler information to print on stdout (or to a file)
+                         INFO may be one of
+-                        <all-target-specs-json|backend-has-mnemonic|backend-has-zstd|calling-conventions|cfg|check-cfg|code-models|crate-name|crate-root-lint-levels|deployment-target|file-names|host-tuple|link-args|native-static-libs|relocation-models|split-debuginfo|stack-protector-strategies|supported-crate-types|sysroot|target-cpus|target-features|target-libdir|target-list|target-spec-json|target-spec-json-schema|tls-models>.
++                        <all-target-specs-json|backend-has-mnemonic|backend-has-zstd|calling-conventions|cfg|check-cfg|code-models|crate-name|crate-root-lint-levels|deployment-target|file-names|host-tuple|link-args|native-static-libs|relocation-models|split-debuginfo|stack-protector-strategies|supported-crate-types|sysroot|target-cpus|target-features|target-libdir|target-list|target-spec-json|target-spec-json-schema|tls-models|wasm-proc-macro-tuple>.
+     -g                  Equivalent to -C debuginfo=2
+     -O                  Equivalent to -C opt-level=3
+     -o <FILENAME>       Write output to FILENAME
+diff --git a/tests/run-make/rustc-help/help.stdout b/tests/run-make/rustc-help/help.stdout
+index f96feccf35980..eea9ae297848a 100644
+--- a/tests/run-make/rustc-help/help.stdout
++++ b/tests/run-make/rustc-help/help.stdout
+@@ -43,7 +43,7 @@ Options:
+         --print <INFO>[=<FILE>]
+                         Compiler information to print on stdout (or to a file)
+                         INFO may be one of
+-                        <all-target-specs-json|backend-has-mnemonic|backend-has-zstd|calling-conventions|cfg|check-cfg|code-models|crate-name|crate-root-lint-levels|deployment-target|file-names|host-tuple|link-args|native-static-libs|relocation-models|split-debuginfo|stack-protector-strategies|supported-crate-types|sysroot|target-cpus|target-features|target-libdir|target-list|target-spec-json|target-spec-json-schema|tls-models>.
++                        <all-target-specs-json|backend-has-mnemonic|backend-has-zstd|calling-conventions|cfg|check-cfg|code-models|crate-name|crate-root-lint-levels|deployment-target|file-names|host-tuple|link-args|native-static-libs|relocation-models|split-debuginfo|stack-protector-strategies|supported-crate-types|sysroot|target-cpus|target-features|target-libdir|target-list|target-spec-json|target-spec-json-schema|tls-models|wasm-proc-macro-tuple>.
+     -g                  Equivalent to -C debuginfo=2
+     -O                  Equivalent to -C opt-level=3
+     -o <FILENAME>       Write output to FILENAME
+diff --git a/tests/ui/compile-flags/invalid/print-without-arg.stderr b/tests/ui/compile-flags/invalid/print-without-arg.stderr
+index 98788b4b87228..966063a492096 100644
+--- a/tests/ui/compile-flags/invalid/print-without-arg.stderr
++++ b/tests/ui/compile-flags/invalid/print-without-arg.stderr
+@@ -3,5 +3,5 @@ error: Argument to option 'print' missing
+            --print <INFO>[=<FILE>]
+                                Compiler information to print on stdout (or to a file)
+                                INFO may be one of
+-                               <all-target-specs-json|backend-has-mnemonic|backend-has-zstd|calling-conventions|cfg|check-cfg|code-models|crate-name|crate-root-lint-levels|deployment-target|file-names|host-tuple|link-args|native-static-libs|relocation-models|split-debuginfo|stack-protector-strategies|supported-crate-types|sysroot|target-cpus|target-features|target-libdir|target-list|target-spec-json|target-spec-json-schema|tls-models>.
++                               <all-target-specs-json|backend-has-mnemonic|backend-has-zstd|calling-conventions|cfg|check-cfg|code-models|crate-name|crate-root-lint-levels|deployment-target|file-names|host-tuple|link-args|native-static-libs|relocation-models|split-debuginfo|stack-protector-strategies|supported-crate-types|sysroot|target-cpus|target-features|target-libdir|target-list|target-spec-json|target-spec-json-schema|tls-models|wasm-proc-macro-tuple>.
+ 
+diff --git a/tests/ui/compile-flags/invalid/print.stderr b/tests/ui/compile-flags/invalid/print.stderr
+index 3eb7634d915db..c7a9e59638e7f 100644
+--- a/tests/ui/compile-flags/invalid/print.stderr
++++ b/tests/ui/compile-flags/invalid/print.stderr
+@@ -1,5 +1,5 @@
+ error: unknown print request: `yyyy`
+   |
+-  = help: valid print requests are: `all-target-specs-json`, `backend-has-mnemonic`, `backend-has-zstd`, `calling-conventions`, `cfg`, `check-cfg`, `code-models`, `crate-name`, `crate-root-lint-levels`, `deployment-target`, `file-names`, `host-tuple`, `link-args`, `native-static-libs`, `relocation-models`, `split-debuginfo`, `stack-protector-strategies`, `supported-crate-types`, `sysroot`, `target-cpus`, `target-features`, `target-libdir`, `target-list`, `target-spec-json`, `target-spec-json-schema`, `tls-models`
++  = help: valid print requests are: `all-target-specs-json`, `backend-has-mnemonic`, `backend-has-zstd`, `calling-conventions`, `cfg`, `check-cfg`, `code-models`, `crate-name`, `crate-root-lint-levels`, `deployment-target`, `file-names`, `host-tuple`, `link-args`, `native-static-libs`, `relocation-models`, `split-debuginfo`, `stack-protector-strategies`, `supported-crate-types`, `sysroot`, `target-cpus`, `target-features`, `target-libdir`, `target-list`, `target-spec-json`, `target-spec-json-schema`, `tls-models`, `wasm-proc-macro-tuple`
+   = help: for more information, see the rustc book: https://doc.rust-lang.org/rustc/command-line-arguments.html#--print-print-compiler-information
+ 
+diff --git a/tests/ui/print-request/print-lints-help.stderr b/tests/ui/print-request/print-lints-help.stderr
+index c6e74e7dce7b6..1f821d12f169d 100644
+--- a/tests/ui/print-request/print-lints-help.stderr
++++ b/tests/ui/print-request/print-lints-help.stderr
+@@ -1,6 +1,6 @@
+ error: unknown print request: `lints`
+   |
+-  = help: valid print requests are: `all-target-specs-json`, `backend-has-mnemonic`, `backend-has-zstd`, `calling-conventions`, `cfg`, `check-cfg`, `code-models`, `crate-name`, `crate-root-lint-levels`, `deployment-target`, `file-names`, `host-tuple`, `link-args`, `native-static-libs`, `relocation-models`, `split-debuginfo`, `stack-protector-strategies`, `supported-crate-types`, `sysroot`, `target-cpus`, `target-features`, `target-libdir`, `target-list`, `target-spec-json`, `target-spec-json-schema`, `tls-models`
++  = help: valid print requests are: `all-target-specs-json`, `backend-has-mnemonic`, `backend-has-zstd`, `calling-conventions`, `cfg`, `check-cfg`, `code-models`, `crate-name`, `crate-root-lint-levels`, `deployment-target`, `file-names`, `host-tuple`, `link-args`, `native-static-libs`, `relocation-models`, `split-debuginfo`, `stack-protector-strategies`, `supported-crate-types`, `sysroot`, `target-cpus`, `target-features`, `target-libdir`, `target-list`, `target-spec-json`, `target-spec-json-schema`, `tls-models`, `wasm-proc-macro-tuple`
+   = help: use `-Whelp` to print a list of lints
+   = help: for more information, see the rustc book: https://doc.rust-lang.org/rustc/command-line-arguments.html#--print-print-compiler-information
+ 

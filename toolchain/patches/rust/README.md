@@ -37,3 +37,20 @@ move the file up a directory and rebuild with `toolchain/build-rustc.sh`, ~3 min
   - The fix uses pid 1 on wasm hosts, so ICE files can be written. Worth applying before anything
     runs rustc.wasm in nightly mode without `RUSTC_ICE=0` (e.g. WP-09's compile server, if it uses
     `-Z` flags).
+
+## available/bjorn3-160981-wasm-proc-macro-locating.diff (WP-20)
+
+rust-lang/rust#160981 "Partially support building and locating wasm proc-macros" by bjorn3,
+merged upstream 2026-08-21 (after 1.99), human-written (no AI trailers). Unmodified `gh pr diff`.
+It allows `--crate-type proc-macro` on the wasm proc-macro target behind `-Zwasm-proc-macros`
+(rustc_session/output.rs) and, when the host lookup of a proc macro fails, looks it up for that
+target (creader.rs, locator.rs, session.rs), plus `--print wasm-proc-macro-tuple`. It covers
+changes 1 and 3 of docs/wp20-rustc-changes.md. Applies cleanly to an unmodified 1.99.1 tree
+(checked with `git apply --check --cached`); it conflicts with a hand-made change 1 in output.rs.
+Upstream hardcodes the tuple `wasm32-wasip2`; we build for `wasm32-wasip1`, as bjorn3's draft
+rust-lang/rust#157709 does (one string in `build_session`, compiler/rustc_session/src/session.rs).
+Apply (the user):
+
+    git -C build/rust checkout compiler/rustc_session/src/output.rs   # drop the hand-made change 1
+    git -C build/rust apply ../../toolchain/patches/rust/available/bjorn3-160981-wasm-proc-macro-locating.diff
+    # then in compiler/rustc_session/src/session.rs: "wasm32-wasip2" → "wasm32-wasip1"

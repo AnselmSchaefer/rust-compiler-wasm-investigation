@@ -3,7 +3,7 @@
 # proc-macro crate for wasm32-wasip1, and the module has readable crate metadata with
 # proc_macro_data. Checks, on tests/proc-macro/hello_pm.rs:
 #  1. rustc.wasm (under wasmtime, toolchain/rustc-wasm.ts) builds it with --crate-type
-#     proc-macro --target wasm32-wasip1 and the planner's link arguments.
+#     proc-macro --target wasm32-wasip1 -Zwasm-proc-macros and the planner's link arguments.
 #  2. The module exports the decls global (__rustc_proc_macro_decls_<id>__), _initialize, the
 #     table and the allocator, and has a `.rustc` custom section.
 #  3. The stock native rustc reads its metadata through the dylib path (-Z ls=root):
@@ -20,9 +20,13 @@ W=build/wp-20/crate-type; rm -rf "$W"; mkdir -p "$W"
 cp tests/proc-macro/hello_pm.rs "$W/"
 CRT=/sysroot/lib/rustlib/wasm32-wasip1/lib/self-contained/crt1-reactor.o  # guest path
 # 1. Build (the paths are the guest's: the working directory is mounted as /).
-(cd "$W" && RUSTC_WASM=$RUSTC_WASM node "$ROOT/toolchain/rustc-wasm.ts" --edition 2021 --crate-type proc-macro --target wasm32-wasip1 \
+# rustc 1.99.1 already gates wasm proc macros behind -Zwasm-proc-macros (rust-lang/rust#160854).
+# -C save-temps: a dylib-like output links rustc's metadata object from a temp dir, and we link
+# outside rustc, after it exited (toolchain/rustc-wasm.ts).
+(cd "$W" && RUSTC_WASM=$RUSTC_WASM RUSTC_BOOTSTRAP=1 node "$ROOT/toolchain/rustc-wasm.ts" -Zwasm-proc-macros --edition 2021 --crate-type proc-macro --target wasm32-wasip1 \
   --crate-name hello_pm hello_pm.rs --out-dir out -C link-arg=$CRT -C link-arg=--export=_initialize -C link-arg=--export-table \
-  -C link-arg=--growable-table -C link-arg=--export=malloc -C link-arg=--export=free -C link-arg=--export=realloc) > "$W/rustc.log" 2>&1 \
+  -C link-arg=--growable-table -C link-arg=--export=malloc -C link-arg=--export=free -C link-arg=--export=realloc \
+  -C save-temps) > "$W/rustc.log" 2>&1 \
   || { cat "$W/rustc.log"; echo "FAIL: rustc.wasm could not build a proc-macro crate for wasm32-wasip1"; exit 1; }
 M=$(ls "$W"/out/*.wasm 2>/dev/null | head -1)
 [ -n "$M" ] || { ls -la "$W/out"; echo "FAIL: no .wasm module emitted"; exit 1; }

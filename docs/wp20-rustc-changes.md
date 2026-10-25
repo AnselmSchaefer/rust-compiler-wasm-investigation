@@ -1,5 +1,7 @@
 # WP-20: the rustc changes (spec for the user)
 
+*Update 2026-10-25: done. Changes 1 and 3 were taken from bjorn3's merged rust-lang/rust#160981 (behind `-Zwasm-proc-macros`; tuple set to `wasm32-wasip1`); change 2 was written by the user as specified. Verified: `scripts/verify/wp-20-crate-type.sh` and the lookup → loader path (STATUS.md, session 21).*
+
 *2026-10-25. Under the rustc policy (`build/rust/AGENTS.md`), the user writes these changes. This file says what they must do, where, and how they will be tested. It contains no code for the rust tree. Everything else in WP-20 (the loader behind the hook, trampolines, the JS host, the planner, the cache) is Claude's, outside `build/rust`.*
 
 ## The plan in one paragraph
