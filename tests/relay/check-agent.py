@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """After tests/relay/agent-run.sh: check, through the relay, that the agent's project is done.
-The same browser profile (build/relay/profile) holds the projects, so a new relay sees it.
-    python3 -I tests/relay/check-agent.py --project wp38-agent [--port 8803] [--browser headless]"""
+Projects live in the browser profile's OPFS, per origin: pass the agent run's --profile and
+--port, or the relay's defaults (build/relay/profile, 8790) for your own session (close the
+session first: one browser per profile).
+    python3 -I tests/relay/check-agent.py --project wp38-agent [--profile DIR] [--port 8803] [--browser headless]"""
 import argparse
 import json
 import sys
@@ -14,10 +16,11 @@ from scenario import Mcp  # noqa: E402
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--project', required=True)
-    ap.add_argument('--port', type=int, default=8803)
+    ap.add_argument('--port', type=int, default=8790)
     ap.add_argument('--browser', default='headless')
+    ap.add_argument('--profile', help="the agent run's browser profile (where its projects are)")
     a = ap.parse_args()
-    mcp = Mcp(argparse.Namespace(port=a.port, browser=a.browser))
+    mcp = Mcp(argparse.Namespace(port=a.port, browser=a.browser, profile=a.profile))
     ok = True
     try:
         mcp.request('initialize', {'protocolVersion': '2025-06-18', 'capabilities': {}, 'clientInfo': {'name': 'check', 'version': '0'}})

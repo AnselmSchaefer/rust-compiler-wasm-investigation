@@ -173,6 +173,7 @@ export async function cargoBuild(host: BuildHost, opts: BuildOptions): Promise<B
   const outputs: Record<number, string> = {};
   const errors: string[] = [];
   const failedDiagnostics: Diagnostic[] = [];
+  const seenErrors = new Set<UnitError>();
   const stores: Promise<void>[] = [];
   const done = new Map<number, Promise<void>>();
   const unit = (u: PlanUnit): Promise<void> => {
@@ -212,7 +213,8 @@ export async function cargoBuild(host: BuildHost, opts: BuildOptions): Promise<B
         if (opts.units) stores.push(opts.units.put(key, r.bundle));
         report({ rustcMs: r.rustcMs, files, stdout: r.bundle.stdout, warnings: r.warnings, diagnostics: r.diagnostics });
       })().catch(e => {
-        if (e instanceof UnitError) { errors.push(e.message); failedDiagnostics.push(...e.diagnostics); }
+        // A failed unit's error reaches every unit that waits on it: count it once.
+        if (e instanceof UnitError && !seenErrors.has(e)) { seenErrors.add(e); errors.push(e.message); failedDiagnostics.push(...e.diagnostics); }
         throw e;
       });
       done.set(u.id, p);

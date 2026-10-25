@@ -64,7 +64,7 @@ Claude Code registers MCP servers per directory. A directory of its own for thes
 Quit Claude (`/exit`), then check the project through the relay. Only one browser can use the profile at a time, so the session must be closed first.
 ```
 cd ~/Projects/rust-compiler-wasm-investigation
-python3 -I tests/relay/check-agent.py --project wp38-agent --browser headed
+python3 -I tests/relay/check-agent.py --project wp38-agent --browser headed --profile build/relay/profile --port 8790
 ```
 Use your project's name instead of `wp38-agent` for other tasks. Remove the registration with `claude mcp remove rust-ide` (in the registered directory).
 
@@ -79,5 +79,5 @@ Use your project's name instead of `wp38-agent` for other tasks. Remove the regi
 
 - **Why a window opens when Claude starts:** Claude Code starts every MCP server registered for the directory when the session begins. The relay then opens Chromium as soon as Claude has connected (MCP `initialize`), so the toolchain is already loaded by the first tool call. With `--browser none` no window opens; the page's URL, with its per-run token, is then in `build/relay/url.txt`.
 - The relay listens on 127.0.0.1 only. If port 8790 is busy it takes a free one; the page URL always comes from the relay.
-- Projects, the build cache and the toolchain live in the browser profile `build/relay/profile`, so they survive restarts.
+- Projects, the build cache and the toolchain live in the browser profile `build/relay/profile`, so they survive restarts. Browser storage is per origin, and the port is part of the origin: on another port (`--port`, or the fallback when 8790 is busy) the page sees other projects.
 - Dependencies come from live crates.io through the relay. Programs run in a sandbox without network, and only the project's files are readable.

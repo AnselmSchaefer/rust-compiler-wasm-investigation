@@ -10,6 +10,7 @@ Also checks the relay's guard: a WebSocket with the wrong token or a foreign Ori
 
     python3 -I tests/relay/scenario.py [--browser headless|headed] [--port 8791]
 Prints one line per step; exits 1 at the first failure. Results: build/wp-38/scenario-<mode>.json.
+Its browser profile is build/wp-38/profile-<mode>, so it runs next to an open Claude Code session.
 """
 
 import argparse
@@ -74,7 +75,8 @@ class Mcp:
     def __init__(self, args):
         env = {**os.environ, 'PYTHONUNBUFFERED': '1'}
         self.log = open(REPO / f'build/wp-38/relay-{args.browser}.log', 'w')
-        self.p = subprocess.Popen([sys.executable, '-I', str(REPO / 'tools/relay/relay.py'), '--port', str(args.port), '--browser', args.browser],
+        profile = getattr(args, 'profile', None) or str(REPO / f'build/wp-38/profile-{args.browser}')
+        self.p = subprocess.Popen([sys.executable, '-I', str(REPO / 'tools/relay/relay.py'), '--port', str(args.port), '--browser', args.browser, '--profile', profile],
                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.log, env=env, cwd=REPO)
         self.id = 0
 

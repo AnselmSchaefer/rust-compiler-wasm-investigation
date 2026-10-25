@@ -19,7 +19,7 @@ Security: it listens on 127.0.0.1 only. The page connects with a token made for 
 WebSocket's Origin must be the relay's own, because any website could otherwise talk to a
 localhost WebSocket. Only the standard library is used. Logs go to stderr; stdout is MCP's.
 
-    python3 tools/relay/relay.py [--port 8790] [--browser headed|headless|none]
+    python3 tools/relay/relay.py [--port 8790] [--browser headed|headless|none] [--profile DIR]
 """
 
 import argparse
@@ -62,9 +62,10 @@ def log(*a):
 
 
 class Relay:
-    def __init__(self, port, browser):
+    def __init__(self, port, browser, profile):
         self.port = port
         self.browser_mode = browser
+        self.profile = profile
         self.token = secrets.token_urlsafe(24)
         self.origin = f'http://127.0.0.1:{port}'
         self.page = None              # the connected page's WebSocket writer
@@ -305,7 +306,7 @@ class Relay:
         if not node:
             log(f'no node on PATH; open {self.url} in Chromium')
             return
-        args = [node, str(Path(__file__).with_name('browser.mjs')), self.url, '--profile', str(REPO / 'build/relay/profile')]
+        args = [node, str(Path(__file__).with_name('browser.mjs')), self.url, '--profile', str(self.profile)]
         if self.browser_mode == 'headless':
             args.append('--headless')
         log(f'starting Chromium ({self.browser_mode})')
@@ -318,11 +319,13 @@ async def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--port', type=int, default=int(os.environ.get('RELAY_PORT', 8790)))
     ap.add_argument('--browser', choices=['headed', 'headless', 'none'], default=os.environ.get('RELAY_BROWSER', 'headed'))
+    # One Chromium per profile: tests use their own, so they can run next to an open session.
+    ap.add_argument('--profile', default=os.environ.get('RELAY_PROFILE', str(REPO / 'build/relay/profile')))
     a = ap.parse_args()
     if not (APP / 'agent.html').is_file():
         log(f'no {APP / "agent.html"}: run `pnpm build:app` first')
         sys.exit(1)
-    relay = Relay(a.port, a.browser)
+    relay = Relay(a.port, a.browser, Path(a.profile).resolve())
     loop = asyncio.get_running_loop()
     stop = asyncio.Event()
     for sig in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
@@ -335,7 +338,8 @@ async def main():
         server = await asyncio.start_server(relay.serve, '127.0.0.1', 0)
         relay.port = server.sockets[0].getsockname()[1]
         relay.origin = f'http://127.0.0.1:{relay.port}'
-        log(f'port {a.port} is in use ({e.strerror}); using {relay.port}')
+        log(f'port {a.port} is in use ({e.strerror}); using {relay.port}. Projects are stored per origin, '
+            f'so this page sees other projects than the one on port {a.port}')
     log(f'serving {relay.origin}; the IDE page: {relay.url}')
     (REPO / 'build/relay').mkdir(parents=True, exist_ok=True)
     (REPO / 'build/relay/url.txt').write_text(relay.url + '\n')
