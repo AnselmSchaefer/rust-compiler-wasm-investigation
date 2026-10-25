@@ -89,6 +89,7 @@ These are taken as defaults so work can start. Changing one later only affects t
 | C. Browser runtime | 11–14 | VFS, workers, run sandbox, minimal UI → **Milestone M1a: offline single-file playground** | 7–10 |
 | D. Dependencies | 15–22 | crates.io, cache, proc macros, build scripts, ecosystem matrix → **M1: playground with crates** | 18–28 |
 | E. Agent-ready v1 | 25–27, 38 | Workspaces, tests/Clippy/rustfmt, incremental check, **agent tool API + local relay (MCP)** → **M2: v1 for agentic development** | 8–9 |
+| Hands-on demo | 40 | A demo a human can use by hand, showing every v1 capability (after M2) | 1–2 |
 | (optional) Public deploy | 29 | Only to share beyond this machine | 1–2 |
 | F. v2 features | 30, 32, 34, 39 | wasip3 components, clang for `cc` build scripts, HTTP handler runs, native deploy of sandbox-developed backends (39, optional) | 9–13 |
 | Appendix: some day later | 23, 24, 28, 31, 33, 35 + parts of 25–27 | Human-only browser IDE: rust-analyzer + editor UI, first-visit perf, web preview, debugger UI, collaboration | — |
@@ -383,6 +384,18 @@ These are taken as defaults so work can start. Changing one later only affects t
   - Guardrails: per-call time and memory limits; user programs run only in the sandbox (WP-13), without network.
 - **Done when:** Claude Code, connected to the relay's MCP server and through it alone, creates a project with a `serde` dependency, fixes a seeded compile error from the diagnostics, makes a failing test pass, and passes Clippy and rustfmt. Run once headed and once headless.
 
+#### WP-40 Hands-on demo (after M2)
+*Added 2026-10-25 at the user's request: a demo a human can use by hand that shows everything v1 can do. Until now the app (`pnpm demo`) is WP-14's single-file Check/Run; the rest is reachable only through the orchestrator's operations, i.e. tests and the agent. Editor intelligence (rust-analyzer, WP-23/24) stays in the Appendix.*
+- **Depends:** WP-38 (the relay serves the app and proxies the crates.io index, so any crate works) · **Est.:** 1–2 sessions
+- **Tasks**
+  - Projects: a file tree with new/rename/delete, zip and GitHub import, zip export; projects persist in OPFS (WP-25).
+  - Build and Run with dependencies: Cargo.toml edits (add/remove a dependency), per-unit progress, cache hits (L1/L2) and timings; the program in the terminal with stdin.
+  - Test panel: per-test results (status, time, output, panic message), rerun one test, run all.
+  - Clippy and Format buttons; diagnostics (rustc and Clippy) as editor markers and a problems list.
+  - A guided sample project that touches every feature: serde derive, a build script, a failing test, a Clippy lint, unformatted code.
+  - Started by the relay (`tools/relay`), so one command opens it; documented in the README.
+- **Done when:** an e2e test drives the demo UI through the sample: build and run with crates, fix the failing test via the test panel, Clippy clean, formatted. The user tries it by hand and signs off **[H]**.
+
 #### WP-29 Public deploy (optional, after M2)
 *With a local relay serving the app and proxying the index, v1 needs no public hosting. This WP is for sharing the environment beyond this machine.*
 - **Depends:** WP-38 · **Est.:** 1–2 sessions
@@ -491,7 +504,7 @@ WP-00 → 01 → 02
              11 → 15 → 16                12 ─┐
                    15 ───────────────────────┴→ 17 → 18 ─┐
                           06 → 19 ───────────────────────┴→ 20 → 21 → 22 (M1) ─┐
-                                 17 + 16 → 25 → 26 ┬────────────────────────────┴→ 38 (agent API + relay, M2) → 29 (optional deploy)
+                                 17 + 16 → 25 → 26 ┬────────────────────────────┴→ 38 (agent API + relay, M2) → 40 (hands-on demo) → 29 (optional deploy)
                                             25 → 27 ┘
 ```
 

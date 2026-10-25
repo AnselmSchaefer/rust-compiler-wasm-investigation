@@ -210,6 +210,7 @@
 | 27 | Incremental compilation | ready | 0 | check-on-idle moved to the Appendix |
 | 28 | First-visit performance | deferred | 0 | Appendix (human-only) |
 | 38 | Agent tool API + local relay (M2) | blocked | 0 | new 2026-10-24: MCP ⇄ Python relay ⇄ WebSocket ⇄ page |
+| 40 | Hands-on demo | blocked | 0 | new 2026-10-25 (user): after WP-38; all v1 features in the app UI |
 | 29 | Public deploy (optional) | blocked | 0 | after M2; only to share beyond this machine |
 | 30, 32, 34 | v2 features | deferred | 0 | agent-useful; 34 = HTTP handlers via the tool API |
 | 39 | Develop in the sandbox, deploy natively (optional) | deferred | 0 | new 2026-10-25: mocked network in the IDE, CI builds `host-native`; after WP-34 |
