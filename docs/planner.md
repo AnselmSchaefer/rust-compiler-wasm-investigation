@@ -24,13 +24,20 @@ It is ported from cargo 0.100, so that it produces cargo's invocations, not just
 
 ## Golden test
 
-`tests/planner/record.sh <case>` runs native `cargo +1.99.1 build -vv --target wasm32-wasip1` on `tests/planner/cases/<case>/` against the pinned index snapshot (index-proxy replay). It keeps every `Running` entry as JSON (`cargo-vv.jsonl`; `shlex`-parsed, since descriptions can span lines), each package's Cargo.toml and file list, and each build script's output. `crates/resolver/tests/plan_golden.rs` plans the same resolve, feeds in the recorded outputs, and compares unit sets, argument lists (in order) and environments. Two normalizations: 16-hex hashes → `H`, and `--cap-lints warn` → `allow`, because `-vv` shows dependencies' warnings.
+`tests/planner/record.sh <case>` runs native `cargo +1.99.1 build -vv --target wasm32-wasip1` on `tests/planner/cases/<case>/` against the pinned index snapshot (index-proxy replay). It keeps every `Running` entry as JSON (`cargo-vv.jsonl`; `shlex`-parsed, since descriptions can span lines), each package's Cargo.toml and file list, and each build script's output (`build-output/<name>-<version>.txt`; host-side runs, i.e. build scripts of build dependencies and proc macros, as `.host.txt`). `crates/resolver/tests/plan_golden.rs` plans the same resolve, feeds in the recorded outputs, and compares unit sets, argument lists (in order) and environments. Two normalizations: 16-hex hashes → `H`, and `--cap-lints warn` → `allow`, because `-vv` shows dependencies' warnings.
 
 | Case | Packages | Units | What it covers | Result |
 |---|---|---|---|---|
 | `serde_json` | 12 | 12 | three build scripts (zmij, serde_core, serde_json), `cfg`/`check-cfg` output, OUT_DIR | identical |
 | `more` (WP-18) | 17 | 17 | 16 crates without build scripts (itertools, indexmap + hashbrown, semver, base64, bytes, typenum, …) | identical |
 | `mix` | 24 | 22 | rand 0.10 (`cfg(target)` deps: getrandom, cpufeatures, libc not built), regex without default features, renamed `json = { package = "serde_json" }`, `[lints]` tables incl. clippy and priority | identical |
+| `ws` (WP-25) | 15 | 15 | a virtual workspace: members by glob, an excluded path dependency, inheritance of package fields, dependencies and lints (`docs/projects.md`) | identical, Cargo.lock too |
+| `ws-root` (WP-25) | 3 | 3 | a root package whose path dependency becomes a member but isn't primary | identical, Cargo.lock too |
+| `derive` (WP-20) | 14 | 28 | proc macros: serde with `derive`, thiserror (serde_derive, thiserror-impl on the host side with syn/quote/proc-macro2), proc-macro2's host-side build script | identical, Cargo.lock too |
+
+## Proc macros (WP-20)
+
+A proc-macro package's lib unit is built for the host side, as cargo does: `--crate-type proc-macro --emit=dep-info,link -C prefer-dynamic`, its dependencies as `.rlib`s (it links), `--extern proc_macro` after the other externs, output `<dll_prefix><crate>-<hash><dll_suffix>` in the host `deps` dir (`libx-H.so` natively, `x-H.wasm` for wasm32-wasip1; `cfg.rs` `TargetInfo`). Its dependents get `--extern name=<that file>`. In the browser, `PlanInput.proc_macro_args` (from `web/build/cargo.ts`) adds the link arguments that make the module loadable by the host in rustc.wasm, and `-C save-temps`; see `docs/proc-macro.md` (WP-20).
 
 ## Build scripts (a slice of WP-21, moved forward)
 
@@ -50,4 +57,4 @@ See `bench/build.md`. serde_json case 10.9 s (2.6 s native cargo), mix 11.6 s.
 
 ## Not covered yet
 
-Proc macros (WP-20), dev units and `cargo test` (WP-26), `[profile]` sections and `--release` (the profile is an input, but manifests' `[profile]` tables are ignored), cdylib/staticlib outputs, workspaces (WP-25), and `-C incremental` (off in the browser until WP-27). The resolver's lockfile is regenerated on every build (no lockfile preference yet).
+Dev units and `cargo test` (WP-26), `[profile]` sections and `--release` (the profile is an input, but manifests' `[profile]` tables are ignored), cdylib/staticlib outputs, and `-C incremental` (off in the browser until WP-27). Workspaces came with WP-25, proc macros with WP-20. The resolver's lockfile is regenerated on every build (no lockfile preference yet).

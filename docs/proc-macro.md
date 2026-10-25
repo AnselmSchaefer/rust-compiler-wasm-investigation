@@ -69,6 +69,14 @@ This proxy is a test harness, not the product. In rustc.wasm (WP-20) the server 
 | Planner (`crates/resolver/src/plan`) | Proc-macro units as cargo builds them (golden case `derive`: identical): `--crate-type proc-macro --emit=dep-info,link -C prefer-dynamic`, dependencies as rlibs, `--extern proc_macro`, output `<dll_prefix><name>-<hash><dll_suffix>` (`.wasm` on wasm32-wasip1), consumers `--extern name=<that file>`. Plus `PlanInput.proc_macro_args` (browser only, `web/build/cargo.ts`): `crt1-reactor.o` (rustc links no crt into this crate type), `--export=_initialize`, `--export-table`, `--growable-table`, `--export=malloc,free,realloc`, `-C save-temps` (the module links rustc's metadata object from a temp dir; the orchestrator links after rustc returned). `-C prefer-dynamic` is harmless on wasm (std links statically). | Claude |
 | wasmtime | The wasmtime CLI gives a spawned thread a linker without `--preload` modules or unknown-import stubs, so a rustc with `rust_pm` imports can't run its compile threads there. `build-rustc-multi.sh` therefore also builds `rustc-multi-wasmtime.wasm` from the same source with `--cfg rust_pm_stub` (pm.rs left out); the release ships it as `rustcWasmtime` and `tools/prebuild` uses it. Crates that use Wasm proc macros can't be prebuilt yet. WP-18's bit-identical browser/wasmtime check still covers both binaries' outputs. | Claude |
 
+## Files and checks
+
+- Driver: `toolchain/rustc-multi/main.rs` (config, `pm::register`), `pm.rs`, `pm_slots.rs` (the 512 slot functions, generated; regenerate for more), built by `toolchain/build-rustc-multi.sh` (both variants); `toolchain/release.sh` ships both.
+- Host: `web/wasi/proc-macro.ts`, hooked into each rustc thread worker by `web/wasi/process-worker.ts` (only for modules that import `rust_pm`).
+- Planner: `crates/resolver/src/plan/mod.rs`, `cfg.rs` (`docs/planner.md`, "Proc macros"); `web/build/cargo.ts` (`PROC_MACRO_ARGS`).
+- Groundwork before the rustc changes: `crates/pm-bridge/host/src/raw.rs` (drives a stock proc-macro module under wasmtime) with `pm-rewrite --raw` / `scripts/build-pm-guest.sh --raw`; `docs/wp20-rustc-changes.md` (the spec for the rustc side, and how it was verified).
+- Checks: `scripts/verify/wp-20-crate-type.sh` (rustc.wasm builds a proc-macro crate for wasm32-wasip1 with readable proc_macro_data; `tests/proc-macro/hello_pm.rs`), golden case `tests/planner/cases/derive`, `tests/e2e/proc-macro.spec.ts` (cold build + run, then reload + edit with the macro modules from L1); all run by `scripts/verify/wp-20.sh`.
+
 ## Notes
 
 - The guest needs no glue: the module is exactly what rustc emits for the crate type plus link arguments, and its `proc_macro` is rustup's stock wasm32-wasip1 one.

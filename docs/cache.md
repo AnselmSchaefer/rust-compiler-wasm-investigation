@@ -38,7 +38,7 @@ The planned arguments already carry the target, `--cfg feature=…`, profile fla
 `tools/prebuild/main.ts`, bundled by `scripts/build-prebuild.mjs` to `build/prebuild/prebuild.mjs`. It runs the same `cargoBuild` with a disk host:
 
 - **Filesystem:** `build/prebuild/work/root/` is the guest's `/`, laid out like the orchestrator's VFS. It holds the release's sysroot tars (sha256-checked), the `sysroot/bin/rustc` and `lib/rustlib` links (relative, because wasmtime refuses absolute ones), `/deps`, `/target`, and the project at `/<name>`.
-- **rustc:** the release's `rustc.wasm` (the browser's compiler, sha256-checked against the manifest) under `wasmtime-threads`, one process per unit, with `--dir root::/` and the unit's env. It follows `Orchestrator.run`: outputs go to `/tmp/job-N`, rustc stops at the link step, the release's `wasm-ld.wasm` links, and the results move into place. Up to `--jobs` (default 4) run at once.
+- **rustc:** the release's `rustc-wasmtime.wasm` (sha256-checked against the manifest; before WP-20 its `rustc.wasm`) under `wasmtime-threads`. It's the browser's rustc-multi built from the same source without the proc-macro host imports, which the wasmtime CLI can't give to spawned threads (`docs/proc-macro.md`, WP-20); the determinism check below still finds identical outputs. It runs one process per unit, with `--dir root::/` and the unit's env. It follows `Orchestrator.run`: outputs go to `/tmp/job-N`, rustc stops at the link step, the release's `wasm-ld.wasm` links, and the results move into place. Up to `--jobs` (default 4) run at once.
 - **Build scripts:** `wasmtime` with only the package dir and an empty OUT_DIR mounted, like the sandbox.
 - **Index and crates:** the WP-15 snapshot via `file:` URLs, and `.crate` files from static.crates.io with a User-Agent of our own. Downloads are cached in `build/prebuild/work/deps-cache`.
 - **Output:** its L1 *is* the L2 directory (`--out`, default `build/l2/<RUSTC_ID>/`). `--rebuild` ignores what's there. `--report` writes every unit's key and output hashes.
@@ -57,5 +57,6 @@ The planner's golden cases (`tests/planner/cases/`) double as cache cases. **New
 
 - Cargo's `rerun-if-changed`/`rerun-if-env-changed`. Not needed: a build script's key already covers the whole package and its env.
 - Warnings of cached units aren't replayed (cargo replays them).
+- Crates that use Wasm proc macros can't be prebuilt (WP-20: the wasmtime build has no proc-macro host); in the browser they're cached in L1 like any unit.
 - No eviction or size limit for L1. No L2 upload from the browser (L2 is filled only by prebuild). No signing of L2 beyond per-file sha256 (the bundle header itself comes from L2; trust in the L2 host is assumed).
 - Proc-macro artifacts (WP-20) will need the same keying. Their outputs are wasm modules for the host, not rlibs.
