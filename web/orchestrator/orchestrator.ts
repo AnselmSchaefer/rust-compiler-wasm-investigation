@@ -1,6 +1,7 @@
-// The orchestrator (WP-12): one VFS, the toolchain release, a long-lived compile server
+// The orchestrator (WP-12): one VFS, the toolchain release, long-lived compile servers
 // (rustc --server --follow, toolchain/rustc-multi) and a linker process (wasm-ld.wasm) per link.
-// Jobs run one at a time, in order. rustc stops at the link step with its link command printed
+// Up to `workers` jobs run at once (WP-17), each on a compile server of its own; the servers start
+// on demand and stay. With one worker, jobs run one at a time, in order. rustc stops at the link step with its link command printed
 // (web/link/link-args.ts); the orchestrator runs wasm-ld with it on the same VFS, then moves the
 // results out of the job's scratch dir. Runs in a page or a worker (orchestrator-worker.ts).
 
@@ -27,21 +28,26 @@ const RUSTC_ARGV0 = '/sysroot/bin/rustc';
 const ENV = ['RUST_MIN_STACK=16777216'];
 
 export class Orchestrator {
-  private queue: Promise<unknown> = Promise.resolve();
   private jobs = 0;
   private linkGroup: Promise<void> | null = null;
+  private readonly servers: CompileServer[] = [];
+  private readonly idle: CompileServer[] = [];
+  private readonly waiting: ((s: CompileServer) => void)[] = [];
+  private readonly running = new Set<Promise<unknown>>();
 
   private constructor(
     readonly vfs: Vfs, private readonly handle: VfsHandle, readonly release: Release,
-    private readonly rustc: Tool, private readonly workerUrl: URL, private readonly server: CompileServer,
-  ) {}
+    private readonly rustc: Tool, private readonly workerUrl: URL, readonly workers: number,
+  ) {
+    this.idle.push(this.startServer());
+  }
 
   /**
    * `releaseUrl`: a release directory (…/<RUSTC_ID>/). `workerUrl`: web/wasi/process-worker.js.
    * `vfsUrl`: vfs.wasm. Loads rustc and the sysroot's metadata group; the link group and lld come
-   * with the first link.
+   * with the first link. `workers`: compile servers at most (default 1).
    */
-  static async create(opts: { releaseUrl: string | URL; workerUrl: string | URL; vfsUrl: string | URL }): Promise<Orchestrator> {
+  static async create(opts: { releaseUrl: string | URL; workerUrl: string | URL; vfsUrl: string | URL; workers?: number }): Promise<Orchestrator> {
     const handle = await createVfs(String(opts.vfsUrl));
     const vfs = await Vfs.attach(handle);
     const release = await Release.open(String(opts.releaseUrl));
@@ -54,19 +60,42 @@ export class Orchestrator {
     vfs.symlink('/sysroot/lib/rustlib', '/lib/rustlib');
     vfs.mkdirAll('/tmp');
     vfs.mkdirAll('/proc');
-    const workerUrl = new URL(String(opts.workerUrl));
-    const server = new CompileServer(vfs, handle, rustc, workerUrl);
-    return new Orchestrator(vfs, handle, release, rustc, workerUrl, server);
+    return new Orchestrator(vfs, handle, release, rustc, new URL(String(opts.workerUrl)), Math.max(1, opts.workers ?? 1));
   }
 
-  /** Run rustc with `args` (paths in the VFS; the working directory is /), linking if needed. */
-  rustcJob(args: string[]): Promise<RustcResult> {
-    const job = this.queue.then(() => this.run(args));
-    this.queue = job.catch(() => {});
+  private startServer() {
+    const s = new CompileServer(this.vfs, this.handle, this.rustc, this.workerUrl, this.servers.length);
+    this.servers.push(s);
+    return s;
+  }
+
+  /** A free compile server: an idle one, a new one (below `workers`), or the next one released. */
+  private acquire(): Promise<CompileServer> {
+    const s = this.idle.shift() ?? (this.servers.length < this.workers ? this.startServer() : undefined);
+    return s ? Promise.resolve(s) : new Promise(r => this.waiting.push(r));
+  }
+
+  private releaseServer(s: CompileServer) {
+    const w = this.waiting.shift();
+    if (w) w(s);
+    else this.idle.push(s);
+  }
+
+  /**
+   * Run rustc with `args` (paths in the VFS; the working directory is /), linking if needed.
+   * `env`: environment variables for this job only (OUT_DIR, CARGO_PKG_*, ...).
+   */
+  rustcJob(args: string[], env?: Record<string, string>): Promise<RustcResult> {
+    const job = (async () => {
+      const s = await this.acquire();
+      try { return await this.run(s, args, env); } finally { this.releaseServer(s); }
+    })();
+    this.running.add(job);
+    job.finally(() => this.running.delete(job)).catch(() => {});
     return job;
   }
 
-  private async run(user: string[]): Promise<RustcResult> {
+  private async run(server: CompileServer, user: string[], env?: Record<string, string>): Promise<RustcResult> {
     const t0 = performance.now();
     const scratch = `/tmp/job-${++this.jobs}`, linkFile = `${scratch}/link-args`;
     this.vfs.mkdirAll(scratch);
@@ -75,7 +104,7 @@ export class Orchestrator {
       // A build that links needs the .rlib files while rustc runs (it checks dependency formats
       // before linking); --emit=metadata or obj alone needs only the .rmeta files.
       if (emitsLink(user)) await this.loadLinkGroup();
-      const r = await this.server.request(plan.args);
+      const r = await server.request(plan.args, env);
       let code = r.exit, stderr = r.stderr, linked = false, linkMs = 0;
       if (code !== 0 && this.vfs.exists(linkFile)) {
         // rustc got to the link step and couldn't start a linker: link here instead.
@@ -127,11 +156,16 @@ export class Orchestrator {
   }
 
   stats() {
-    return { vfsBytes: this.handle.memory.buffer.byteLength, rustcBytes: this.server.memoryBytes, jobs: this.jobs };
+    const rustcBytes = this.servers.reduce((a, s) => a + s.memoryBytes, 0);
+    return { vfsBytes: this.handle.memory.buffer.byteLength, rustcBytes, jobs: this.jobs, servers: this.servers.length };
   }
 
-  /** Stop the compile server; resolves with its process result. */
-  async close(): Promise<RunResult> { await this.queue; return this.server.quit(); }
+  /** Stop the compile servers after the running jobs; resolves with the first one's process result. */
+  async close(): Promise<RunResult> {
+    await Promise.allSettled([...this.running]);
+    const results = await Promise.all(this.servers.map(s => s.quit()));
+    return results[0];
+  }
 }
 
 /** Whether rustc with `args` emits `link` (the default when there is no --emit). */
@@ -168,10 +202,11 @@ class CompileServer {
 
   get memoryBytes() { return this.memory.buffer.byteLength; }
 
-  constructor(private readonly vfs: Vfs, handle: VfsHandle, rustc: Tool, workerUrl: URL) {
-    this.stdin = '/proc/rustc.in';
-    this.stdout = '/proc/rustc.out';
-    this.stderr = '/proc/rustc.err';
+  constructor(private readonly vfs: Vfs, handle: VfsHandle, rustc: Tool, workerUrl: URL, n: number) {
+    const name = n === 0 ? 'rustc' : `rustc-${n}`;
+    this.stdin = `/proc/${name}.in`;
+    this.stdout = `/proc/${name}.out`;
+    this.stderr = `/proc/${name}.err`;
     vfs.writeFile(this.stdin, '');
     const memory = new WebAssembly.Memory({ ...rustc.limits, shared: true });
     this.memory = memory;
@@ -181,9 +216,9 @@ class CompileServer {
     }, workerUrl, () => this.wake?.());
   }
 
-  async request(args: string[]): Promise<{ exit: number; ms: number; stderr: string }> {
+  async request(args: string[], env?: Record<string, string>): Promise<{ exit: number; ms: number; stderr: string }> {
     const id = ++this.nextId;
-    this.vfs.appendFile(this.stdin, JSON.stringify({ id, args }) + '\n');
+    this.vfs.appendFile(this.stdin, JSON.stringify(env ? { id, args, env } : { id, args }) + '\n');
     const answer = await this.answer(id);
     const e = this.vfs.readText(this.stderr), mark = `\x1e${id}\n`, at = e.indexOf(mark, this.errPos);
     const stderr = e.slice(this.errPos, at);

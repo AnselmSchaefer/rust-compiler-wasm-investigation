@@ -4,6 +4,7 @@
 pub mod index;
 pub mod lockfile;
 pub mod manifest;
+pub mod plan;
 pub mod resolve;
 pub mod summary;
 #[cfg(target_family = "wasm")]

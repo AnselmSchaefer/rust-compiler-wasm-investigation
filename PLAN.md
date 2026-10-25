@@ -284,6 +284,7 @@ These are taken as defaults so work can start. Changing one later only affects t
   - Schedule work in parallel across N rustc workers.
   - Golden test against the invocations in native `cargo build -v` output.
 - **Done when:** a pure-Rust crate graph (`serde_json`, `itoa`, `memchr`, `ryu`) builds in the browser, and the resulting program runs.
+  - *2026-10-25 (done, session 19):* serde_json 1.0.154 now uses `zmij` instead of `ryu`, and zmij, serde_core and serde_json have build scripts, so WP-21's basic path (compile `build.rs` to wasm32-wasip1, run it in the sandbox with cargo's env and OUT_DIR, parse `cargo:` lines) moved here. Planner golden-identical to `cargo build -vv` on 2 cases (34 units); see `docs/planner.md`, `bench/build.md`.
 
 #### WP-18 Content-addressed cache (L1 OPFS, L2 CDN) and prebuild tool
 - **Depends:** WP-17 · **Est.:** 2–3 sessions
@@ -326,6 +327,7 @@ These are taken as defaults so work can start. Changing one later only affects t
   - Route `rustc` process spawns to the compile server.
   - Override list for known-unsupportable scripts.
 - **Done when:** crates with `autocfg`, `rustversion`, `libc` and `proc-macro2`-style build scripts build in the browser.
+  - *2026-10-25:* the first three tasks and the parser are done in WP-17 (`web/build/cargo.ts`, `crates/resolver/src/plan/build_output.rs`). Left: routing `rustc` spawns (scripts now see `Command` fail), the working directory (now `/`, not the package dir), `DEP_<links>_*` and `-L` from dependencies' scripts (planned, untested), and the override list.
 
 #### WP-22 Ecosystem matrix → **M1** (repeatable WP)
 - **Depends:** WP-21 · **Est.:** 3–5 sessions (repeat until the target is met)

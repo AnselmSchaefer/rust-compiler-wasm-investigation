@@ -11,7 +11,8 @@ const pages = {
   orchestrator: {
     src: 'tests/e2e/orchestrator',
     entries: { main: 'main', 'orchestrator-worker': '../../../web/orchestrator/orchestrator-worker', 'process-worker': '../../../web/wasi/process-worker', 'sandbox-worker': '../../../web/sandbox/sandbox-worker' },
-    assets: { 'vfs.wasm': 'build/www/vfs/vfs.wasm' },
+    // WP-17: the resolver module also plans builds (the `build` op).
+    assets: { 'vfs.wasm': 'build/www/vfs/vfs.wasm', 'resolver.wasm': 'build/www/resolver/resolver.wasm' },
   },
   // WP-16: resolver + crate download; the index is the WP-15 snapshot, mounted at /index/.
   'deps-test': {

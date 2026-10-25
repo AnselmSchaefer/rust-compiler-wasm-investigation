@@ -1,0 +1,392 @@
+{
+  "release": "1.99.1-e6f1d21de137",
+  "workers": 4,
+  "profile": "dev",
+  "stats": {
+    "vfsBytes": 317849600,
+    "rustcBytes": 883621888,
+    "jobs": 36,
+    "servers": 4
+  },
+  "cases": {
+    "serde_json": {
+      "packages": 12,
+      "units": [
+        {
+          "id": 0,
+          "name": "itoa",
+          "version": "1.0.18",
+          "kind": "lib",
+          "start": 945,
+          "end": 5586,
+          "rustcMs": 4158.5,
+          "warnings": []
+        },
+        {
+          "id": 1,
+          "name": "memchr",
+          "version": "2.8.3",
+          "kind": "lib",
+          "start": 950,
+          "end": 6980,
+          "rustcMs": 5562.2,
+          "warnings": []
+        },
+        {
+          "id": 2,
+          "name": "serde_core",
+          "version": "1.0.229",
+          "kind": "custom-build",
+          "start": 952,
+          "end": 7285,
+          "rustcMs": 4251.4,
+          "warnings": []
+        },
+        {
+          "id": 5,
+          "name": "zmij",
+          "version": "1.0.23",
+          "kind": "custom-build",
+          "start": 953,
+          "end": 7292,
+          "rustcMs": 4253.9,
+          "warnings": []
+        },
+        {
+          "id": 8,
+          "name": "serde_json",
+          "version": "1.0.154",
+          "kind": "custom-build",
+          "start": 953,
+          "end": 7297,
+          "rustcMs": 400.1,
+          "warnings": []
+        },
+        {
+          "id": 3,
+          "name": "serde_core",
+          "version": "1.0.229",
+          "kind": "run-custom-build",
+          "start": 7285,
+          "end": 7399,
+          "warnings": []
+        },
+        {
+          "id": 6,
+          "name": "zmij",
+          "version": "1.0.23",
+          "kind": "run-custom-build",
+          "start": 7292,
+          "end": 7443,
+          "warnings": []
+        },
+        {
+          "id": 9,
+          "name": "serde_json",
+          "version": "1.0.154",
+          "kind": "run-custom-build",
+          "start": 7297,
+          "end": 7460,
+          "warnings": []
+        },
+        {
+          "id": 4,
+          "name": "serde_core",
+          "version": "1.0.229",
+          "kind": "lib",
+          "start": 7399,
+          "end": 17478,
+          "rustcMs": 10073.9,
+          "warnings": []
+        },
+        {
+          "id": 7,
+          "name": "zmij",
+          "version": "1.0.23",
+          "kind": "lib",
+          "start": 7443,
+          "end": 8872,
+          "rustcMs": 1411.5,
+          "warnings": []
+        },
+        {
+          "id": 10,
+          "name": "serde_json",
+          "version": "1.0.154",
+          "kind": "lib",
+          "start": 17478,
+          "end": 21238,
+          "rustcMs": 3759.5,
+          "warnings": []
+        },
+        {
+          "id": 11,
+          "name": "demo",
+          "version": "0.1.0",
+          "kind": "bin",
+          "start": 21238,
+          "end": 21643,
+          "rustcMs": 257.1,
+          "warnings": []
+        }
+      ],
+      "libs": 5,
+      "buildScripts": 3,
+      "ms": {
+        "deps": 909,
+        "plan": 35,
+        "build": 20703,
+        "total": 21648
+      },
+      "parallelism": 1.67,
+      "slowest": [
+        "serde_core lib 10079 ms",
+        "serde_json custom-build 6344 ms",
+        "zmij custom-build 6339 ms"
+      ],
+      "run": {
+        "code": 0,
+        "stdout": "{\"n\":[1,2.5,-3],\"name\":\"demo\",\"ok\":true}\nroundtrip ok, n[1] = 2.5\n"
+      }
+    },
+    "mix": {
+      "packages": 24,
+      "units": [
+        {
+          "id": 0,
+          "name": "itoa",
+          "version": "1.0.18",
+          "kind": "lib",
+          "start": 842,
+          "end": 1339,
+          "rustcMs": 485.8,
+          "warnings": []
+        },
+        {
+          "id": 5,
+          "name": "zmij",
+          "version": "1.0.23",
+          "kind": "custom-build",
+          "start": 842,
+          "end": 1386,
+          "rustcMs": 378.6,
+          "warnings": []
+        },
+        {
+          "id": 2,
+          "name": "serde_core",
+          "version": "1.0.229",
+          "kind": "custom-build",
+          "start": 842,
+          "end": 1643,
+          "rustcMs": 592.8,
+          "warnings": []
+        },
+        {
+          "id": 1,
+          "name": "memchr",
+          "version": "2.8.3",
+          "kind": "lib",
+          "start": 842,
+          "end": 2591,
+          "rustcMs": 1738.1,
+          "warnings": []
+        },
+        {
+          "id": 8,
+          "name": "serde_json",
+          "version": "1.0.154",
+          "kind": "custom-build",
+          "start": 843,
+          "end": 1684,
+          "rustcMs": 137.3,
+          "warnings": []
+        },
+        {
+          "id": 12,
+          "name": "rand_core",
+          "version": "0.10.1",
+          "kind": "lib",
+          "start": 843,
+          "end": 1749,
+          "rustcMs": 362.4,
+          "warnings": []
+        },
+        {
+          "id": 11,
+          "name": "cfg-if",
+          "version": "1.0.5",
+          "kind": "lib",
+          "start": 850,
+          "end": 1700,
+          "rustcMs": 56.2,
+          "warnings": []
+        },
+        {
+          "id": 14,
+          "name": "getrandom",
+          "version": "0.4.3",
+          "kind": "custom-build",
+          "start": 850,
+          "end": 2333,
+          "rustcMs": 390.6,
+          "warnings": []
+        },
+        {
+          "id": 18,
+          "name": "regex-syntax",
+          "version": "0.8.11",
+          "kind": "lib",
+          "start": 851,
+          "end": 8725,
+          "rustcMs": 7023.1,
+          "warnings": []
+        },
+        {
+          "id": 6,
+          "name": "zmij",
+          "version": "1.0.23",
+          "kind": "run-custom-build",
+          "start": 1386,
+          "end": 1429,
+          "warnings": []
+        },
+        {
+          "id": 7,
+          "name": "zmij",
+          "version": "1.0.23",
+          "kind": "lib",
+          "start": 1429,
+          "end": 2849,
+          "rustcMs": 1093.7,
+          "warnings": []
+        },
+        {
+          "id": 3,
+          "name": "serde_core",
+          "version": "1.0.229",
+          "kind": "run-custom-build",
+          "start": 1643,
+          "end": 1694,
+          "warnings": []
+        },
+        {
+          "id": 9,
+          "name": "serde_json",
+          "version": "1.0.154",
+          "kind": "run-custom-build",
+          "start": 1684,
+          "end": 1741,
+          "warnings": []
+        },
+        {
+          "id": 4,
+          "name": "serde_core",
+          "version": "1.0.229",
+          "kind": "lib",
+          "start": 1694,
+          "end": 8507,
+          "rustcMs": 6172.8,
+          "warnings": []
+        },
+        {
+          "id": 13,
+          "name": "chacha20",
+          "version": "0.10.2",
+          "kind": "lib",
+          "start": 1749,
+          "end": 3184,
+          "rustcMs": 590.1,
+          "warnings": []
+        },
+        {
+          "id": 15,
+          "name": "getrandom",
+          "version": "0.4.3",
+          "kind": "run-custom-build",
+          "start": 2333,
+          "end": 2406,
+          "warnings": []
+        },
+        {
+          "id": 16,
+          "name": "getrandom",
+          "version": "0.4.3",
+          "kind": "lib",
+          "start": 2406,
+          "end": 3242,
+          "rustcMs": 392.2,
+          "warnings": []
+        },
+        {
+          "id": 17,
+          "name": "rand",
+          "version": "0.10.3",
+          "kind": "lib",
+          "start": 3242,
+          "end": 5260,
+          "rustcMs": 2015.9,
+          "warnings": []
+        },
+        {
+          "id": 10,
+          "name": "serde_json",
+          "version": "1.0.154",
+          "kind": "lib",
+          "start": 8507,
+          "end": 10877,
+          "rustcMs": 2368.2,
+          "warnings": []
+        },
+        {
+          "id": 19,
+          "name": "regex-automata",
+          "version": "0.4.18",
+          "kind": "lib",
+          "start": 8725,
+          "end": 14086,
+          "rustcMs": 5360.1,
+          "warnings": []
+        },
+        {
+          "id": 20,
+          "name": "regex",
+          "version": "1.13.1",
+          "kind": "lib",
+          "start": 14086,
+          "end": 14895,
+          "rustcMs": 807.5,
+          "warnings": []
+        },
+        {
+          "id": 21,
+          "name": "mix",
+          "version": "0.1.0",
+          "kind": "bin",
+          "start": 14895,
+          "end": 15266,
+          "rustcMs": 195.2,
+          "warnings": []
+        }
+      ],
+      "libs": 13,
+      "buildScripts": 4,
+      "ms": {
+        "deps": 804,
+        "plan": 38,
+        "build": 14433,
+        "total": 15275
+      },
+      "parallelism": 2.11,
+      "slowest": [
+        "regex-syntax lib 7874 ms",
+        "serde_core lib 6813 ms",
+        "regex-automata lib 5361 ms"
+      ],
+      "run": {
+        "code": 0,
+        "stdout": "user=ferris host=rust\n{\"user\":\"ferris\"}\ndice ok\n"
+      }
+    }
+  }
+}

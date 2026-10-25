@@ -2,7 +2,7 @@
 // own that holds only the files the host passed in, so it never sees the project or the toolchain.
 // No network: the program's only imports are WASI preview 1, whose socket calls return NOSYS. The
 // host kills it by terminating this worker.
-import { createVfs, Vfs } from '../vfs/vfs';
+import { createVfs, Kind, Vfs } from '../vfs/vfs';
 import { createProcess, ProcExit, WasiProcess } from '../wasi/wasi';
 import { PipeReader } from './pipe';
 import type { SandboxEvent, SandboxStart } from './sandbox';
@@ -15,9 +15,10 @@ onmessage = (e: MessageEvent<SandboxStart>) => {
   run(e.data).catch(err => post({ type: 'exit', code: 134, trap: `sandbox: ${String((err as Error)?.stack ?? err)}`, files: [] }));
 };
 
-async function run({ vfsUrl, module, args, env, stdin, files, collect }: SandboxStart) {
+async function run({ vfsUrl, module, args, env, stdin, files, dirs, collect }: SandboxStart) {
   const vfs = await Vfs.attach(await createVfs(vfsUrl));
   for (const [path, data] of files) vfs.writeFile(path, data);
+  for (const d of dirs) vfs.mkdirAll(d);
   vfs.mkdirAll('/proc');
   const out = '/proc/stdout', err = '/proc/stderr';
   vfs.writeFile(out, '');
@@ -55,6 +56,15 @@ async function run({ vfsUrl, module, args, env, stdin, files, collect }: Sandbox
   }
   flush(1);
   flush(2);
-  const back: [string, Uint8Array][] = collect.filter(p => vfs.exists(p)).map(p => [p, vfs.readFile(p)]);
+  // A path ending in '/' collects every file below it (a build script's OUT_DIR).
+  const paths = collect.flatMap(p => p.endsWith('/') ? (vfs.exists(p) ? filesBelow(vfs, p.slice(0, -1)) : []) : [p]);
+  const back: [string, Uint8Array][] = paths.filter(p => vfs.exists(p)).map(p => [p, vfs.readFile(p)]);
   post({ type: 'exit', code, trap, files: back }, back.map(([, d]) => d.buffer as ArrayBuffer));
+}
+
+function filesBelow(vfs: Vfs, dir: string): string[] {
+  return vfs.readdir(dir).flatMap(e => {
+    const p = `${dir}/${e.name}`;
+    return e.kind === Kind.Dir ? filesBelow(vfs, p) : e.kind === Kind.File ? [p] : [];
+  });
 }

@@ -1,6 +1,8 @@
 // The Cargo resolver (crates/resolver, built by scripts/build-resolver.sh) in the browser (WP-16).
 // It's a wasm32-wasip1 module that never touches files, so a handful of WASI stubs does. JS
 // supplies index files; each `resolve` reports either the files it still needs or the result.
+// The same module plans builds (WP-17): `plan` turns the resolve and the packages' manifests into
+// units with rustc arguments, `finish` adds a build script's output to a unit.
 
 export interface ResolvedPackage {
   name: string; version: string; source: 'path' | 'registry';
@@ -13,12 +15,31 @@ export type ResolveResult =
   | { lock: string; packages: ResolvedPackage[] }
   | { error: string };
 
+/** crates/resolver/src/plan/mod.rs: PlanInput, Unit, Plan, Finished. */
+export interface PlanInput {
+  packages: { name: string; version: string; manifest: string | null; dir: string; source: 'path' | 'registry'; files: string[]; deps: number[] }[];
+  root: number; target: string; host: string; target_dir: string; rustc_id: string;
+  features?: string[]; default_features?: boolean; target_flag_for_host?: boolean;
+  profile?: { name?: string; opt_level?: string; debuginfo?: number; debug_assertions?: boolean; overflow_checks?: boolean; incremental?: boolean };
+  tools?: { cargo?: string; rustc?: string; rustdoc?: string; jobs?: number };
+}
+export type UnitKind = 'lib' | 'bin' | 'custom-build' | 'run-custom-build';
+export interface PlanUnit {
+  id: number; pkg: number; name: string; version: string; kind: UnitKind; crate_name: string; host: boolean;
+  features: string[]; hash: string; deps: number[]; args: string[]; env: Record<string, string>;
+  build_output: number | null; outputs: string[]; program: string | null; out_dir: string | null; cwd: string | null;
+}
+export interface Plan { units: PlanUnit[]; bins: [string, number][] }
+export interface Finished { args: string[]; env: Record<string, string>; warnings: string[] }
+
 type Exports = {
   memory: WebAssembly.Memory;
   resolver_alloc(len: number): number;
   resolver_free(ptr: number, len: number): void;
   resolver_add_index(name: number, nameLen: number, data: number, dataLen: number, present: number): void;
   resolver_resolve(manifest: number, len: number): bigint;
+  planner_plan(input: number, len: number): bigint;
+  planner_finish(input: number, len: number): bigint;
 };
 
 const enc = new TextEncoder(), dec = new TextDecoder();
@@ -75,10 +96,28 @@ export class Resolver {
   }
 
   resolve(manifest: string): ResolveResult {
-    const [p, l] = this.put(enc.encode(manifest));
+    return this.call('resolver_resolve', manifest);
+  }
+
+  /** Plan a build; the plan stays in the module for `finish`. */
+  plan(input: PlanInput): Plan {
+    const r = this.call<{ plan: Plan } | { error: string }>('planner_plan', JSON.stringify(input));
+    if ('error' in r) throw new Error(r.error);
+    return r.plan;
+  }
+
+  /** A unit's final rustc args and env; `outputs`: run unit id → its build script's stdout. */
+  finish(unit: number, outputs: Record<number, string>): Finished {
+    const r = this.call<Finished | { error: string }>('planner_finish', JSON.stringify({ unit, outputs }));
+    if ('error' in r) throw new Error(r.error);
+    return r;
+  }
+
+  private call<T>(f: 'resolver_resolve' | 'planner_plan' | 'planner_finish', input: string): T {
+    const [p, l] = this.put(enc.encode(input));
     let r: bigint;
     try {
-      r = this.x.resolver_resolve(p, l);
+      r = this.x[f](p, l);
     } catch (e) {
       throw new Error(`resolver trapped: ${(e as Error).message}\n${this.stderr.join('')}`);
     }

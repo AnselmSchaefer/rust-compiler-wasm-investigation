@@ -425,6 +425,7 @@ dependencies = [
  "cargo-util-schemas",
  "im-rc",
  "semver",
+ "serde",
  "serde_json",
  "toml",
 ]

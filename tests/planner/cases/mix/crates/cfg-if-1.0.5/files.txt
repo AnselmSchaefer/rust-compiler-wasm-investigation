@@ -1,0 +1,14 @@
+.cargo_vcs_info.json
+.github/dependabot.yml
+.github/workflows/main.yaml
+.github/workflows/publish.yaml
+.gitignore
+CHANGELOG.md
+Cargo.lock
+Cargo.toml
+Cargo.toml.orig
+LICENSE-APACHE
+LICENSE-MIT
+README.md
+src/lib.rs
+tests/xcrate.rs

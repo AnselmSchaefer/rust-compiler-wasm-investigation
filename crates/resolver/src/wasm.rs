@@ -1,4 +1,5 @@
-//! The browser entry point (wasm32-unknown-unknown, no bindings generator). JS owns fetching:
+//! The browser entry point (wasm32-wasip1 with a few WASI stubs, no bindings generator). JS owns
+//! fetching:
 //!
 //!   loop {
 //!     resolver_resolve(manifest) → JSON
@@ -6,6 +7,11 @@
 //!       {"lock": "...", "packages": [{name, version, source, checksum, features, deps}]}
 //!       {"error": "..."}
 //!   }
+//!
+//! The build planner (WP-17), on the same kind of JSON:
+//!
+//!   planner_plan(PlanInput) → {"plan": Plan} or {"error"}; the plan is kept for:
+//!   planner_finish({"unit": id, "outputs": {"<run unit id>": "<stdout>"}}) → Finished or {"error"}
 //!
 //! Strings and bytes cross as (ptr, len) in this module's memory: JS gets a buffer with
 //! resolver_alloc, writes into it, and passes it in (the callee frees it). A result is returned as
@@ -22,6 +28,8 @@ struct State {
     /// name → index file (None: the package doesn't exist).
     files: HashMap<String, Option<Vec<u8>>>,
     cache: IndexCache,
+    /// The last plan, with each package's `links`.
+    plan: Option<(crate::plan::Plan, Vec<Option<String>>)>,
 }
 
 thread_local! {
@@ -121,4 +129,56 @@ fn run(state: &mut State, manifest: &str) -> serde_json::Value {
             json!({ "lock": crate::write_lockfile(&r), "packages": packages })
         }
     }
+}
+
+/// # Safety
+/// The input buffer must come from `resolver_alloc` with this length; it is consumed.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn planner_plan(input: *mut u8, len: usize) -> u64 {
+    use serde_json::json;
+    let input = unsafe { take(input, len) };
+    let out = match serde_json::from_slice::<crate::plan::PlanInput>(&input) {
+        Err(e) => json!({ "error": format!("bad plan input: {e}") }),
+        Ok(input) => match crate::plan::plan(&input) {
+            Err(e) => json!({ "error": e }),
+            Ok(plan) => {
+                let v = json!({ "plan": &plan });
+                let links = input
+                    .packages
+                    .iter()
+                    .map(|p| p.manifest.as_deref().and_then(|m| toml::from_str::<toml::Table>(m).ok()).and_then(|t| {
+                        t.get("package")?.get("links")?.as_str().map(String::from)
+                    }))
+                    .collect();
+                STATE.with_borrow_mut(|s| s.plan = Some((plan, links)));
+                v
+            }
+        },
+    };
+    give(out.to_string())
+}
+
+/// # Safety
+/// The input buffer must come from `resolver_alloc` with this length; it is consumed.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn planner_finish(input: *mut u8, len: usize) -> u64 {
+    use serde_json::{Value, json};
+    let input: Value = serde_json::from_slice(&unsafe { take(input, len) }).unwrap_or_default();
+    let out = STATE.with_borrow(|s| {
+        let Some((plan, links)) = &s.plan else { return json!({ "error": "no plan" }) };
+        let Some(id) = input["unit"].as_u64().map(|i| i as usize).filter(|&i| i < plan.units.len()) else {
+            return json!({ "error": "bad unit" });
+        };
+        let outputs: HashMap<usize, String> = input["outputs"]
+            .as_object()
+            .into_iter()
+            .flatten()
+            .filter_map(|(k, v)| Some((k.parse().ok()?, v.as_str()?.to_string())))
+            .collect();
+        match crate::plan::finish(plan, &|p| links.get(p).cloned().flatten(), id, &outputs) {
+            Ok(f) => json!(f),
+            Err(e) => json!({ "error": e }),
+        }
+    });
+    give(out.to_string())
 }

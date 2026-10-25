@@ -4,12 +4,14 @@
 //   rustc-multi <args> --next <args> ...      each group runs like `rustc <args>`; prints
 //                                             `rustc-multi: exit <code>` to stderr after each
 //   rustc-multi --server [--follow]           compile server: one JSON request per line on stdin,
-//                                             {"id": 1, "args": [...]} or {"id": 2, "quit": true};
-//                                             answers {"id": 1, "exit": 0, "ms": 12.5} on stdout
+//                                             {"id": 1, "args": [...], "env": {...}} or
+//                                             {"id": 2, "quit": true}; answers
+//                                             {"id": 1, "exit": 0, "ms": 12.5} on stdout
 //
 // In server mode, a line "\x1e<id>" on stderr ends each request's diagnostics, so a host can split
 // both streams per request. --follow: stdin is a file that the host appends to (the browser VFS),
-// so at its end, wait for more instead of stopping.
+// so at its end, wait for more instead of stopping. "env" (optional) sets environment variables
+// for that request only, e.g. OUT_DIR and CARGO_PKG_* for env!() (the build planner, WP-17).
 //
 // Each invocation goes through the same catch_with_exit_code that rustc_driver::main uses, plus a
 // catch_unwind for ICEs, which catch_with_exit_code re-raises. Built out of tree against
@@ -88,13 +90,39 @@ fn serve(argv0: &str, follow: bool) -> ExitCode {
         let argv: Vec<String> = std::iter::once(argv0.to_owned())
             .chain(args.iter().map(|a| a.as_str().unwrap_or_default().to_owned()))
             .collect();
+        let env = req.get("env").and_then(Value::as_object);
+        let saved = env.map(|e| set_env(e)).unwrap_or_default();
         let t0 = Instant::now();
         let code = compile(&argv);
+        restore_env(saved);
         let ms = t0.elapsed().as_secs_f64() * 1000.0;
         eprintln!("\x1e{id}");
         let mut out = std::io::stdout().lock();
         let _ = writeln!(out, "{}", json!({ "id": id, "exit": code, "ms": (ms * 10.0).round() / 10.0 }));
         let _ = out.flush();
+    }
+}
+
+type SavedEnv = Vec<(String, Option<std::ffi::OsString>)>;
+
+fn set_env(env: &serde_json::Map<String, Value>) -> SavedEnv {
+    env.iter()
+        .map(|(k, v)| {
+            let old = std::env::var_os(k);
+            // SAFETY: requests run one at a time; no compiler thread is alive between them.
+            unsafe { std::env::set_var(k, v.as_str().unwrap_or_default()) };
+            (k.clone(), old)
+        })
+        .collect()
+}
+
+fn restore_env(saved: SavedEnv) {
+    for (k, old) in saved.into_iter().rev() {
+        // SAFETY: as in set_env.
+        match old {
+            Some(v) => unsafe { std::env::set_var(&k, v) },
+            None => unsafe { std::env::remove_var(&k) },
+        }
     }
 }
 

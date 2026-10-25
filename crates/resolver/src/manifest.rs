@@ -65,7 +65,7 @@ pub fn parse_manifest(text: &str) -> Result<RootManifest, String> {
     Ok(RootManifest { summary, behavior, rust_version })
 }
 
-fn gather(
+pub(crate) fn gather(
     out: &mut Vec<Rc<Dependency>>,
     table: Option<&BTreeMap<PackageName, InheritableDependency>>,
     kind: DepKind,

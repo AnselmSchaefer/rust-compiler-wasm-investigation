@@ -8,7 +8,7 @@ import { createPipe, PipeWriter } from './pipe';
 /** Message to sandbox-worker.ts. */
 export interface SandboxStart {
   vfsUrl: string; module: WebAssembly.Module; args: string[]; env: string[]; stdin: SharedArrayBuffer;
-  files: [string, Uint8Array][]; collect: string[];
+  files: [string, Uint8Array][]; dirs: string[]; collect: string[];
 }
 /** Messages from sandbox-worker.ts. */
 export type SandboxEvent =
@@ -29,7 +29,9 @@ export interface SandboxOptions {
   interactive?: boolean;
   /** Files the program sees (absolute paths in its own filesystem). */
   files?: Record<string, string | Uint8Array>;
-  /** Files to read back when it exits. */
+  /** Directories to create (empty) before it starts. */
+  dirs?: string[];
+  /** Files to read back when it exits; a path ending in '/' means every file below it. */
   collect?: string[];
   /** Kill the program after this long; default: no limit. */
   timeoutMs?: number;
@@ -92,7 +94,7 @@ export function runSandboxed(o: SandboxOptions): SandboxHandle {
     const module = o.program instanceof WebAssembly.Module ? o.program : await WebAssembly.compile(o.program as Uint8Array<ArrayBuffer>);
     const files = Object.entries(o.files ?? {}).map(([p, d]): [string, Uint8Array] => [p, typeof d === 'string' ? enc.encode(d) : d]);
     worker.postMessage({
-      vfsUrl: String(o.vfsUrl), module, args: o.args ?? ['main'], env: o.env ?? [], stdin: pipe, files, collect: o.collect ?? [],
+      vfsUrl: String(o.vfsUrl), module, args: o.args ?? ['main'], env: o.env ?? [], stdin: pipe, files, dirs: o.dirs ?? [], collect: o.collect ?? [],
     } satisfies SandboxStart);
     if (o.stdin !== undefined) stdin.write(typeof o.stdin === 'string' ? enc.encode(o.stdin) : o.stdin);
     if (!o.interactive) stdin.close();
