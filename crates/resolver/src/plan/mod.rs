@@ -9,8 +9,9 @@
 //! `<triple>/<profile>/`, host units (build scripts and what they use) in `<profile>/`.
 //!
 //! Build-script output can only be applied once the script ran: `finish` adds it to a unit.
-//! Not covered yet: proc macros (WP-20), `DEP_<links>_*` metadata and `-L` from dependencies'
-//! scripts (WP-21), dev units (tests, WP-26), `[lints]` check-cfg, `[profile]` sections.
+//! A run unit gets `DEP_<LINKS>_*` from its `links` dependencies' scripts, and a compile unit the
+//! `-L` paths of every script in its linkable closure (WP-21).
+//! Not covered yet: dev units (tests, WP-26), `[lints]` check-cfg, `[profile]` sections.
 
 pub mod build_output;
 pub mod cfg;
@@ -59,6 +60,12 @@ pub struct PlanInput {
     /// `-C save-temps` (the orchestrator links after rustc exits).
     #[serde(default)]
     pub proc_macro_args: Vec<String>,
+    /// Appended to every host-side compile (WP-21: `--extern std=` the build-script std).
+    #[serde(default)]
+    pub host_args: Vec<String>,
+    /// Appended to build-script compiles (WP-21: its link arguments).
+    #[serde(default)]
+    pub build_script_args: Vec<String>,
 }
 
 fn yes() -> bool {
@@ -161,6 +168,8 @@ pub struct Unit {
     pub program: Option<String>,
     pub out_dir: Option<String>,
     pub cwd: Option<String>,
+    /// Run units: the package's `links` value.
+    pub links: Option<String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -500,7 +509,7 @@ impl Builder<'_> {
         }
         // cargo: incremental for local (path) packages; primary for the packages being built.
         let is_root = self.roots.contains(&pkg) && kind != UnitKind::CustomBuild;
-        if p.summary.source == Source::Path && kind != UnitKind::CustomBuild && prof.incremental {
+        if p.summary.source == Source::Path && prof.incremental {
             push(&["-C", &format!("incremental={layout}/incremental")]);
         }
         push(&["-L", &format!("dependency={layout}/deps")]);
@@ -527,6 +536,12 @@ impl Builder<'_> {
         }
         if proc_macro {
             a.extend(self.input.proc_macro_args.iter().cloned());
+        }
+        if host {
+            a.extend(self.input.host_args.iter().cloned());
+        }
+        if kind == UnitKind::CustomBuild {
+            a.extend(self.input.build_script_args.iter().cloned());
         }
 
         let mut env = self.pkg_env(pkg);
@@ -567,6 +582,7 @@ impl Builder<'_> {
             program: None,
             out_dir: None,
             cwd: None,
+            links: None,
         }
     }
 
@@ -618,40 +634,71 @@ impl Builder<'_> {
             outputs: Vec::new(),
             out_dir: Some(out_dir),
             cwd: Some(p.dir.clone()),
+            links: p.links.clone(),
         }
     }
 }
 
 /// The unit's final rustc arguments and environment: for a compile unit, with what its build
-/// script printed (`outputs`: run unit id → stdout); a run unit gets `DEP_<LINKS>_<KEY>` from
-/// the scripts of its `links` dependencies.
-pub fn finish(plan: &Plan, pkg_links: &dyn Fn(usize) -> Option<String>, id: usize, outputs: &HashMap<usize, String>) -> Result<Finished, String> {
+/// script printed (`outputs`: run unit id → stdout) and the `-L` paths of the scripts it links
+/// with; a run unit gets `DEP_<LINKS>_<KEY>` from the scripts of its `links` dependencies.
+pub fn finish(plan: &Plan, id: usize, outputs: &HashMap<usize, String>) -> Result<Finished, String> {
     let u = &plan.units[id];
     let (mut args, mut env) = (u.args.clone(), u.env.clone());
     let mut warnings = Vec::new();
+    let parse = |r: usize| BuildOutput::parse(outputs.get(&r).map(String::as_str).unwrap_or(""), &plan.units[r].name);
     match u.kind {
         UnitKind::RunCustomBuild => {
             for &d in &u.deps[1..] {
                 let dep = &plan.units[d];
-                let out = BuildOutput::parse(outputs.get(&d).map(String::as_str).unwrap_or(""), &dep.name)?;
-                let links = pkg_links(dep.pkg).unwrap_or_default().to_uppercase().replace('-', "_");
-                for (k, v) in out.metadata {
+                let links = dep.links.as_deref().unwrap_or_default().to_uppercase().replace('-', "_");
+                for (k, v) in parse(d)?.metadata {
                     env.insert(format!("DEP_{links}_{}", k.to_uppercase().replace('-', "_")), v);
                 }
             }
         }
         _ => {
-            if let Some(r) = u.build_output {
-                let out = BuildOutput::parse(outputs.get(&r).map(String::as_str).unwrap_or(""), &u.name)?;
-                if !out.errors.is_empty() {
-                    return Err(format!("build script of {} {} failed: {}", u.name, u.version, out.errors.join("; ")));
-                }
-                out.apply(&mut args, &mut env, u.kind == UnitKind::Bin);
-                warnings = out.warnings;
+            let mut out = match u.build_output {
+                Some(r) => parse(r)?,
+                None => BuildOutput::default(),
+            };
+            if !out.errors.is_empty() {
+                return Err(format!("build script of {} {} failed: {}", u.name, u.version, out.errors.join("; ")));
             }
+            // cargo's `to_link`: link-search paths come from the unit's own script, then from
+            // those of the target-side libs it links with, transitively.
+            let mut search = std::mem::take(&mut out.link_search);
+            for r in to_link(plan, id).into_iter().filter(|&r| Some(r) != u.build_output) {
+                search.extend(parse(r)?.link_search);
+            }
+            out.link_search = search;
+            out.apply(&mut args, &mut env, u.kind == UnitKind::Bin);
+            warnings = out.warnings;
         }
     }
     Ok(Finished { args, env, warnings })
+}
+
+/// The run units whose `-L` paths a compile unit gets, in cargo's order, without repeats.
+fn to_link(plan: &Plan, id: usize) -> Vec<usize> {
+    fn walk(plan: &Plan, id: usize, out: &mut Vec<usize>) {
+        let u = &plan.units[id];
+        if let Some(r) = u.build_output {
+            if !out.contains(&r) {
+                out.push(r);
+            }
+        }
+        for &d in &u.deps {
+            let dep = &plan.units[d];
+            // Proc macros and host-side libs aren't linked into the unit.
+            if dep.kind == UnitKind::Lib && !dep.host {
+                walk(plan, d, out);
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(plan, id, &mut out);
+    out
 }
 
 #[derive(Serialize, Debug)]

@@ -1,6 +1,7 @@
 // tools/prebuild (WP-18): fill the L2 build cache natively. It runs the browser's `cargo build`
 // (web/build/cargo.ts: same resolver, planner, cache keys and bundles) with a host that runs the
-// release's own rustc.wasm and wasm-ld.wasm under wasmtime, and build scripts under wasmtime too.
+// release's own rustc.wasm and wasm-ld.wasm under wasmtime, and build scripts under Node's WASI (in
+// a worker thread, so that their rustc probes can block on the host's answer, WP-21).
 // The guest sees a directory on disk as `/`, laid out like the browser's VFS (/sysroot, /deps,
 // /target, the project at /<name>), so outputs are bit-identical to a browser build.
 //
@@ -12,9 +13,10 @@
 // which scripts/verify/wp-18.sh compares with a browser build's. Built by scripts/build-prebuild.mjs.
 
 import { spawn } from 'node:child_process';
+import { Worker } from 'node:worker_threads';
 import { brotliDecompressSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { closeSync, cpSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { type BuildFs, type BuildHost, cargoBuild, type BuildResult } from '../../web/build/cargo';
@@ -23,7 +25,7 @@ import type { ByteStore } from '../../web/deps/cache';
 import { Resolver } from '../../web/deps/resolver';
 import { readTar } from '../../web/orchestrator/tar';
 import type { Manifest } from '../../web/orchestrator/toolchain';
-import { linkerSpawnError, outputDestination, parseLinkCommand, rewriteOutputs, wasmLdArgs } from '../../web/link/link-args';
+import { absolute, linkerSpawnError, outputDestination, parseLinkCommand, rewriteOutputs, wasmLdArgs } from '../../web/link/link-args';
 import { Kind } from '../../web/vfs/vfs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -102,6 +104,7 @@ class DiskFs implements BuildFs {
   readText(path: string) { return readFileSync(this.p(path), 'utf8'); }
   writeFile(path: string, data: Uint8Array | string) { mkdirSync(dirname(this.p(path)), { recursive: true }); writeFileSync(this.p(path), data); }
   mkdirAll(path: string) { mkdirSync(this.p(path), { recursive: true }); }
+  removeAll(path: string) { rmSync(this.p(path), { recursive: true, force: true }); }
   readdir(path: string) {
     return readdirSync(this.p(path), { withFileTypes: true }).map(e => ({ name: e.name, ino: 0, kind: e.isDirectory() ? Kind.Dir : e.isSymbolicLink() ? Kind.Symlink : Kind.File }));
   }
@@ -118,9 +121,10 @@ class DiskStore implements ByteStore {
   }
 }
 
-function run(cmd: string, args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
+function run(cmd: string, args: string[], input?: string): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((ok, fail) => {
-    const c = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const c = spawn(cmd, args, { stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] });
+    if (input !== undefined) c.stdin!.end(input);
     const out: Buffer[] = [], err: Buffer[] = [];
     c.stdout.on('data', d => out.push(d));
     c.stderr.on('data', d => err.push(d));
@@ -134,9 +138,83 @@ function run(cmd: string, args: string[]): Promise<{ code: number; stdout: strin
 const quiet = (s: string) => s.split('\n').filter(l => !l.startsWith('WARNING: the `-Sthreads`') && !/^ +$/.test(l)).join('\n')
   .replace(/^Error: (?:failed to run main module|error while executing at wasm backtrace)[\s\S]*?wasm trap: wasm `unreachable` instruction executed\n?/m,
     t => (/^\s+0: [^\n]*!abort$/m.test(t) ? '' : t));
-const threaded = (argv0: string, module: string, env: Record<string, string>, args: string[]) =>
+const threaded = (argv0: string, module: string, env: Record<string, string>, args: string[], input?: string) =>
   run(WASMTIME_THREADS, ['run', '-W', 'threads=y,shared-memory=y,exceptions=y', '-S', 'threads=y', '--dir', `${root}::/`,
-    ...Object.entries(env).flatMap(([k, v]) => ['--env', `${k}=${v}`]), '--argv0', argv0, module, ...args]);
+    ...Object.entries(env).flatMap(([k, v]) => ['--env', `${k}=${v}`]), '--argv0', argv0, module, ...args], input);
+
+/**
+ * A build script's probe (WP-21): one request to rustc-multi's server mode, which takes a working
+ * directory and stdin per request, like the browser's compile servers.
+ */
+async function probe(module: string, env: Record<string, string>, args: string[], io: { cwd?: string; stdin?: string }) {
+  const req = JSON.stringify({ id: 1, args, ...(io.cwd && { cwd: io.cwd }), ...(io.stdin !== undefined && { stdin: io.stdin }) });
+  const r = await threaded('/sysroot/bin/rustc', module, env, ['--server'], `${req}\n{"id":2,"quit":true}\n`);
+  const lines = r.stdout.split('\n'), at = lines.findIndex(l => l.startsWith('{"') && JSON.parse(l).id === 1);
+  if (at < 0) return { code: 101, stdout: '', stderr: quiet(r.stderr) };
+  const err = quiet(r.stderr);
+  return { code: JSON.parse(lines[at]).exit as number, stdout: lines.slice(0, at).map(l => l + '\n').join(''), stderr: err.slice(0, Math.max(0, err.indexOf('\x1e1'))) };
+}
+
+/**
+ * Runs in a worker thread: a build script under node:wasi, its stdout and stderr in files. A host
+ * call (`rust_bs.run`) posts the request and waits on the channel: i32 state, u32 length, answer.
+ */
+const SCRIPT_WORKER = `
+const { workerData: w, parentPort } = require('node:worker_threads');
+const { WASI } = require('node:wasi');
+const { readFileSync } = require('node:fs');
+const st = new Int32Array(w.channel, 0, 2);
+let memory, last = new Uint8Array();
+const rust_bs = {
+  run(ptr, len) {
+    Atomics.store(st, 0, 0);
+    parentPort.postMessage(new Uint8Array(memory.buffer, ptr, len).slice());
+    Atomics.wait(st, 0, 0);
+    last = new Uint8Array(w.channel, 8, Atomics.load(st, 1)).slice();
+    return last.length;
+  },
+  take(ptr) { new Uint8Array(memory.buffer, ptr, last.length).set(last); },
+};
+const wasi = new WASI({ version: 'preview1', args: w.args, env: w.env, preopens: w.preopens, stdout: w.stdout, stderr: w.stderr, returnOnExit: true });
+const inst = new WebAssembly.Instance(new WebAssembly.Module(readFileSync(w.program)), { wasi_snapshot_preview1: wasi.wasiImport, rust_bs });
+memory = inst.exports.memory;
+let code, trap;
+try { code = wasi.start(inst); } catch (e) { code = 134; trap = String(e); }
+parentPort.postMessage({ code, trap });
+`;
+
+function runScriptWorker(o: { program: string; args: string[]; env: string[]; preopens: Record<string, string>; call: (req: Uint8Array) => Promise<Uint8Array> }) {
+  const tmp = join(work, 'scripts');
+  mkdirSync(tmp, { recursive: true });
+  const n = ++scriptCount, outFile = join(tmp, `${n}.out`), errFile = join(tmp, `${n}.err`);
+  const stdout = openSync(outFile, 'w'), stderr = openSync(errFile, 'w');
+  const channel = new SharedArrayBuffer(1 << 16, { maxByteLength: 1 << 30 });
+  const env = Object.fromEntries(o.env.map(e => [e.slice(0, e.indexOf('=')), e.slice(e.indexOf('=') + 1)]));
+  const worker = new Worker(SCRIPT_WORKER, { eval: true, workerData: { program: o.program, args: o.args, env, preopens: o.preopens, stdout, stderr, channel } });
+  return new Promise<{ code: number; trap?: string; stdout: string; stderr: string }>((ok, fail) => {
+    worker.on('message', (m: Uint8Array | { code: number; trap?: string }) => {
+      if (m instanceof Uint8Array) {
+        o.call(m).then(resp => {
+          if (8 + resp.length > channel.byteLength) channel.grow(8 + resp.length);
+          new Uint8Array(channel, 8, resp.length).set(resp);
+          const st = new Int32Array(channel, 0, 2);
+          Atomics.store(st, 1, resp.length);
+          Atomics.store(st, 0, 1);
+          Atomics.notify(st, 0);
+        }, fail);
+        return;
+      }
+      closeSync(stdout);
+      closeSync(stderr);
+      ok({ code: m.code, trap: m.trap, stdout: readFileSync(outFile, 'utf8'), stderr: readFileSync(errFile, 'utf8') });
+      rmSync(outFile);
+      rmSync(errFile);
+      worker.terminate();
+    });
+    worker.on('error', fail);
+  });
+}
+let scriptCount = 0;
 
 let jobCount = 0;
 let free = jobs;
@@ -156,13 +234,14 @@ function diskHost(): BuildHost {
     vfs: fs, rustcId: RUSTC_ID, workers: jobs,
     // Orchestrator.run, on disk: outputs go to a scratch dir, rustc stops at the link step, wasm-ld
     // links, the results move into place.
-    rustc: (user, env) => slot(async () => {
+    rustc: (user, env, io) => slot(async () => {
       const t0 = performance.now();
       const scratch = `/tmp/job-${++jobCount}`, linkFile = `${scratch}/link-args`;
       fs.mkdirAll(scratch);
       try {
         const plan = rewriteOutputs(user, scratch, linkFile);
-        const r = await threaded('/sysroot/bin/rustc', rustcWasm, { RUST_MIN_STACK: '16777216', ...env }, plan.args);
+        const renv = { RUST_MIN_STACK: '16777216', ...env };
+        const r = io ? await probe(rustcWasm, renv, plan.args, io) : await threaded('/sysroot/bin/rustc', rustcWasm, renv, plan.args);
         const ms = Math.round(performance.now() - t0);
         let code = r.code, stderr = quiet(r.stderr);
         if (code !== 0 && fs.exists(linkFile)) {
@@ -178,27 +257,30 @@ function diskHost(): BuildHost {
           for (const e of fs.readdir(scratch)) {
             const dst = outputDestination(plan, e.name);
             if (!dst || e.kind !== Kind.File || e.name === 'link-args') continue;
-            const to = dst.startsWith('./') ? dst.slice(1) : dst.startsWith('/') ? dst : `/${dst}`;
+            const to = absolute(dst, io?.cwd);
             fs.mkdirAll(dirname(to));
             renameSync(join(root, scratch, e.name), join(root, to));
           }
         }
-        return { code, stderr, ms: { rustc: ms } };
+        return { code, stderr, stdout: r.stdout, ms: { rustc: ms } };
       } finally {
         rmSync(join(root, scratch), { recursive: true, force: true });
       }
     }),
-    // The sandbox, on disk: the package dir and an empty OUT_DIR, nothing else.
-    runScript: o => slot(async () => {
+    // The sandbox, on disk: the package dir and an empty OUT_DIR, nothing else. Its probes share
+    // the disk, so OUT_DIR needs no copying. Not inside `slot`: a probe takes a slot of its own.
+    runScript: async o => {
       rmSync(join(root, o.outDir), { recursive: true, force: true });
       fs.mkdirAll(o.outDir);
-      const r = await run(WASMTIME, ['run', '--dir', `${join(root, o.pkgDir)}::${o.pkgDir}`, '--dir', `${join(root, o.outDir)}::${o.outDir}`,
-        ...o.env.flatMap(e => ['--env', e]), '--argv0', o.args[0], join(root, o.program), ...o.args.slice(1)]);
+      const r = await runScriptWorker({
+        program: join(root, o.program), args: o.args, env: o.env, call: o.call,
+        preopens: { [o.pkgDir]: join(root, o.pkgDir), [o.outDir]: join(root, o.outDir) },
+      });
       const files: Record<string, Uint8Array> = {};
       const walk = (d: string) => { for (const e of fs.readdir(d)) { const p = `${d}/${e.name}`; if (e.kind === Kind.Dir) walk(p); else if (e.kind === Kind.File) files[p] = fs.readFile(p); } };
       walk(o.outDir);
-      return { code: r.code, stdout: r.stdout, stderr: r.stderr, files };
-    }),
+      return { code: r.code, trap: r.trap, stdout: r.stdout, stderr: r.stderr, files };
+    },
   };
 }
 
@@ -225,8 +307,8 @@ for (const c of cases) {
   const project = `/${name}`;
   rmSync(join(root, name), { recursive: true, force: true });
   mkdirSync(join(root, name), { recursive: true });
-  cpSync(join(c, 'Cargo.toml'), join(root, name, 'Cargo.toml'));
-  cpSync(join(c, 'src'), join(root, name, 'src'), { recursive: true });
+  // The case's own files (path packages too), not what record.sh keeps next to them.
+  cpSync(c, join(root, name), { recursive: true, filter: f => !['crates', 'build-output', 'cargo-vv.jsonl', 'target'].includes(f.slice(c.length + 1).split('/')[0]) });
   const store = new DiskStore(outDir, rebuild);
   const t0 = performance.now();
   const r: BuildResult = await cargoBuild(host, {
@@ -237,7 +319,7 @@ for (const c of cases) {
   const ran = bin ? await run(WASMTIME, ['run', join(root, bin)]) : null;
   const counts = r.units.reduce((a: Record<string, number>, u) => { const k = u.cached ?? 'built'; a[k] = (a[k] ?? 0) + 1; return a; }, {});
   console.log(`[${name}] ${r.packages} packages, ${r.units.length} units (${Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(', ')}) in ${Math.round(performance.now() - t0)} ms; run: exit ${ran?.code}`);
-  report.cases[name] = { ok: r.ok, ms: r.ms, run: ran, units: r.units.map(u => ({ name: u.name, version: u.version, kind: u.kind, key: u.key, cached: u.cached, files: u.files })) };
+  report.cases[name] = { ok: r.ok, ms: r.ms, run: ran, units: r.units.map(u => ({ name: u.name, version: u.version, kind: u.kind, key: u.key, cached: u.cached, files: u.files, stdout: u.stdout })) };
 }
 // Every stored bundle must still decode (a cheap check that writes completed).
 for (const c of Object.values(report.cases) as { units: { key: string }[] }[])

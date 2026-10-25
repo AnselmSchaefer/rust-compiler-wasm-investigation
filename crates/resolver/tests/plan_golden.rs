@@ -159,6 +159,8 @@ fn check_case(case: &Path, index: &Path) -> Vec<String> {
         target_flag_for_host: false,
         tools: Tools { jobs: 12, ..Tools::default() },
         proc_macro_args: Vec::new(),
+        host_args: Vec::new(),
+        build_script_args: Vec::new(),
     };
     let p = plan(&input).unwrap_or_else(|e| panic!("{}: {e}", case.display()));
 
@@ -171,10 +173,9 @@ fn check_case(case: &Path, index: &Path) -> Vec<String> {
             outputs.insert(u.id, std::fs::read_to_string(&f).unwrap_or_else(|_| panic!("no {}", f.display())));
         }
     }
-    let links = |_: usize| None;
     let mut ours = BTreeMap::new();
     for u in &p.units {
-        let f = finish(&p, &links, u.id, &outputs).unwrap();
+        let f = finish(&p, u.id, &outputs).unwrap();
         let env: BTreeMap<String, String> = f.env.iter().map(|(k, v)| (k.clone(), unhash(v))).collect();
         let key = match u.kind {
             UnitKind::RunCustomBuild => format!("run {}", u.name),

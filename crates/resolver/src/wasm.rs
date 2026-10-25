@@ -35,8 +35,8 @@ struct State {
     /// name → index file (None: the package doesn't exist).
     files: HashMap<String, Option<Vec<u8>>>,
     cache: IndexCache,
-    /// The last plan, with each package's `links`.
-    plan: Option<(crate::plan::Plan, Vec<Option<String>>)>,
+    /// The last plan.
+    plan: Option<crate::plan::Plan>,
 }
 
 thread_local! {
@@ -178,14 +178,7 @@ pub unsafe extern "C" fn planner_plan(input: *mut u8, len: usize) -> u64 {
             Err(e) => json!({ "error": e }),
             Ok(plan) => {
                 let v = json!({ "plan": &plan });
-                let links = input
-                    .packages
-                    .iter()
-                    .map(|p| p.manifest.as_deref().and_then(|m| toml::from_str::<toml::Table>(m).ok()).and_then(|t| {
-                        t.get("package")?.get("links")?.as_str().map(String::from)
-                    }))
-                    .collect();
-                STATE.with_borrow_mut(|s| s.plan = Some((plan, links)));
+                STATE.with_borrow_mut(|s| s.plan = Some(plan));
                 v
             }
         },
@@ -200,7 +193,7 @@ pub unsafe extern "C" fn planner_finish(input: *mut u8, len: usize) -> u64 {
     use serde_json::{Value, json};
     let input: Value = serde_json::from_slice(&unsafe { take(input, len) }).unwrap_or_default();
     let out = STATE.with_borrow(|s| {
-        let Some((plan, links)) = &s.plan else { return json!({ "error": "no plan" }) };
+        let Some(plan) = &s.plan else { return json!({ "error": "no plan" }) };
         let Some(id) = input["unit"].as_u64().map(|i| i as usize).filter(|&i| i < plan.units.len()) else {
             return json!({ "error": "bad unit" });
         };
@@ -210,7 +203,7 @@ pub unsafe extern "C" fn planner_finish(input: *mut u8, len: usize) -> u64 {
             .flatten()
             .filter_map(|(k, v)| Some((k.parse().ok()?, v.as_str()?.to_string())))
             .collect();
-        match crate::plan::finish(plan, &|p| links.get(p).cloned().flatten(), id, &outputs) {
+        match crate::plan::finish(plan, id, &outputs) {
             Ok(f) => json!(f),
             Err(e) => json!({ "error": e }),
         }

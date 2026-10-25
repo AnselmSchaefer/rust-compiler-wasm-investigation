@@ -14,6 +14,8 @@ for (const [name, list] of Object.entries(browser.units)) {
     if (!n) { bad++; console.log(`  MISSING in prebuild: ${name}: ${id}`); continue; }
     if (n.key !== u.key) { bad++; console.log(`  KEY ${name}: ${id}: browser ${u.key.slice(0, 12)} wasmtime ${n.key.slice(0, 12)}`); continue; }
     const diff = Object.keys({ ...u.files, ...n.files }).filter(f => u.files[f] !== n.files[f]);
+    // A build script's stdout is the part of its output that its package's compile reads (WP-21).
+    if ((u.stdout ?? '') !== (n.stdout ?? '')) diff.push('stdout');
     if (diff.length) { bad++; console.log(`  OUTPUT ${name}: ${id}: ${diff.join(', ')}`); continue; }
     if (u.name !== name) crates.add(`${u.name} ${u.version}`);
   }

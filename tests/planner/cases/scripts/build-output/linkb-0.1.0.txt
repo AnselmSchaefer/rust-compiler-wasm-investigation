@@ -1,0 +1,2 @@
+cargo:rustc-env=LINKB_GREETING=hello from linka
+cargo:rustc-env=LINKB_INCLUDE_DIR=true

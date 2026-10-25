@@ -1,0 +1,15 @@
+# WP-21 planner case: build scripts. autocfg (num-traits), `rustc --version` probes (rustversion,
+# libc), compile probes (proc-macro2, anyhow), and `links`: linka's script sets metadata and a
+# link-search path that linkb's script and compile see (DEP_LINKA_*, -L).
+[package]
+name = "scripts"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+num-traits = "0.2"
+rustversion = "1"
+libc = "0.2"
+proc-macro2 = "1"
+anyhow = "1"
+linkb = { path = "linkb" }

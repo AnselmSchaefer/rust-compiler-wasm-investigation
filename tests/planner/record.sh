@@ -38,18 +38,25 @@ for d in "$REG"/*/; do
   cp "$d/Cargo.toml" "$SRC/crates/$n/"
   (cd "$d" && find . -type f ! -name .cargo-ok | sed 's#^\./##' | LC_ALL=C sort) > "$SRC/crates/$n/files.txt"
 done
+# <name>-<version> of a package: a registry crate, else a path package of the case (CARGO_PKG_VERSION).
+pkgver() {
+  local v
+  v=$(grep -o "\$REG/$1-[0-9][^/\" ]*" "$SRC/cargo-vv.jsonl" | head -1 | sed "s#\$REG/##" || true)
+  [ -n "$v" ] || v="$1-$(grep "\"CARGO_PKG_NAME\": \"$1\"" "$SRC/cargo-vv.jsonl" | head -1 | grep -o '"CARGO_PKG_VERSION": "[^"]*"' | cut -d'"' -f4)"
+  echo "$v"
+}
 # Build-script output of each target-kind run: target/wasm32-wasip1/debug/build/<pkg>-<hash>/output
 for o in "$W"/root/target/wasm32-wasip1/debug/build/*/output; do
   [ -f "$o" ] || continue
   pkg=$(basename "$(dirname "$o")"); pkg=${pkg%-*}
-  ver=$(grep -o "\$REG/$pkg-[0-9][^/\" ]*" "$SRC/cargo-vv.jsonl" | head -1 | sed "s#\$REG/##")
+  ver=$(pkgver "$pkg")
   norm < "$o" > "$SRC/build-output/$ver.txt"
 done
 # Host-side runs (build scripts of build dependencies and proc macros): target/debug/build/.
 for o in "$W"/root/target/debug/build/*/output; do
   [ -f "$o" ] || continue
   pkg=$(basename "$(dirname "$o")"); pkg=${pkg%-*}
-  ver=$(grep -o "\$REG/$pkg-[0-9][^/\" ]*" "$SRC/cargo-vv.jsonl" | head -1 | sed "s#\$REG/##")
+  ver=$(pkgver "$pkg")
   norm < "$o" > "$SRC/build-output/$ver.host.txt"
 done
 echo "recorded $CASE: $(wc -l < "$SRC/cargo-vv.jsonl") invocations, $(ls "$SRC/crates" | wc -l) crates, $(ls "$SRC/build-output" | wc -l) build-script outputs"

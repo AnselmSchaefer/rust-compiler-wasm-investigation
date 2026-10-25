@@ -19,6 +19,7 @@ await build({
     'sandbox-worker': 'web/sandbox/sandbox-worker.ts',
   },
   outdir: out, bundle: true, format: 'esm', target: 'es2024', minify: true, sourcemap: true, logLevel: 'warning',
+  loader: { '.rs': 'text' },
   define: { __RELEASE__: JSON.stringify(release) },
 });
 await build({ entryPoints: { main: 'app/style.css' }, outdir: out, bundle: true, minify: true, logLevel: 'warning' });

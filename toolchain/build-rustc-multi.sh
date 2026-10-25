@@ -36,7 +36,7 @@ build() {
     "${flags[@]}" "${deps[@]}" "${native[@]}" \
     --extern rustc_driver="$DRIVER" --extern rustc_session="$(lib rustc_session)" --extern serde_json="$(lib serde_json)" \
     --extern rustc_interface="$(lib rustc_interface)" --extern rustc_metadata="$(lib rustc_metadata)" \
-    --extern rustc_proc_macro="$(lib rustc_proc_macro)" \
+    --extern rustc_proc_macro="$(lib rustc_proc_macro)" --extern rustc_span="$(lib rustc_span)" \
     -C link-arg=-Wl,--export-table --check-cfg 'cfg(rust_pm_stub)' "$@"
 }
 build "$ROOT/toolchain/rustc-multi/main.rs" -o "$OUT/rustc-multi.wasm"

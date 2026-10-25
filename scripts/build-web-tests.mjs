@@ -31,6 +31,8 @@ for (const [name, { src, entries, assets }] of Object.entries(pages)) {
     // Output name → source (relative to the page dir), so outputs land flat in `out`.
     entryPoints: Object.fromEntries(Object.entries(entries).map(([o, i]) => [o, `${src}/${i}.ts`])),
     outdir: out, bundle: true, format: 'esm', target: 'es2024', sourcemap: true, logLevel: 'warning',
+    // WP-21: the build-script std's source (web/build/bs-std/lib.rs) is bundled as text.
+    loader: { '.rs': 'text' },
   });
   await copyFile(`${src}/index.html`, `${out}/index.html`);
   for (const [to, from] of Object.entries(assets)) await copyFile(from, `${out}/${to}`);

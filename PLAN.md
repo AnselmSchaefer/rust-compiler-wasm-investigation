@@ -331,6 +331,7 @@ These are taken as defaults so work can start. Changing one later only affects t
   - Override list for known-unsupportable scripts.
 - **Done when:** crates with `autocfg`, `rustversion`, `libc` and `proc-macro2`-style build scripts build in the browser.
   - *2026-10-25:* the first three tasks and the parser are done in WP-17 (`web/build/cargo.ts`, `crates/resolver/src/plan/build_output.rs`). Left: routing `rustc` spawns (scripts now see `Command` fail), the working directory (now `/`, not the package dir), `DEP_<links>_*` and `-L` from dependencies' scripts (planned, untested), and the override list.
+  - *2026-10-25 (session 22):* scripts are compiled against a build-script std outside the Rust tree (`web/build/bs-std/lib.rs`: a crate named `std`, passed as `--extern std=`, re-exporting the real one with its own `process`), whose `Command` sends `rustc` runs to a compile server (rustc-multi requests now take cwd and stdin). Package dir as working directory, `DEP_<links>_*` and dependencies' `-L` match cargo (golden case `scripts`), override list mechanism (empty list). See `docs/build-scripts.md`.
 
 #### WP-22 Ecosystem matrix → **M1** (repeatable WP)
 - **Depends:** WP-21 · **Est.:** 3–5 sessions (repeat until the target is met)

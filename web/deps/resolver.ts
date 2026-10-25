@@ -32,12 +32,16 @@ export interface PlanInput {
   tools?: { cargo?: string; rustc?: string; rustdoc?: string; jobs?: number };
   /** Extra rustc arguments for proc-macro units (WP-20). */
   proc_macro_args?: string[];
+  /** Extra rustc arguments for every host-side compile, and for build-script compiles (WP-21). */
+  host_args?: string[]; build_script_args?: string[];
 }
 export type UnitKind = 'lib' | 'bin' | 'custom-build' | 'run-custom-build';
 export interface PlanUnit {
   id: number; pkg: number; name: string; version: string; kind: UnitKind; crate_name: string; host: boolean;
   features: string[]; hash: string; deps: number[]; args: string[]; env: Record<string, string>;
   build_output: number | null; outputs: string[]; program: string | null; out_dir: string | null; cwd: string | null;
+  /** Run units: the package's `links`. */
+  links: string | null;
 }
 export interface Plan { units: PlanUnit[]; bins: [string, number][] }
 export interface Finished { args: string[]; env: Record<string, string>; warnings: string[] }

@@ -1,0 +1,6 @@
+[package]
+name = "linka"
+version = "0.1.0"
+edition = "2021"
+links = "linka"
+build = "build.rs"

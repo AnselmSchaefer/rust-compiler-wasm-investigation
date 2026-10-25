@@ -11,26 +11,43 @@
 // into L1. The host is the browser (browser-host.ts) or wasmtime (tools/prebuild), so both build
 // the same plan with the same keys.
 //
+// WP-21: host-side units (build scripts and what they use, proc macros) are compiled against the
+// build-script std (bs-std/lib.rs; a cached unit of its own, built first), whose `Command` sends
+// `rustc` runs back here (spawn.ts). Scripts run in their package dir. A package on the override
+// list (overrides.ts) doesn't run its script: the listed output stands in for it.
+//
 // Paths: the project at `project` (a package or a workspace, WP-25), crates under
 // /deps/<name>-<version>/, outputs under /target/ (shared by all projects) in cargo's layout.
 
 import { fetchDependencies, type DepsOptions, type DepsResult } from '../deps/deps';
 import type { Plan, PlanInput, PlanUnit, Resolver } from '../deps/resolver';
 import { Kind, type Vfs } from '../vfs/vfs';
-import { type Bundle, type CacheLevel, makeBundle, sourceId, type UnitCache, unitKey } from './cache';
+import { type Bundle, type CacheLevel, makeBundle, sha256, sourceId, type UnitCache, unitKey } from './cache';
+import BS_STD from './bs-std/lib.rs';
+import { findOverride, type Override } from './overrides';
+import { decodeSpawn, encodeSpawnResult, runSpawn } from './spawn';
 
 /** The files a build touches: the orchestrator's VFS, or a directory on disk (tools/prebuild). */
-export type BuildFs = Pick<Vfs, 'exists' | 'readFile' | 'readText' | 'writeFile' | 'readdir' | 'mkdirAll'>;
+export type BuildFs = Pick<Vfs, 'exists' | 'readFile' | 'readText' | 'writeFile' | 'readdir' | 'mkdirAll' | 'removeAll'>;
 
 /** Where units run: the browser (browser-host.ts) or wasmtime (tools/prebuild). */
 export interface BuildHost {
   vfs: BuildFs;
   rustcId: string;
   workers: number;
-  /** rustc with these args and env, linking if needed; outputs land where the args say. */
-  rustc(args: string[], env: Record<string, string>): Promise<{ code: number; stderr: string; ms: { rustc: number } }>;
-  /** A build script (wasm32-wasip1) with its package dir readable and an empty `outDir`; returns OUT_DIR's files. */
-  runScript(o: { program: string; args: string[]; env: string[]; pkgDir: string; outDir: string }):
+  /**
+   * rustc with these args and env, linking if needed; outputs land where the args say. `io`: a
+   * build script's probe, with its working directory and stdin (an input of `-`).
+   */
+  rustc(args: string[], env: Record<string, string>, io?: { cwd?: string; stdin?: string }):
+    Promise<{ code: number; stderr: string; stdout?: string; ms: { rustc: number } }>;
+  /**
+   * A build script (wasm32-wasip1) with its package dir readable and an empty `outDir`; returns
+   * OUT_DIR's files. `call` answers its host calls (a request in spawn.ts's format → the answer);
+   * the host makes sure rustc sees the script's OUT_DIR as it is at that moment, and the script
+   * sees what rustc wrote there.
+   */
+  runScript(o: { program: string; args: string[]; env: string[]; pkgDir: string; outDir: string; call: (req: Uint8Array) => Promise<Uint8Array> }):
     Promise<{ code: number | null; trap?: string; stdout: string; stderr: string; files: Record<string, Uint8Array> }>;
 }
 
@@ -51,6 +68,8 @@ export interface BuildOptions {
   defaultFeatures?: boolean;
   /** Overrides of cargo's dev profile. Default: no incremental (WP-27). */
   profile?: PlanInput['profile'];
+  /** Build scripts that don't run (overrides.ts); default: the built-in list. */
+  overrides?: Override[];
   onUnit?: (u: UnitReport) => void;
 }
 
@@ -64,6 +83,8 @@ export interface UnitReport {
   rustcMs?: number;
   /** Output path → sha256. */
   files: Record<string, string>;
+  /** Build-script runs: what the script printed (its `cargo:` lines). */
+  stdout?: string;
   warnings: string[];
 }
 
@@ -99,7 +120,8 @@ export async function cargoBuild(host: BuildHost, opts: BuildOptions): Promise<B
   const lockPath = `${opts.project}/Cargo.lock`;
   if (!vfs.exists(lockPath) || vfs.readText(lockPath) !== deps.lock) vfs.writeFile(lockPath, deps.lock);
   const t1 = performance.now();
-  const input = planInput(vfs, opts, deps, host);
+  const std = await hostStd(host, opts);
+  const input = planInput(vfs, opts, deps, host, std.path);
   const plan = opts.resolver.plan(input);
   const t2 = performance.now();
 
@@ -119,11 +141,12 @@ export async function cargoBuild(host: BuildHost, opts: BuildOptions): Promise<B
     let k = keys.get(u.id);
     if (!k) {
       keys.set(u.id, k = Promise.all([source(u.pkg), Promise.all(u.deps.map(d => keyOf(plan.units[d])))])
-        .then(([src, dk]) => unitKey({ rustcId: host.rustcId, kind: u.kind, args: u.args, env: u.env, source: src, deps: dk })));
+        .then(([src, dk]) => unitKey({ rustcId: host.rustcId, kind: u.kind, args: overridden(u) ? ['override', JSON.stringify(overridden(u))] : u.args, env: u.env, source: src, deps: dk })));
     }
     return k;
   };
 
+  const overridden = (u: PlanUnit) => (u.kind === 'run-custom-build' ? findOverride(opts.overrides, u.name, u.version) : undefined);
   const closure = (u: PlanUnit, seen = new Set<number>()): Set<number> => {
     for (const d of u.deps) if (!seen.has(d)) { seen.add(d); closure(plan.units[d], seen); }
     return seen;
@@ -140,7 +163,7 @@ export async function cargoBuild(host: BuildHost, opts: BuildOptions): Promise<B
       p = (async () => {
         const key = await keyOf(u);
         let start = performance.now() - t0;
-        const report = (r: { cached?: UnitReport['cached']; rustcMs?: number; files: Record<string, string>; warnings: string[] }) => {
+        const report = (r: { cached?: UnitReport['cached']; rustcMs?: number; files: Record<string, string>; stdout?: string; warnings: string[] }) => {
           const rep = { id: u.id, name: u.name, version: u.version, kind: u.kind, key, start: Math.round(start), end: Math.round(performance.now() - t0), ...r };
           units.push(rep);
           opts.onUnit?.(rep);
@@ -148,24 +171,27 @@ export async function cargoBuild(host: BuildHost, opts: BuildOptions): Promise<B
         const here = fresh.get(key);
         if (here && Object.keys(here.files).every(f => vfs.exists(f))) {
           if (here.stdout !== undefined) outputs[u.id] = here.stdout;
-          return report({ cached: 'fresh', files: here.files, warnings: [] });
+          return report({ cached: 'fresh', files: here.files, stdout: here.stdout, warnings: [] });
         }
         const hit = await opts.units?.get(key);
         if (hit) {
           restore(vfs, u, hit.bundle, outputs);
           const files = hashes(hit.bundle);
           fresh.set(key, { files, stdout: hit.bundle.stdout });
-          return report({ cached: hit.from, files, warnings: [] });
+          return report({ cached: hit.from, files, stdout: hit.bundle.stdout, warnings: [] });
         }
         // rustc reads the dependencies' dependencies too (-L dependency=), so a miss needs the
         // whole closure in place; a hit above didn't put its own dependencies there.
         await Promise.all([...closure(u)].map(d => unit(plan.units[d])));
         start = performance.now() - t0;
-        const r = u.kind === 'run-custom-build' ? await runBuildScript(host, opts.resolver, u, outputs) : await compile(host, opts.resolver, u, outputs);
+        if (plan.units.some(x => x.host && x.kind !== 'run-custom-build')) await std.ready();
+        const o = overridden(u);
+        const r = o ? await overrideBuildScript(host, u, o, outputs)
+          : u.kind === 'run-custom-build' ? await runBuildScript(host, opts.resolver, u, outputs) : await compile(host, opts.resolver, u, outputs);
         const files = hashes(r.bundle);
         fresh.set(key, { files, stdout: r.bundle.stdout });
         if (opts.units) stores.push(opts.units.put(key, r.bundle));
-        report({ rustcMs: r.rustcMs, files, warnings: r.warnings });
+        report({ rustcMs: r.rustcMs, files, stdout: r.bundle.stdout, warnings: r.warnings });
       })().catch(e => {
         if (e instanceof UnitError) errors.push(e.message);
         throw e;
@@ -211,7 +237,7 @@ function restore(vfs: BuildFs, u: PlanUnit, b: Bundle, outputs: Record<number, s
   }
 }
 
-function planInput(vfs: BuildFs, opts: BuildOptions, deps: DepsResult, host: BuildHost): PlanInput {
+function planInput(vfs: BuildFs, opts: BuildOptions, deps: DepsResult, host: BuildHost, std: string): PlanInput {
   const packages = deps.packages.map(p => {
     const dir = p.dir ?? `/deps/${p.name}-${p.version}`;
     const has = vfs.exists(`${dir}/Cargo.toml`);
@@ -229,6 +255,45 @@ function planInput(vfs: BuildFs, opts: BuildOptions, deps: DepsResult, host: Bui
     profile: { incremental: false, ...opts.profile },
     tools: { rustc: '/sysroot/bin/rustc', jobs: host.workers },
     proc_macro_args: PROC_MACRO_ARGS,
+    host_args: ['--extern', `std=${std}`],
+    build_script_args: BUILD_SCRIPT_ARGS,
+  };
+}
+
+/**
+ * Build scripts link the build-script std's constructor and stat wrappers (bs-std/lib.rs): `-u`
+ * pulls in its object, `--wrap` sends libc's stat calls through it.
+ */
+const BUILD_SCRIPT_ARGS = ['--undefined=__bs_std_init', ...['stat', 'lstat', 'fstat', 'fstatat'].map(f => `--wrap=${f}`)]
+  .flatMap(a => ['-C', `link-arg=${a}`]);
+
+/**
+ * The build-script std as a unit: its rlib at `<target>/bs-std/`, named by a hash of its source,
+ * from the cache or compiled (once, before the first host-side compile needs it).
+ */
+async function hostStd(host: BuildHost, opts: BuildOptions) {
+  const dir = `${opts.targetDir ?? '/target'}/bs-std`;
+  const h = (await sha256(BS_STD)).slice(0, 16);
+  const src = `${dir}/lib.rs`, path = `${dir}/libstd-${h}.rlib`;
+  const args = ['--crate-name', 'std', '--edition=2024', src, '--crate-type', 'rlib', '--emit=link', '-C', `metadata=bs-std-${h}`,
+    '-C', 'codegen-units=1', '-C', 'debuginfo=0', '--cap-lints', 'allow', '--target', TARGET, '-o', path];
+  const key = await unitKey({ rustcId: host.rustcId, kind: 'bs-std', args, env: {}, source: `bs-std:${h}`, deps: [] });
+  let ready: Promise<void> | undefined;
+  return {
+    path,
+    ready: () => ready ??= (async () => {
+      if (host.vfs.exists(path)) return;
+      const hit = await opts.units?.get(key);
+      if (hit) {
+        for (const f of hit.bundle.files) host.vfs.writeFile(f.path, f.data);
+        return;
+      }
+      host.vfs.mkdirAll(dir);
+      host.vfs.writeFile(src, BS_STD);
+      const r = await host.rustc(args, {});
+      if (r.code !== 0) throw new Error(`the build-script std didn't compile:\n${rendered(r.stderr)}`);
+      await opts.units?.put(key, await makeBundle([[path, host.vfs.readFile(path)]]));
+    })(),
   };
 }
 
@@ -303,12 +368,27 @@ function rendered(stderr: string) {
 async function runBuildScript(host: BuildHost, resolver: Resolver, u: PlanUnit, outputs: Record<number, string>) {
   const f = resolver.finish(u.id, outputs);
   const outDir = u.out_dir!;
-  const r = await host.runScript({ program: u.program!, args: [u.program!], env: Object.entries(f.env).map(([k, v]) => `${k}=${v}`), pkgDir: u.cwd!, outDir });
+  // rustc probes write here too (autocfg's --emit=llvm-ir); the bundle has only what the script left.
+  if (host.vfs.exists(outDir)) host.vfs.removeAll(outDir);
+  host.vfs.mkdirAll(outDir);
+  const call = async (req: Uint8Array) => encodeSpawnResult(await runSpawn(decodeSpawn(req), async (args, env, io) => {
+    const r = await host.rustc(args, env, io);
+    return { code: r.code, stdout: r.stdout ?? '', stderr: r.stderr };
+  }));
+  const r = await host.runScript({ program: u.program!, args: [u.program!], env: Object.entries(f.env).map(([k, v]) => `${k}=${v}`), pkgDir: u.cwd!, outDir, call });
   if (r.code !== 0) {
     throw new UnitError(`error: failed to run custom build command for \`${u.name} v${u.version}\` (exit ${r.code}${r.trap ? `, ${r.trap}` : ''})\n--- stdout\n${r.stdout}\n--- stderr\n${r.stderr}`);
   }
   const files = Object.entries(r.files).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   const bundle = await makeBundle(files, r.stdout);
+  if (host.vfs.exists(outDir)) host.vfs.removeAll(outDir);
+  restore(host.vfs, u, bundle, outputs);
+  return { warnings: [] as string[], bundle, rustcMs: undefined };
+}
+
+/** A build script on the override list: its listed output instead of a run. */
+async function overrideBuildScript(host: BuildHost, u: PlanUnit, o: Override, outputs: Record<number, string>) {
+  const bundle = await makeBundle(Object.entries(o.files ?? {}).map(([p, d]) => [`${u.out_dir}/${p}`, new TextEncoder().encode(d)]), o.stdout.replaceAll('$OUT_DIR', u.out_dir!));
   restore(host.vfs, u, bundle, outputs);
   return { warnings: [] as string[], bundle, rustcMs: undefined };
 }

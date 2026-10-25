@@ -1,0 +1,4 @@
+cargo:rustc-link-search=native=$TARGET/wasm32-wasip1/debug/build/linka-e292b47b08e31176/out/lib
+cargo:greeting=hello from linka
+cargo:include=$TARGET/wasm32-wasip1/debug/build/linka-e292b47b08e31176/out/include
+cargo:rustc-env=LINKA_CWD=linka

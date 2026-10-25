@@ -34,18 +34,18 @@ It is ported from cargo 0.100, so that it produces cargo's invocations, not just
 | `ws` (WP-25) | 15 | 15 | a virtual workspace: members by glob, an excluded path dependency, inheritance of package fields, dependencies and lints (`docs/projects.md`) | identical, Cargo.lock too |
 | `ws-root` (WP-25) | 3 | 3 | a root package whose path dependency becomes a member but isn't primary | identical, Cargo.lock too |
 | `derive` (WP-20) | 14 | 28 | proc macros: serde with `derive`, thiserror (serde_derive, thiserror-impl on the host side with syn/quote/proc-macro2), proc-macro2's host-side build script | identical, Cargo.lock too |
+| `scripts` (WP-21) | 10 | 24 | build scripts: autocfg (num-traits), rustversion (host side), libc, proc-macro2, anyhow; a `links` path pair: `DEP_LINKA_*`, `-L native=` from a dependency's script (transitively), `-C incremental` for path packages' build scripts | identical |
 
 ## Proc macros (WP-20)
 
 A proc-macro package's lib unit is built for the host side, as cargo does: `--crate-type proc-macro --emit=dep-info,link -C prefer-dynamic`, its dependencies as `.rlib`s (it links), `--extern proc_macro` after the other externs, output `<dll_prefix><crate>-<hash><dll_suffix>` in the host `deps` dir (`libx-H.so` natively, `x-H.wasm` for wasm32-wasip1; `cfg.rs` `TargetInfo`). Its dependents get `--extern name=<that file>`. In the browser, `PlanInput.proc_macro_args` (from `web/build/cargo.ts`) adds the link arguments that make the module loadable by the host in rustc.wasm, and `-C save-temps`; see `docs/proc-macro.md` (WP-20).
 
-## Build scripts (a slice of WP-21, moved forward)
+## Build scripts (WP-17's slice of WP-21; the rest in `docs/build-scripts.md`)
 
 All three build scripts in serde_json's graph are needed for the WP-17 crate set, so the basic path is done here. The script is compiled with `--target wasm32-wasip1` (the browser's rustc runs on wasm32-wasip1-threads, so host units get `--target` too: `target_flag_for_host`). It then runs in the sandbox with a copy of its package's files, cargo's environment and an empty `OUT_DIR`, which is copied back to the VFS. Its stdout goes to `<build dir>/output`, like cargo.
 
-- `Command::new(RUSTC)` fails under WASI. zmij and serde_core treat that as "unknown version" and emit no cfgs, which is the right result for 1.99, but they then skip their `rustc-check-cfg` lines (only lint noise, and capped anyway). Routing `rustc --version` to the compile server is WP-21.
-- The working directory is `/`, not the package directory (the sandbox's WASI has no cwd). Scripts that read relative paths need WP-21.
-- Not yet done: `DEP_<links>_<key>` env (the planner orders `links` scripts, and `finish` sets the variables, but untested), `-L` from dependencies' scripts, the override list, `rerun-if-*`.
+- WP-21: `Command::new(RUSTC)` reaches a compile server, scripts run in their package dir, and `DEP_<links>_<key>` and dependencies' `-L` are planned like cargo's (golden case `scripts`). Run units carry their package's `links`. `finish` takes `-L` paths from the unit's own script, then from the scripts of the target-side libs it links with, transitively (cargo's `to_link`). `PlanInput.host_args` / `build_script_args` add the build-script std (`--extern std=`) and its link arguments.
+- Not done: `rerun-if-*` (a run's cache key covers the whole package and its env, `docs/cache.md`).
 
 ## Compile server: per-request env
 

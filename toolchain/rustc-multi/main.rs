@@ -4,7 +4,8 @@
 //   rustc-multi <args> --next <args> ...      each group runs like `rustc <args>`; prints
 //                                             `rustc-multi: exit <code>` to stderr after each
 //   rustc-multi --server [--follow]           compile server: one JSON request per line on stdin,
-//                                             {"id": 1, "args": [...], "env": {...}} or
+//                                             {"id": 1, "args": [...], "env": {...}, "cwd": "/dir",
+//                                             "stdin": "..."} or
 //                                             {"id": 2, "quit": true}; answers
 //                                             {"id": 1, "exit": 0, "ms": 12.5} on stdout
 //
@@ -12,6 +13,8 @@
 // both streams per request. --follow: stdin is a file that the host appends to (the browser VFS),
 // so at its end, wait for more instead of stopping. "env" (optional) sets environment variables
 // for that request only, e.g. OUT_DIR and CARGO_PKG_* for env!() (the build planner, WP-17).
+// "cwd" and "stdin" (optional, WP-21) are a build script's `rustc` probe: its working directory,
+// and the source it pipes in for an input of `-` (the server's own stdin carries the requests).
 //
 // Each invocation goes through the same catch_with_exit_code that rustc_driver::main uses, plus a
 // catch_unwind for ICEs, which catch_with_exit_code re-raises. Built out of tree against
@@ -30,6 +33,7 @@ extern crate rustc_interface;
 extern crate rustc_metadata;
 extern crate rustc_proc_macro;
 extern crate rustc_session;
+extern crate rustc_span;
 extern crate serde_json;
 
 #[cfg(not(rust_pm_stub))]
@@ -40,24 +44,57 @@ use std::process::ExitCode;
 use std::time::{Duration, Instant};
 
 use rustc_session::EarlyDiagCtxt;
-use rustc_session::config::ErrorOutputType;
+use rustc_session::config::{ErrorOutputType, Input};
+use rustc_span::FileName;
 use serde_json::{Value, json};
 
 rustc_driver::override_c_allocator_in_binary!();
 
-struct Callbacks;
+/// Stands in for an input of `-` when a request brings its own stdin: rustc would read the
+/// server's stdin before any callback runs.
+const STDIN_INPUT: &str = "/\u{1}rustc-multi-stdin";
+
+struct Callbacks {
+    stdin: Option<String>,
+    /// Entered once the session options are built: rustc looks for `lib/rustlib` relative to
+    /// the working directory when it finds its sysroot (there's no dll_path on WASI).
+    cwd: Option<String>,
+}
 impl rustc_driver::Callbacks for Callbacks {
     fn config(&mut self, config: &mut rustc_interface::Config) {
         // Proc macros are wasm32-wasip1 modules here (pm.rs); no `-Z` flag or RUSTC_BOOTSTRAP needed.
         config.opts.unstable_opts.wasm_proc_macros = true;
+        if let Some(d) = &self.cwd {
+            if let Err(e) = std::env::set_current_dir(d) {
+                eprintln!("rustc-multi: cwd {d}: {e}");
+            }
+        }
+        if let (Input::File(p), Some(src)) = (&config.input, &self.stdin) {
+            if p.as_os_str() == STDIN_INPUT {
+                // What rustc's make_input builds from real stdin.
+                config.input = Input::Str { name: FileName::anon_source_code(src), input: src.clone() };
+            }
+        }
     }
 }
 
 /// Runs one rustc invocation; `argv[0]` is the program name. Returns 0, 1 (errors) or 101 (ICE).
 fn compile(argv: &[String]) -> u8 {
-    let r = std::panic::catch_unwind(|| {
-        rustc_driver::catch_with_exit_code(|| rustc_driver::run_compiler(argv, &mut Callbacks))
-    });
+    compile_with(argv, Callbacks { stdin: None, cwd: None })
+}
+
+/// With a request's stdin (the source for an input of `-`) and working directory.
+fn compile_with(argv: &[String], mut callbacks: Callbacks) -> u8 {
+    let mut argv = argv.to_vec();
+    if callbacks.stdin.is_some() {
+        if let Some(i) = argv.iter().rposition(|a| a == "-") {
+            argv[i] = STDIN_INPUT.into();
+        }
+    }
+    // An ICE leaves nothing in the callbacks that a later request would read.
+    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        rustc_driver::catch_with_exit_code(|| rustc_driver::run_compiler(&argv, &mut callbacks))
+    }));
     // ExitCode has no accessor; SUCCESS is the only code we need to tell apart.
     match r {
         Ok(c) if c == ExitCode::SUCCESS => 0,
@@ -110,8 +147,14 @@ fn serve(argv0: &str, follow: bool) -> ExitCode {
             .collect();
         let env = req.get("env").and_then(Value::as_object);
         let saved = env.map(|e| set_env(e)).unwrap_or_default();
+        let cwd = req.get("cwd").and_then(Value::as_str).map(String::from);
+        let stdin = req.get("stdin").and_then(Value::as_str).map(String::from);
+        let home = std::env::current_dir().ok();
         let t0 = Instant::now();
-        let code = compile(&argv);
+        let code = compile_with(&argv, Callbacks { stdin, cwd });
+        if let Some(h) = home {
+            let _ = std::env::set_current_dir(h);
+        }
         restore_env(saved);
         let ms = t0.elapsed().as_secs_f64() * 1000.0;
         eprintln!("\x1e{id}");

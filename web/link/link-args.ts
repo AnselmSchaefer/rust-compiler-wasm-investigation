@@ -125,6 +125,17 @@ export function outputDestination(plan: OutputPlan, name: string): string | null
   return `${dir}/${name}`;
 }
 
+/** A path as rustc saw it, made absolute against its working directory. */
+export function absolute(p: string, cwd = '/'): string {
+  if (p.startsWith('/')) return p;
+  const parts = (cwd === '/' ? '' : cwd).split('/');
+  for (const s of p.split('/')) {
+    if (s === '..') parts.pop();
+    else if (s && s !== '.') parts.push(s);
+  }
+  return parts.join('/') || '/';
+}
+
 const SPAWN_FAILED = /^(linker `[^`]*` not found|could not exec the linker)/;
 
 /**

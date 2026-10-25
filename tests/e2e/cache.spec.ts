@@ -75,7 +75,7 @@ test('build cache: cold, second build, edit → run, L2', async ({ page }, info)
   for (const s of cold) {
     check(s, expected[s.name]);
     result.steps[`cold/${s.name}`] = summary(s);
-    result.units[s.name] = s.build.units.map((u: any) => ({ name: u.name, version: u.version, kind: u.kind, key: u.key, cached: u.cached, files: u.files }));
+    result.units[s.name] = s.build.units.map((u: any) => ({ name: u.name, version: u.version, kind: u.kind, key: u.key, cached: u.cached, files: u.files, stdout: u.stdout }));
   }
 
   // 2. Reload, build again: everything comes from L1 (only what the bins need is restored).

@@ -1,0 +1,413 @@
+{
+  "release": "1.99.1-7520bf319596",
+  "units": [
+    {
+      "id": 0,
+      "name": "serde_core",
+      "version": "1.0.229",
+      "kind": "custom-build",
+      "key": "51dfe0ea8abde8bb1d20cecef704e3cb8a5eb1312b2d973691db449287e23798",
+      "start": 1391,
+      "end": 8455,
+      "rustcMs": 1238.7,
+      "files": {
+        "/target/debug/build/serde_core-562a6d4e70f8fd98/build_script_build-562a6d4e70f8fd98.wasm": "d251d34f7c07007776291dceeeea5612c6c87b9cbaf94829b4605acb3d500485"
+      },
+      "warnings": []
+    },
+    {
+      "id": 3,
+      "name": "unicode-ident",
+      "version": "1.0.27",
+      "kind": "lib",
+      "key": "a49d723047bd4e5cffb69b9718019581ddd4d04f2e3e10138081239a46a06a5e",
+      "start": 1392,
+      "end": 6262,
+      "rustcMs": 825.6,
+      "files": {
+        "/target/debug/deps/libunicode_ident-4d5571bc80c94314.rlib": "ab833d7c061acbf733c37461dbcd64c187e812d0a9bc986fec8a601104c03280",
+        "/target/debug/deps/libunicode_ident-4d5571bc80c94314.rmeta": "a2b755a9873c181909a0c1906cef4691f8b5176df0b8b9f155a8fa29c80b39e5"
+      },
+      "warnings": []
+    },
+    {
+      "id": 12,
+      "name": "serde",
+      "version": "1.0.229",
+      "kind": "custom-build",
+      "key": "60714efc9a66adb14bacfd0abb6584f3d1f1c5f1367de7a1c552b8eb155f48bf",
+      "start": 1392,
+      "end": 8426,
+      "rustcMs": 626.5,
+      "files": {
+        "/target/debug/build/serde-f36a26790c7ff08e/build_script_build-f36a26790c7ff08e.wasm": "f1e49eb3d51912cf6a56cdd57b68e3568e1f7e8fa398e4c087925bed2b366697"
+      },
+      "warnings": []
+    },
+    {
+      "id": 4,
+      "name": "proc-macro2",
+      "version": "1.0.107",
+      "kind": "custom-build",
+      "key": "725666fd68afdcb60492c04db93ee4e4333fbf591a6f708422224e35715e099a",
+      "start": 1392,
+      "end": 8480,
+      "rustcMs": 1133.3,
+      "files": {
+        "/target/debug/build/proc-macro2-ac94c9da260c971f/build_script_build-ac94c9da260c971f.wasm": "fb8b7175cd27750fced276008d8b3bd28da6071d6f815d259057ed8608b7faf5"
+      },
+      "warnings": []
+    },
+    {
+      "id": 7,
+      "name": "quote",
+      "version": "1.0.47",
+      "kind": "custom-build",
+      "key": "248f2180a8ecb5edbbf7d8a8caf0e9a5bf6074ef6b5073e6832e44bbcb1ee116",
+      "start": 1392,
+      "end": 8500,
+      "rustcMs": 1019.7,
+      "files": {
+        "/target/debug/build/quote-f79416706b3ea819/build_script_build-f79416706b3ea819.wasm": "80ed3e0eb3376aa9f5ee98a7c3573f026ef6771e7f1908a1e7c390216c4d65e5"
+      },
+      "warnings": []
+    },
+    {
+      "id": 20,
+      "name": "serde_json",
+      "version": "1.0.154",
+      "kind": "custom-build",
+      "key": "d3a9a093c27a24d9b92b0739a1bf8157da0771404371f49cb254d5c876ac8441",
+      "start": 1392,
+      "end": 9343,
+      "rustcMs": 559.1,
+      "files": {
+        "/target/debug/build/serde_json-871a584e3f19d496/build_script_build-871a584e3f19d496.wasm": "6636bdc5bf8042a39f46f9999dd2fed92bbca1a6e7ae47320f01bf400bf00ebf"
+      },
+      "warnings": []
+    },
+    {
+      "id": 17,
+      "name": "zmij",
+      "version": "1.0.23",
+      "kind": "custom-build",
+      "key": "c2ad17cc4dd973cdd8230d8a0fbb3c21128659760d59364e79b7d48529959336",
+      "start": 1392,
+      "end": 9723,
+      "rustcMs": 805.4,
+      "files": {
+        "/target/debug/build/zmij-ffb91011a8b36fd7/build_script_build-ffb91011a8b36fd7.wasm": "6989ce71c7796858960568c232031a220b41fb47c0a3f257460983d241122edb"
+      },
+      "warnings": []
+    },
+    {
+      "id": 15,
+      "name": "itoa",
+      "version": "1.0.18",
+      "kind": "lib",
+      "key": "d7e5d9cae787af8eeb531a1f2f72036e388d2980b05232a4a3621c26b60c2d91",
+      "start": 1392,
+      "end": 9882,
+      "rustcMs": 1450.6,
+      "files": {
+        "/target/wasm32-wasip1/debug/deps/libitoa-ab32d266352a3566.rlib": "e3c0f9561f53d659125b8fa0ecf2419d1b93f018d10b6c2fb36681c2b9e6754a",
+        "/target/wasm32-wasip1/debug/deps/libitoa-ab32d266352a3566.rmeta": "4e59931f18a1a11597380e672acb7b86b7844feb94ed165de84df4d60388e596"
+      },
+      "warnings": []
+    },
+    {
+      "id": 16,
+      "name": "memchr",
+      "version": "2.8.3",
+      "kind": "lib",
+      "key": "82c8cc21dd017ffa5a51e9dffd3972aee0899b6b8f69a3ebd4134a7727d03e97",
+      "start": 1392,
+      "end": 11668,
+      "rustcMs": 3208.3,
+      "files": {
+        "/target/wasm32-wasip1/debug/deps/libmemchr-98767184d449b957.rlib": "443cf7bfae109a33bd70876a77606867c56d0eb2c7e1a6d3849d4f44a3be57f7",
+        "/target/wasm32-wasip1/debug/deps/libmemchr-98767184d449b957.rmeta": "5af456cca01332b031afacd251aee0fe150308c9cc4164a7a9ee5496c8e685b7"
+      },
+      "warnings": []
+    },
+    {
+      "id": 24,
+      "name": "thiserror",
+      "version": "2.0.21",
+      "kind": "custom-build",
+      "key": "beaecada68967fe1b1374de9df5004abf001e3eca8d21a7f277b0fc344c0200e",
+      "start": 1393,
+      "end": 10450,
+      "rustcMs": 832.8,
+      "files": {
+        "/target/debug/build/thiserror-021f841e493d45b6/build_script_build-021f841e493d45b6.wasm": "bf7f57dce5449397fc9581a5878554a162dd6168b782c29843157812abc745e1"
+      },
+      "warnings": []
+    },
+    {
+      "id": 13,
+      "name": "serde",
+      "version": "1.0.229",
+      "kind": "run-custom-build",
+      "key": "1ad2e841224518906efd321d76591a13db4dd3cad88cb7e079e94e86f1c0db7b",
+      "start": 8426,
+      "end": 9770,
+      "files": {
+        "/target/wasm32-wasip1/debug/build/serde-26a21314d90a665a/out/private.rs": "edaefc31eb178d1c82d9ab94c18a374316f8ff13ad55147cc631698dc9498162"
+      },
+      "stdout": "cargo:rerun-if-changed=build.rs\ncargo:rustc-cfg=if_docsrs_then_no_serde_core\ncargo:rustc-check-cfg=cfg(feature, values(\"result\"))\ncargo:rustc-check-cfg=cfg(if_docsrs_then_no_serde_core)\ncargo:rustc-check-cfg=cfg(no_core_cstr)\ncargo:rustc-check-cfg=cfg(no_core_error)\ncargo:rustc-check-cfg=cfg(no_core_net)\ncargo:rustc-check-cfg=cfg(no_core_num_saturating)\ncargo:rustc-check-cfg=cfg(no_diagnostic_namespace)\ncargo:rustc-check-cfg=cfg(no_serde_derive)\ncargo:rustc-check-cfg=cfg(no_std_atomic)\ncargo:rustc-check-cfg=cfg(no_std_atomic64)\ncargo:rustc-check-cfg=cfg(no_target_has_atomic)\n",
+      "warnings": []
+    },
+    {
+      "id": 1,
+      "name": "serde_core",
+      "version": "1.0.229",
+      "kind": "run-custom-build",
+      "key": "93c1ddb6a9aed737cb3ef2504a522876b1e7ebf6a8f8f2c3b48821300f7e12da",
+      "start": 8455,
+      "end": 9798,
+      "files": {
+        "/target/wasm32-wasip1/debug/build/serde_core-202087e33c8a1528/out/private.rs": "899563ce84b59b13cd7036e25f7897c1e730906f62a43aff14472d11c4229f34"
+      },
+      "stdout": "cargo:rerun-if-changed=build.rs\ncargo:rustc-check-cfg=cfg(if_docsrs_then_no_serde_core)\ncargo:rustc-check-cfg=cfg(no_core_cstr)\ncargo:rustc-check-cfg=cfg(no_core_error)\ncargo:rustc-check-cfg=cfg(no_core_net)\ncargo:rustc-check-cfg=cfg(no_core_num_saturating)\ncargo:rustc-check-cfg=cfg(no_diagnostic_namespace)\ncargo:rustc-check-cfg=cfg(no_serde_derive)\ncargo:rustc-check-cfg=cfg(no_std_atomic)\ncargo:rustc-check-cfg=cfg(no_std_atomic64)\ncargo:rustc-check-cfg=cfg(no_target_has_atomic)\n",
+      "warnings": []
+    },
+    {
+      "id": 5,
+      "name": "proc-macro2",
+      "version": "1.0.107",
+      "kind": "run-custom-build",
+      "key": "a790d6cbb1a93706724a9b8eb62d98c665aed06f1762afca78a46ea55e60b36d",
+      "start": 8481,
+      "end": 10596,
+      "files": {},
+      "stdout": "cargo:rustc-check-cfg=cfg(fuzzing)\ncargo:rustc-check-cfg=cfg(no_is_available)\ncargo:rustc-check-cfg=cfg(no_literal_byte_character)\ncargo:rustc-check-cfg=cfg(no_literal_c_string)\ncargo:rustc-check-cfg=cfg(no_source_text)\ncargo:rustc-check-cfg=cfg(proc_macro_span)\ncargo:rustc-check-cfg=cfg(proc_macro_span_file)\ncargo:rustc-check-cfg=cfg(proc_macro_span_location)\ncargo:rustc-check-cfg=cfg(procmacro2_backtrace)\ncargo:rustc-check-cfg=cfg(procmacro2_build_probe)\ncargo:rustc-check-cfg=cfg(procmacro2_nightly_testing)\ncargo:rustc-check-cfg=cfg(procmacro2_semver_exempt)\ncargo:rustc-check-cfg=cfg(randomize_layout)\ncargo:rustc-check-cfg=cfg(span_locations)\ncargo:rustc-check-cfg=cfg(super_unstable)\ncargo:rustc-check-cfg=cfg(wrap_proc_macro)\ncargo:rerun-if-changed=src/probe/proc_macro_span.rs\ncargo:rustc-cfg=wrap_proc_macro\ncargo:rerun-if-changed=src/probe/proc_macro_span_location.rs\ncargo:rustc-cfg=proc_macro_span_location\ncargo:rerun-if-changed=src/probe/proc_macro_span_file.rs\ncargo:rustc-cfg=proc_macro_span_file\ncargo:rerun-if-env-changed=RUSTC_BOOTSTRAP\n",
+      "warnings": []
+    },
+    {
+      "id": 8,
+      "name": "quote",
+      "version": "1.0.47",
+      "kind": "run-custom-build",
+      "key": "09d46ee0f555b42917798feca6aa7d9717b24f6462775f18d08799837ef3d959",
+      "start": 8500,
+      "end": 9753,
+      "files": {},
+      "stdout": "cargo:rerun-if-changed=build.rs\ncargo:rustc-check-cfg=cfg(no_diagnostic_namespace)\n",
+      "warnings": []
+    },
+    {
+      "id": 21,
+      "name": "serde_json",
+      "version": "1.0.154",
+      "kind": "run-custom-build",
+      "key": "55d1a8ad656b00cfe6f6e2ecc3e28e91bfe763ed193ad180d018ded3ebe20374",
+      "start": 9343,
+      "end": 9448,
+      "files": {},
+      "stdout": "cargo:rerun-if-changed=build.rs\ncargo:rustc-check-cfg=cfg(fast_arithmetic, values(\"32\", \"64\"))\ncargo:rustc-cfg=fast_arithmetic=\"64\"\n",
+      "warnings": []
+    },
+    {
+      "id": 18,
+      "name": "zmij",
+      "version": "1.0.23",
+      "kind": "run-custom-build",
+      "key": "8992aed112a9772f46810698680d74bec5f13fd5b1624bcee1e496e69fd3bdde",
+      "start": 9723,
+      "end": 9924,
+      "files": {},
+      "stdout": "cargo:rerun-if-changed=build.rs\ncargo:rustc-check-cfg=cfg(exhaustive)\ncargo:rustc-check-cfg=cfg(opt_level, values(\"s\"))\ncargo:rustc-check-cfg=cfg(zmij_no_select_unpredictable)\n",
+      "warnings": []
+    },
+    {
+      "id": 2,
+      "name": "serde_core",
+      "version": "1.0.229",
+      "kind": "lib",
+      "key": "231101b6ce2ea295241c53370c77bc4fb7125a9d43b765e926b013608c0ce797",
+      "start": 9798,
+      "end": 23462,
+      "rustcMs": 13538.5,
+      "files": {
+        "/target/wasm32-wasip1/debug/deps/libserde_core-47f70b3bd68c93fa.rlib": "4ba143f2829afa323113b7fc75717b5e9ae4fbf88475c90688d732b14b49f0a0",
+        "/target/wasm32-wasip1/debug/deps/libserde_core-47f70b3bd68c93fa.rmeta": "1aa440dc4b30f5f61fc306f51460fec5a2c69b27915dddcd4729a6ab6212525c"
+      },
+      "warnings": []
+    },
+    {
+      "id": 19,
+      "name": "zmij",
+      "version": "1.0.23",
+      "kind": "lib",
+      "key": "18cf1e6ebff0064d40b60ebf05f695ceaa5135ccb6b5cc370f2159a86550ca63",
+      "start": 9924,
+      "end": 11485,
+      "rustcMs": 1501.4,
+      "files": {
+        "/target/wasm32-wasip1/debug/deps/libzmij-0858c1da357e8c94.rlib": "eb82d57fd6bf361d693d885ea1214546c46537b6ddf23fe406c5009906a78d1a",
+        "/target/wasm32-wasip1/debug/deps/libzmij-0858c1da357e8c94.rmeta": "57c0b0271fb7b0a7acaff4cd4838d1c4aaf2edaf576bff4692c5d6bb983490ad"
+      },
+      "warnings": []
+    },
+    {
+      "id": 25,
+      "name": "thiserror",
+      "version": "2.0.21",
+      "kind": "run-custom-build",
+      "key": "3c768b3ae9c3cc6580373500f4f667a31dbd2869c72d44be4ee2625a884f2944",
+      "start": 10450,
+      "end": 11495,
+      "files": {
+        "/target/wasm32-wasip1/debug/build/thiserror-ec87d13b6914fced/out/private.rs": "f7906d652f9ff9cfb6ba31b096ffc511c7fb98ee44614c10d6fe41ad533bdc0c"
+      },
+      "stdout": "cargo:rerun-if-changed=build/probe.rs\ncargo:rustc-check-cfg=cfg(error_generic_member_access)\ncargo:rustc-check-cfg=cfg(thiserror_nightly_testing)\ncargo:rustc-check-cfg=cfg(thiserror_no_backtrace_type)\ncargo:rerun-if-env-changed=RUSTC_BOOTSTRAP\n",
+      "warnings": []
+    },
+    {
+      "id": 6,
+      "name": "proc-macro2",
+      "version": "1.0.107",
+      "kind": "lib",
+      "key": "b809c3d0944250dd5513acc9c716521b220ba789c3ef2e71435bc31705b28dcb",
+      "start": 10596,
+      "end": 15359,
+      "rustcMs": 4663.9,
+      "files": {
+        "/target/debug/deps/libproc_macro2-fdccd2d35d56e3ae.rlib": "091dd957065ab0652576df0c0318aa7f38e8b7e5a251dccc0c55ffd61bed0fab",
+        "/target/debug/deps/libproc_macro2-fdccd2d35d56e3ae.rmeta": "c9db50dd87270f5cb2944c1033b9086c5227bb3d546db5167914ad604a4a240e"
+      },
+      "warnings": []
+    },
+    {
+      "id": 9,
+      "name": "quote",
+      "version": "1.0.47",
+      "kind": "lib",
+      "key": "c6b51a73ac9a12ffc850855851d07c47beaf1b12cc390da0e5a26de9e913755d",
+      "start": 15359,
+      "end": 16792,
+      "rustcMs": 1426.1,
+      "files": {
+        "/target/debug/deps/libquote-8faf882fb5872b13.rlib": "40a2601204bea352c2c4221dbdf9a525d52d5741472558b79519bbfaebd428de",
+        "/target/debug/deps/libquote-8faf882fb5872b13.rmeta": "bb2f5637a378fde23c5d6c0a24ffbdb7f240eac06f20691beeb511a98eed3193"
+      },
+      "warnings": []
+    },
+    {
+      "id": 10,
+      "name": "syn",
+      "version": "3.0.9",
+      "kind": "lib",
+      "key": "715256329242c084b8fdd5d09c7913ea18a66f9e668b6595b179dec7e673edcf",
+      "start": 16792,
+      "end": 31476,
+      "rustcMs": 14632.5,
+      "files": {
+        "/target/debug/deps/libsyn-e0df17776baf718a.rlib": "1e2ccc67a35b6c04e177cbc94224b8c690366ba73df95c4b1f68fb1d0ba58b4c",
+        "/target/debug/deps/libsyn-e0df17776baf718a.rmeta": "4e2664f82374c8de340b1365d52d8d82ba5e7b3c46ebc33a94e6767b69df8965"
+      },
+      "warnings": []
+    },
+    {
+      "id": 22,
+      "name": "serde_json",
+      "version": "1.0.154",
+      "kind": "lib",
+      "key": "e7b8c66287a2cb90f7d91dbb9c0b13171110c6705486b7b02c901a91367ed1cc",
+      "start": 23462,
+      "end": 30277,
+      "rustcMs": 6768.8,
+      "files": {
+        "/target/wasm32-wasip1/debug/deps/libserde_json-707011dd8fa9a420.rlib": "b9e9747d23c8d1db8f38f4fb11e6fbae0bc8bfffead1699f430cb1d2114872ee",
+        "/target/wasm32-wasip1/debug/deps/libserde_json-707011dd8fa9a420.rmeta": "9d7e87cd12697ef97095bfcba90df3dbdf7375dab32fcbfa8095275f5ace3081"
+      },
+      "warnings": []
+    },
+    {
+      "id": 23,
+      "name": "thiserror-impl",
+      "version": "2.0.21",
+      "kind": "lib",
+      "key": "cc5fca2ccfe930424319fdfca741e9de3b5a0287e6e88b04e564cfc291196d89",
+      "start": 31476,
+      "end": 36968,
+      "rustcMs": 5168.1,
+      "files": {
+        "/target/debug/deps/thiserror_impl-e62201d8e02e0550.wasm": "b16248785621c37c8e09444c10220f8f8d6d9a21d5ea1c501871dd3ce68c320a"
+      },
+      "warnings": []
+    },
+    {
+      "id": 11,
+      "name": "serde_derive",
+      "version": "1.0.229",
+      "kind": "lib",
+      "key": "071c33491e1063d6a9205e5dfa440ee2e52517f6f1d2b4c757f678e719b2529f",
+      "start": 31476,
+      "end": 43444,
+      "rustcMs": 11479.6,
+      "files": {
+        "/target/debug/deps/serde_derive-2542d0defa0ac064.wasm": "e7f2ea82ba90206451a0273c947c8e508f5bcab9a7d72e6c19c00f5fab18d7c9"
+      },
+      "warnings": []
+    },
+    {
+      "id": 26,
+      "name": "thiserror",
+      "version": "2.0.21",
+      "kind": "lib",
+      "key": "920f09ac0cf3e00d73ad5f72d63ca0755038cdada56cce318c16ef903c4d55dd",
+      "start": 36968,
+      "end": 37169,
+      "rustcMs": 196.4,
+      "files": {
+        "/target/wasm32-wasip1/debug/deps/libthiserror-8471bca08183329c.rlib": "41c96579e6e7ba3c45327add61f517c59fc414d512335e10b77fa9289449d004",
+        "/target/wasm32-wasip1/debug/deps/libthiserror-8471bca08183329c.rmeta": "b7340a37697b1def0e3c75f1c17070100f51d262aedf85a567f8a8098f76f2b8"
+      },
+      "warnings": []
+    },
+    {
+      "id": 14,
+      "name": "serde",
+      "version": "1.0.229",
+      "kind": "lib",
+      "key": "bd80d81bf8cc7b1d2f6604d90366f2e5fb1d15c184ce0e982eaf3f35965551bb",
+      "start": 43444,
+      "end": 45783,
+      "rustcMs": 2326.1,
+      "files": {
+        "/target/wasm32-wasip1/debug/deps/libserde-f71b177a91f895a8.rlib": "e109665283977143cbb36a20fcbaed4b19ceaa5b9fdd284adacd6a39da39337f",
+        "/target/wasm32-wasip1/debug/deps/libserde-f71b177a91f895a8.rmeta": "124da08a3b80f310789d27187540a1beea404d6e4e76573c0f06bb1717eda10d"
+      },
+      "warnings": []
+    },
+    {
+      "id": 27,
+      "name": "derive",
+      "version": "0.1.0",
+      "kind": "bin",
+      "key": "319421e8157bad2284b395a912c9510a984e29e4b3668e65f407bf1ef4becec1",
+      "start": 45783,
+      "end": 46882,
+      "rustcMs": 924.5,
+      "files": {
+        "/target/wasm32-wasip1/debug/deps/derive-4638641d2eeeb4a4.wasm": "cfc02a0ef1288dc97b14beceb34b08292311e7e2177d614351b43e6f8477d119"
+      },
+      "warnings": []
+    }
+  ],
+  "ms": {
+    "deps": 1347,
+    "plan": 34,
+    "build": 45508,
+    "store": 30,
+    "total": 46919
+  },
+  "run": {
+    "code": 0,
+    "stdout": "{\"xPos\":1,\"yPos\":2}\nPoint { x_pos: 3, y_pos: 4, label: Some(\"z\") }\nbad point Point { x_pos: -1, y_pos: 0, label: None }\njson: EOF while parsing an object at line 1 column 1\n",
+    "stderr": "",
+    "ms": 42
+  }
+}

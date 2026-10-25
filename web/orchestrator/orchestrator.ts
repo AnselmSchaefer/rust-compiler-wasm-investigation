@@ -7,7 +7,7 @@
 
 import { createVfs, Kind, Vfs, type VfsHandle } from '../vfs/vfs';
 import { runProcess, type RunResult } from '../wasi/process';
-import { linkerSpawnError, outputDestination, parseLinkCommand, rewriteOutputs, wasmLdArgs } from '../link/link-args';
+import { absolute, linkerSpawnError, outputDestination, parseLinkCommand, rewriteOutputs, wasmLdArgs } from '../link/link-args';
 import { Release, type Tool } from './toolchain';
 import { readTar } from './tar';
 
@@ -16,6 +16,8 @@ export interface RustcResult {
   code: number;
   /** rustc's (and the linker's) diagnostics. */
   stderr: string;
+  /** What rustc printed (`--version`, `--print`). */
+  stdout: string;
   /** Whether the job ran wasm-ld. */
   linked: boolean;
   /** Files written, after moving them out of the scratch dir. */
@@ -26,6 +28,9 @@ export interface RustcResult {
 const RUSTC_ARGV0 = '/sysroot/bin/rustc';
 // rustc's main thread needs more than the default stack for deep expressions (as in WP-01).
 const ENV = ['RUST_MIN_STACK=16777216'];
+
+/** A job's working directory and stdin (WP-21). */
+export interface JobIo { cwd?: string; stdin?: string }
 
 export class Orchestrator {
   private jobs = 0;
@@ -82,20 +87,21 @@ export class Orchestrator {
   }
 
   /**
-   * Run rustc with `args` (paths in the VFS; the working directory is /), linking if needed.
-   * `env`: environment variables for this job only (OUT_DIR, CARGO_PKG_*, ...).
+   * Run rustc with `args` (paths in the VFS), linking if needed. `env`: environment variables for
+   * this job only (OUT_DIR, CARGO_PKG_*, ...). `cwd` (default /) and `stdin` (the source for an
+   * input of `-`): a build script's rustc probe (WP-21).
    */
-  rustcJob(args: string[], env?: Record<string, string>): Promise<RustcResult> {
+  rustcJob(args: string[], env?: Record<string, string>, io?: JobIo): Promise<RustcResult> {
     const job = (async () => {
       const s = await this.acquire();
-      try { return await this.run(s, args, env); } finally { this.releaseServer(s); }
+      try { return await this.run(s, args, env, io); } finally { this.releaseServer(s); }
     })();
     this.running.add(job);
     job.finally(() => this.running.delete(job)).catch(() => {});
     return job;
   }
 
-  private async run(server: CompileServer, user: string[], env?: Record<string, string>): Promise<RustcResult> {
+  private async run(server: CompileServer, user: string[], env?: Record<string, string>, io?: JobIo): Promise<RustcResult> {
     const t0 = performance.now();
     const scratch = `/tmp/job-${++this.jobs}`, linkFile = `${scratch}/link-args`;
     this.vfs.mkdirAll(scratch);
@@ -104,7 +110,7 @@ export class Orchestrator {
       // A build that links needs the .rlib files while rustc runs (it checks dependency formats
       // before linking); --emit=metadata or obj alone needs only the .rmeta files.
       if (emitsLink(user)) await this.loadLinkGroup();
-      const r = await server.request(plan.args, env);
+      const r = await server.request(plan.args, env, io);
       let code = r.exit, stderr = r.stderr, linked = false, linkMs = 0;
       if (code !== 0 && this.vfs.exists(linkFile)) {
         // rustc got to the link step and couldn't start a linker: link here instead.
@@ -125,13 +131,13 @@ export class Orchestrator {
           // rustc's temp dirs and its link command stay behind and go with the scratch dir.
           const dst = outputDestination(plan, e.name);
           if (!dst || e.kind !== Kind.File || e.name === 'link-args') continue;
-          const to = dst.startsWith('./') ? dst.slice(1) : dst.startsWith('/') ? dst : `/${dst}`;
+          const to = absolute(dst, io?.cwd);
           this.vfs.mkdirAll(to.slice(0, to.lastIndexOf('/')) || '/');
           this.vfs.rename(`${scratch}/${e.name}`, to);
           outputs.push(to);
         }
       }
-      return { code, stderr, linked, outputs, ms: { rustc: r.ms, link: Math.round(linkMs), total: Math.round(performance.now() - t0) } };
+      return { code, stderr, stdout: r.stdout, linked, outputs, ms: { rustc: r.ms, link: Math.round(linkMs), total: Math.round(performance.now() - t0) } };
     } finally {
       this.vfs.removeAll(scratch);
     }
@@ -216,24 +222,30 @@ class CompileServer {
     }, workerUrl, () => this.wake?.());
   }
 
-  async request(args: string[], env?: Record<string, string>): Promise<{ exit: number; ms: number; stderr: string }> {
+  async request(args: string[], env?: Record<string, string>, io?: JobIo): Promise<{ exit: number; ms: number; stderr: string; stdout: string }> {
     const id = ++this.nextId;
-    this.vfs.appendFile(this.stdin, JSON.stringify(env ? { id, args, env } : { id, args }) + '\n');
+    this.vfs.appendFile(this.stdin, JSON.stringify({ id, args, ...(env && { env }), ...(io?.cwd && { cwd: io.cwd }), ...(io?.stdin !== undefined && { stdin: io.stdin }) }) + '\n');
     const answer = await this.answer(id);
     const e = this.vfs.readText(this.stderr), mark = `\x1e${id}\n`, at = e.indexOf(mark, this.errPos);
     const stderr = e.slice(this.errPos, at);
     this.errPos = at + mark.length;
-    return { exit: answer.exit, ms: answer.ms, stderr };
+    return { exit: answer.exit, ms: answer.ms, stderr, stdout: answer.stdout };
   }
 
-  private async answer(id: number): Promise<{ exit: number; ms: number }> {
+  /** The answer line, and rustc's own stdout before it (e.g. -V). */
+  private async answer(id: number): Promise<{ exit: number; ms: number; stdout: string }> {
+    let stdout = '';
     for (;;) {
       const text = this.vfs.readText(this.stdout);
       const nl = text.indexOf('\n', this.outPos);
       if (nl >= 0) {
         const line = text.slice(this.outPos, nl);
-        this.outPos = nl + 1; // other lines are rustc's own stdout (e.g. -V)
-        if (line.startsWith('{') && JSON.parse(line).id === id) return JSON.parse(line);
+        this.outPos = nl + 1;
+        if (line.startsWith('{"') && line.includes('"id"')) {
+          const a = JSON.parse(line);
+          if (a.id === id) return { ...a, stdout };
+        }
+        stdout += line + '\n';
         continue;
       }
       // Woken by the server's next stdout write; the timeout only guards against a lost wake-up.
