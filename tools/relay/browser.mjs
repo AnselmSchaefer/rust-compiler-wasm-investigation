@@ -1,7 +1,8 @@
 // Started by tools/relay/relay.py (WP-38): Chromium on the IDE page, through Playwright, with a
 // profile of its own so projects (OPFS), the build cache and the toolchain (Cache Storage)
 // survive between runs. Headed to watch, or --headless. Background-tab throttling is off: the
-// page does the work while nobody looks at it. Exits when the browser closes, or on SIGTERM.
+// page does the work while nobody looks at it. Exits when the browser closes, on SIGTERM, or
+// when its stdin (a pipe from the relay) closes.
 //   node tools/relay/browser.mjs <url> [--profile DIR] [--headless]
 import { chromium } from '@playwright/test';
 
@@ -21,4 +22,8 @@ console.error(`browser: ${headless ? 'headless' : 'headed'} Chromium on ${new UR
 const stop = async () => { await ctx.close().catch(() => {}); process.exit(0); };
 process.on('SIGTERM', stop);
 process.on('SIGINT', stop);
+// The relay holds our stdin: when it closes, the relay is gone, so we go too.
+process.stdin.on('end', stop);
+process.stdin.on('close', stop);
+process.stdin.resume();
 ctx.on('close', () => process.exit(0));

@@ -30,6 +30,7 @@ import mimetypes
 import os
 import secrets
 import shutil
+import signal
 import struct
 import subprocess
 import sys
@@ -304,7 +305,9 @@ class Relay:
         if self.browser_mode == 'headless':
             args.append('--headless')
         log(f'starting Chromium ({self.browser_mode})')
-        self.browser = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=sys.stderr, stderr=sys.stderr, cwd=REPO)
+        # Its stdin is a pipe from us: when the relay goes, however it goes, the browser follows
+        # (an orphaned one would keep the profile locked and knock with a stale token).
+        self.browser = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=sys.stderr, stderr=sys.stderr, cwd=REPO)
 
 
 async def main():
@@ -316,11 +319,16 @@ async def main():
         log(f'no {APP / "agent.html"}: run `pnpm build:app` first')
         sys.exit(1)
     relay = Relay(a.port, a.browser)
+    loop = asyncio.get_running_loop()
+    stop = asyncio.Event()
+    for sig in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
+        loop.add_signal_handler(sig, stop.set)
     server = await asyncio.start_server(relay.serve, '127.0.0.1', a.port)
     log(f'serving {relay.origin}; the IDE page: {relay.url}')
     relay.start_browser()
     try:
-        await relay.mcp()
+        mcp = asyncio.ensure_future(relay.mcp())
+        await asyncio.wait([mcp, asyncio.ensure_future(stop.wait())], return_when=asyncio.FIRST_COMPLETED)
     finally:
         server.close()
         if relay.browser and relay.browser.poll() is None:
