@@ -407,6 +407,7 @@ These are taken as defaults so work can start. Changing one later only affects t
   - A guided sample project that touches every feature: serde derive, a build script, a failing test, a Clippy lint, unformatted code.
   - Started by the relay (`tools/relay`), so one command opens it; documented in the README.
 - **Done when:** an e2e test drives the demo UI through the sample: build and run with crates, fix the failing test via the test panel, Clippy clean, formatted. The user tries it by hand and signs off **[H]**.
+  - *2026-10-25 (done, session 22): one page for a person and an agent, `app/ide.html` (`pnpm ide`, or the relay for an agent); `tests/e2e/ide.spec.ts` drives the guided sample through the UI; busy bar, button spinner and phase line so a click visibly works. The user tried it and signed off ("it looks fine"). See `README.md`, `docs/relay-manual-guide.md`.*
 
 #### WP-29 Public deploy (optional, after M2)
 *With a local relay serving the app and proxying the index, v1 needs no public hosting. This WP is for sharing the environment beyond this machine.*

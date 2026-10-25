@@ -3,13 +3,14 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** **WP-40** in progress (session 22): the IDE (`app/ide.html`) is built and verified (`scripts/verify/wp-40.sh`); waiting for the user's hands-on sign-off **[H]**. M2 reached (WP-38).
+- **Active WP:** none. WP-40 **done** (session 22, signed off by the user). **M1 and M2 are reached**; everything on the way to v1 is done. What's left is optional or recurring: WP-29 (public deploy, [H]), WP-36 (upstream proposals, written by the user), WP-37 (rebase onto each Rust release), WP-27b (incremental, deferred), v2 features and the Appendix (deferred).
 - **Last session:** 2026-10-25 (session 22). WP-21 done: build scripts with autocfg, rustc probes, libc, proc-macro2, anyhow and `links` metadata build in the browser and print what they print natively. Release **1.99.1-7520bf319596**.
 - **Rule for rustc source:** rust-lang's agent policy (`build/rust/AGENTS.md`) applies. Claude does not write or edit rustc source, and does not draft rust-lang issues, PRs or Zulip posts. The user writes those, or applies existing **human-written** patches (bjorn3/oligamiq), which the user prefers whenever one exists. **danlapid 0005–0007 are LLM-generated** (Claude co-author trailers), so they don't qualify even if the user applies them; design reference only (`docs/patches.md`). Claude reviews, builds and explains. Everything outside `build/rust` is Claude's, including out-of-tree drivers using `rustc_driver` (`toolchain/rustc-multi`).
-- **Next step:** the user tries `pnpm ide` (Sample walks through everything) and signs off, or names what to change; then mark WP-40 done. Open follow-ups: doc tests, Wasm proc macros in prebuild/L2, top-500 matrix, the IDE's file tree shows one project at a time (project picker), Run's program has no timeout (Stop or Ctrl-C).
+- **Next step:** the user picks what's next: an optional WP (WP-29 public deploy, WP-37 rebase when Rust 1.100 is out, WP-36 upstream proposals) or a follow-up (doc tests via libtest for the wasm host, Wasm proc macros in prebuild/L2, top-500 matrix, a measured cold build of a large project, more compile workers, opening the browser only on the first tool call).
 - **Running background jobs:** none
 
-## Current session (2026-10-25, session 22, cont. 6): WP-40 built, sign-off pending
+## Current session (2026-10-25, session 22, cont. 6): WP-40 done (signed off)
+- Added after the first version, at the user's request: a busy bar, a spinner on the clicked button and a phase line (resolving, fetching crates n/m, planning, compiling with the units running now, running tests n/m), from new build progress events; buttons disabled while a call runs. Checked in `tests/e2e/ide.spec.ts`.
 - **One page for a person and an agent** (user agreed): `app/ide.html`/`ide.ts` replaces `app/agent.html` (WP-14's `index.html` stays for its tests). The buttons are another client of `AgentTools`: same per-project queue, same results, one Activity log (you/agent).
 - **UI:** project picker with New / Sample / Import (zip, GitHub) / Export / Delete; Check, Build, Run (interactive terminal stdin), Stop, Test, Clippy, Format, + Dependency; file tree with new/rename/delete and markers; editable editor that saves into the project; tabs Terminal, Tests (per-test results, Rerun one, Run all), Problems (click → line; editor markers from span start/end), Activity; stats row with live per-unit progress (new `progress` messages in the orchestrator protocol). Guided sample `app/sample.ts` (serde derive, build script, stdin program, failing test, Clippy lint, unformatted code, README walkthrough).
 - **Relay:** serves `ide.html`; `--no-mcp` (`pnpm ide`) runs the IDE without an agent. `dependency_add` without a version takes the newest release (found: the manifest edit needs one).
@@ -191,7 +192,7 @@
 - [ ] **Possible upstream rustc bug** (user to report, if wanted): `filesearch.rs` `from_env_args_next` checks `lib/rustlib` relative to the *working directory*, not next to argv[0] (see `~/Projects/rustc-wasm-host-source-changes.md` §6).
 
 ## Human actions needed
-- [ ] **[H] WP-40 sign-off:** `pnpm ide`, then **Sample** and its README's steps; sign off or name changes.
+- [x] **[H] WP-40 sign-off:** done 2026-10-25 ("it looks fine").
 - [x] **[H] WP-38 Claude Code run:** done 2026-10-25 with the user's go-ahead (headless and headed). `tests/relay/agent-run.sh headed` and `headless` run `claude -p` (the user's plan) with only the relay's tools; or connect your own Claude Code session to the relay (`docs/relay.md`).
 - [x] **WP-27b (2026-10-25):** deferred by the user (optional). If it's picked up again: incremental compilation can't start on a WASI host (`rustc_data_structures::flock` has no lock for WASI, `rustc_incremental`'s `lock_directory` makes that fatal); the rustc change is the user's to write, see `docs/incremental.md`.
 - [x] **[H] WP-20 rustc changes** (2026-10-25): applied by the user (bjorn3 #160981 + tuple wasip1; change 2 written by the user); rustc.wasm rebuilt and the lookup/registration path verified. Open, optional: the `": "` separator in change 2's error message.
@@ -241,7 +242,7 @@
 | 27b | Incremental compilation in OPFS (optional) | deferred | 0 | user, 2026-10-25: budgets met without it; needs a rustc change for file locks on WASI (`docs/incremental.md`) |
 | 28 | First-visit performance | deferred | 0 | Appendix (human-only) |
 | 38 | Agent tool API + local relay (M2) | done | 1 | **M2**: Claude Code through the relay alone, headless 50 s and headed 47 s, checked by `tests/relay/check-agent.py`; `docs/relay.md` |
-| 40 | Hands-on demo | in-progress | 1 | `app/ide.html`, `pnpm ide`; `scripts/verify/wp-40.sh` passes; waiting for the user's sign-off [H] |
+| 40 | Hands-on demo | done | 1 | `app/ide.html`, `pnpm ide`; `scripts/verify/wp-40.sh`; signed off by the user 2026-10-25 |
 | 29 | Public deploy (optional) | blocked | 0 | after M2; only to share beyond this machine |
 | 30, 32, 34 | v2 features | deferred | 0 | agent-useful; 34 = HTTP handlers via the tool API |
 | 39 | Develop in the sandbox, deploy natively (optional) | deferred | 0 | new 2026-10-25: mocked network in the IDE, CI builds `host-native`; after WP-34 |
