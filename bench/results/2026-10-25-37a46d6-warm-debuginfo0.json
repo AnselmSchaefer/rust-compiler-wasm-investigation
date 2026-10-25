@@ -1,0 +1,339 @@
+{
+  "release": "1.99.1-6c798e2613f0",
+  "incremental": false,
+  "debuginfo": 0,
+  "summary": {
+    "medium": {
+      "cold": 3903,
+      "units": 1,
+      "checkMedian": 241,
+      "runMedian": 1114,
+      "check": [
+        257,
+        261,
+        241,
+        224,
+        230
+      ],
+      "run": [
+        1301,
+        1138,
+        1043,
+        1114,
+        1078
+      ]
+    },
+    "check": {
+      "cold": 14802,
+      "units": 28,
+      "checkMedian": 344,
+      "runMedian": 606,
+      "check": [
+        365,
+        344,
+        346,
+        325,
+        318
+      ],
+      "run": [
+        630,
+        606,
+        607,
+        592,
+        597
+      ]
+    }
+  },
+  "detail": {
+    "medium": {
+      "coldMs": 3903,
+      "units": 1,
+      "check": [
+        257,
+        261,
+        241,
+        224,
+        230
+      ],
+      "run": [
+        1301,
+        1138,
+        1043,
+        1114,
+        1078
+      ],
+      "detail": [
+        {
+          "check": {
+            "deps": 2,
+            "plan": 1,
+            "build": 249,
+            "store": 4,
+            "total": 255
+          },
+          "built": [
+            "medium bin 247.5"
+          ]
+        },
+        {
+          "check": {
+            "deps": 2,
+            "plan": 0,
+            "build": 252,
+            "store": 4,
+            "total": 258
+          },
+          "built": [
+            "medium bin 249.5"
+          ]
+        },
+        {
+          "check": {
+            "deps": 2,
+            "plan": 1,
+            "build": 232,
+            "store": 4,
+            "total": 238
+          },
+          "built": [
+            "medium bin 230.1"
+          ]
+        },
+        {
+          "check": {
+            "deps": 2,
+            "plan": 0,
+            "build": 213,
+            "store": 5,
+            "total": 221
+          },
+          "built": [
+            "medium bin 211.5"
+          ]
+        },
+        {
+          "check": {
+            "deps": 2,
+            "plan": 1,
+            "build": 221,
+            "store": 4,
+            "total": 227
+          },
+          "built": [
+            "medium bin 218"
+          ]
+        },
+        {
+          "build": {
+            "deps": 9,
+            "plan": 1,
+            "build": 1225,
+            "store": 16,
+            "total": 1250
+          },
+          "run": 44,
+          "built": [
+            "medium bin 1091.4"
+          ]
+        },
+        {
+          "build": {
+            "deps": 3,
+            "plan": 1,
+            "build": 1085,
+            "store": 18,
+            "total": 1107
+          },
+          "run": 25,
+          "built": [
+            "medium bin 955"
+          ]
+        },
+        {
+          "build": {
+            "deps": 2,
+            "plan": 1,
+            "build": 991,
+            "store": 20,
+            "total": 1012
+          },
+          "run": 25,
+          "built": [
+            "medium bin 863"
+          ]
+        },
+        {
+          "build": {
+            "deps": 1,
+            "plan": 0,
+            "build": 1068,
+            "store": 17,
+            "total": 1087
+          },
+          "run": 22,
+          "built": [
+            "medium bin 935.9"
+          ]
+        },
+        {
+          "build": {
+            "deps": 2,
+            "plan": 0,
+            "build": 1031,
+            "store": 18,
+            "total": 1051
+          },
+          "run": 23,
+          "built": [
+            "medium bin 904"
+          ]
+        }
+      ]
+    },
+    "check": {
+      "coldMs": 14802,
+      "units": 28,
+      "check": [
+        365,
+        344,
+        346,
+        325,
+        318
+      ],
+      "run": [
+        630,
+        606,
+        607,
+        592,
+        597
+      ],
+      "detail": [
+        {
+          "check": {
+            "deps": 136,
+            "plan": 9,
+            "build": 212,
+            "store": 3,
+            "total": 361
+          },
+          "built": [
+            "check bin 207.3"
+          ]
+        },
+        {
+          "check": {
+            "deps": 125,
+            "plan": 9,
+            "build": 203,
+            "store": 3,
+            "total": 339
+          },
+          "built": [
+            "check bin 198.7"
+          ]
+        },
+        {
+          "check": {
+            "deps": 121,
+            "plan": 8,
+            "build": 210,
+            "store": 3,
+            "total": 342
+          },
+          "built": [
+            "check bin 206.1"
+          ]
+        },
+        {
+          "check": {
+            "deps": 129,
+            "plan": 7,
+            "build": 183,
+            "store": 2,
+            "total": 321
+          },
+          "built": [
+            "check bin 178.8"
+          ]
+        },
+        {
+          "check": {
+            "deps": 111,
+            "plan": 7,
+            "build": 195,
+            "store": 4,
+            "total": 316
+          },
+          "built": [
+            "check bin 189.6"
+          ]
+        },
+        {
+          "build": {
+            "deps": 129,
+            "plan": 7,
+            "build": 449,
+            "store": 12,
+            "total": 597
+          },
+          "run": 26,
+          "built": [
+            "check bin 334.2"
+          ]
+        },
+        {
+          "build": {
+            "deps": 110,
+            "plan": 6,
+            "build": 442,
+            "store": 16,
+            "total": 574
+          },
+          "run": 27,
+          "built": [
+            "check bin 317.9"
+          ]
+        },
+        {
+          "build": {
+            "deps": 113,
+            "plan": 6,
+            "build": 442,
+            "store": 14,
+            "total": 575
+          },
+          "run": 24,
+          "built": [
+            "check bin 323.3"
+          ]
+        },
+        {
+          "build": {
+            "deps": 111,
+            "plan": 5,
+            "build": 428,
+            "store": 15,
+            "total": 559
+          },
+          "run": 28,
+          "built": [
+            "check bin 300.1"
+          ]
+        },
+        {
+          "build": {
+            "deps": 114,
+            "plan": 5,
+            "build": 432,
+            "store": 13,
+            "total": 565
+          },
+          "run": 27,
+          "built": [
+            "check bin 315.9"
+          ]
+        }
+      ]
+    }
+  }
+}

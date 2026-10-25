@@ -1,0 +1,69 @@
+{
+ "date": "2026-10-25",
+ "commit": "37a46d6",
+ "browser": "chromium",
+ "rustc": "1.99.1 wasm32-wasip1-threads host, panic=unwind",
+ "load": {
+  "ms": 1738,
+  "sysroot": {
+   "meta": {
+    "files": 27,
+    "size": 84377734,
+    "brSize": 22717097,
+    "ms": 835
+   }
+  }
+ },
+ "link": {
+  "files": 31,
+  "size": 24685447,
+  "brSize": 6787826,
+  "ms": 237
+ },
+ "vfsMiB": {
+  "afterMeta": 113,
+  "afterLink": 137
+ },
+ "steps": {
+  "check-hello": {
+   "ms": [
+    910,
+    199,
+    169
+   ],
+   "peakMiB": 102
+  },
+  "obj-hello": {
+   "ms": [
+    1189,
+    514,
+    780
+   ],
+   "peakMiB": 139
+  },
+  "check-medium": {
+   "ms": [
+    1550,
+    933,
+    1011
+   ],
+   "peakMiB": 111
+  },
+  "obj-medium": {
+   "ms": [
+    2887,
+    2106,
+    2357
+   ],
+   "peakMiB": 189
+  },
+  "obj-medium-O": {
+   "ms": [
+    9358,
+    5224,
+    5839
+   ],
+   "peakMiB": 168
+  }
+ }
+}

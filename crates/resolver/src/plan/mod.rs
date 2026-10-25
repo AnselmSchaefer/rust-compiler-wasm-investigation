@@ -72,6 +72,10 @@ pub struct PlanInput {
     /// Plan `cargo test` instead of `cargo build` (WP-26).
     #[serde(default)]
     pub test: bool,
+    /// Plan `cargo check` (WP-27): target-side units only emit metadata; build scripts, proc
+    /// macros and what they use are still built.
+    #[serde(default)]
+    pub check: bool,
 }
 
 fn yes() -> bool {
@@ -609,7 +613,8 @@ impl Builder<'_> {
                 push(&["--crate-type", t]);
             }
         }
-        push(&[if is_lib { "--emit=dep-info,metadata,link" } else { "--emit=dep-info,link" }]);
+        let check = self.input.check && !host;
+        push(&[if check { "--emit=dep-info,metadata" } else if is_lib { "--emit=dep-info,metadata,link" } else { "--emit=dep-info,link" }]);
         if proc_macro {
             push(&["-C", "prefer-dynamic"]);
         }
@@ -696,6 +701,8 @@ impl Builder<'_> {
 
         let info = self.info(host);
         let outputs = match kind {
+            // cargo check: a metadata file per unit, bins included (lib<crate>-<hash>.rmeta).
+            _ if check => vec![format!("{out_dir}/lib{}-{hash}.rmeta", target.crate_name)],
             UnitKind::Lib if proc_macro => vec![format!("{out_dir}/{}{}-{hash}{}", info.dll_prefix, target.crate_name, info.dll_suffix)],
             UnitKind::Lib => vec![format!("{out_dir}/lib{}-{hash}.rlib", target.crate_name), format!("{out_dir}/lib{}-{hash}.rmeta", target.crate_name)],
             _ => vec![format!("{out_dir}/{}-{hash}{}", target.crate_name, info.exe_suffix)],

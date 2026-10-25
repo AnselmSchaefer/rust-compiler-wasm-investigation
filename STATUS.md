@@ -3,11 +3,19 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** WP-26 **done** (session 22). Next: **WP-27** (incremental compilation), then WP-38 (→ M2). M1 reached (WP-22).
+- **Active WP:** WP-27a **done** (session 22; WP-27 split). Next: **WP-38** (agent tool API + local relay → M2), then WP-40 (hands-on demo). WP-27b (incremental) blocked on **[H]**.
 - **Last session:** 2026-10-25 (session 22). WP-21 done: build scripts with autocfg, rustc probes, libc, proc-macro2, anyhow and `links` metadata build in the browser and print what they print natively. Release **1.99.1-7520bf319596**.
 - **Rule for rustc source:** rust-lang's agent policy (`build/rust/AGENTS.md`) applies. Claude does not write or edit rustc source, and does not draft rust-lang issues, PRs or Zulip posts. The user writes those, or applies existing **human-written** patches (bjorn3/oligamiq), which the user prefers whenever one exists. **danlapid 0005–0007 are LLM-generated** (Claude co-author trailers), so they don't qualify even if the user applies them; design reference only (`docs/patches.md`). Claude reviews, builds and explains. Everything outside `build/rust` is Claude's, including out-of-tree drivers using `rustc_driver` (`toolchain/rustc-multi`).
-- **Next step:** WP-27: persist rustc's incremental directory in OPFS (planner `profile.incremental` is already there, off in the browser), then profile warm `check` and edit → run on the 500-line benchmark against PROPOSAL §6 (< 1 s check, < 2 s edit → run). Open follow-ups: doc tests (rustdoc needs libtest for the wasm host), Wasm proc macros in prebuild/L2 (WP-20), top-500 matrix.
+- **Next step:** WP-38: page-side tool layer over the orchestrator ops (files, resolve, check, build, run, test, clippy, fmt; JSON results), Python relay `tools/relay/` (MCP on stdio, WebSocket to the page, serves the app with COOP/COEP, proxies `/index/` to index.crates.io, 127.0.0.1 + per-run token + Origin check), headed/headless Chromium via Playwright. Open follow-ups: WP-27b (needs the rustc file-lock change), doc tests, Wasm proc macros in prebuild/L2, top-500 matrix.
 - **Running background jobs:** none
+
+## Current session (2026-10-25, session 22, cont. 3): WP-27a done, WP-27b blocked [H]
+- Added WP-40 (hands-on demo, after WP-38) at the user's request.
+- **Incremental:** rustc.wasm stops with "could not create session directory lock file: file locks not supported on this platform": `rustc_data_structures::flock` uses its `unsupported` impl on WASI, and `lock_directory` makes any lock error fatal. No human-written patch covers it. **[H]** the user writes the change (what it must achieve: `docs/incremental.md`). WP-27 split: 27a (budgets) / 27b (incremental, blocked).
+- **cargo check:** planner mode (`PlanInput.check`: target-side units `--emit=dep-info,metadata`, host side as usual), op `check`; golden case `tests/planner/cases/check` identical to `cargo check -vv` (28 units); 9/9 cases.
+- **Measured** (`tests/e2e/warm.spec.ts`, Chromium, medians of 5): 500-line benchmark warm check 235–288 ms; warm edit → run 2,012 ms with cargo's debuginfo 2 (codegen ~1.75 s), 1,478 ms with 1, **1,114–1,269 ms with 0** → `debuginfo: 0` is now the browser's default dev profile (nothing reads DWARF here). Project with serde derive/serde_json/thiserror: check ~300–347 ms, edit → run 559–623 ms. `bench/warm.md`.
+- `scripts/verify/wp-27.sh` passes. With the new default: full Chromium suite 18 passed + 1 skipped, WP-21 (incl. WP-18 determinism) and WP-26 verify.
+- **Human action:** the rustc change for file locks on a WASI host (WP-27b). Not blocking M2.
 
 ## Current session (2026-10-25, session 22, cont. 2): WP-26 done
 - **cargo test:** planner test mode (`PlanInput.test`: dev-dependency edges for the roots, examples, `--test` harnesses for lib/bins/integration tests, bins with `CARGO_BIN_EXE_*` + `CARGO_TARGET_TMPDIR`, `Plan.tests`). Golden case `tests/planner/cases/tests` from `cargo test --no-run -vv` (`record.cmd`): 10 units identical; 8/8 cases. `record.sh` fix: env names with lowercase letters. Runner `web/build/test.ts`: `--list`, then each test in its own sandbox process (wasm32-wasip1 aborts on panic, like -Zpanic-abort-tests), libtest JSON with `RUSTC_BOOTSTRAP=1` at run time, `--nocapture` output separated from events, panic message from stderr; should_panic → ignored (libtest's own behaviour on panic=abort). Ops `test` (filter, exact, includeIgnored), `clippy`, `fmt`.
@@ -164,6 +172,7 @@
 - [ ] **Possible upstream rustc bug** (user to report, if wanted): `filesearch.rs` `from_env_args_next` checks `lib/rustlib` relative to the *working directory*, not next to argv[0] (see `~/Projects/rustc-wasm-host-source-changes.md` §6).
 
 ## Human actions needed
+- [ ] **[H] WP-27b rustc change (2026-10-25):** incremental compilation can't start on a WASI host: `rustc_data_structures::flock` has no lock for WASI and `rustc_incremental`'s `lock_directory` treats that as fatal. What the change must achieve, and the follow-up steps: `docs/incremental.md`. No human-written patch exists. Not blocking M2 (budgets met without it).
 - [x] **[H] WP-20 rustc changes** (2026-10-25): applied by the user (bjorn3 #160981 + tuple wasip1; change 2 written by the user); rustc.wasm rebuilt and the lookup/registration path verified. Open, optional: the `": "` separator in change 2's error message.
 - [x] **Scope (2026-10-24):** v1 targets agentic development; human-only browser-IDE WPs moved to the PLAN.md Appendix.
 - [x] **Agent setup (2026-10-24):** the agent runs on this machine and reaches the browser page through a local Python relay (MCP ⇄ WebSocket). WP-38 updated; WP-29 deploy is optional now.
@@ -207,7 +216,8 @@
 | 24 | Editor integration | deferred | 0 | Appendix (human-only) |
 | 25 | Projects and workspaces | done | 1 | `scripts/verify/wp-25.sh` passes. Workspaces golden-identical to cargo (2 cases + lockfiles); OPFS projects, zip/GitHub import, Cargo.toml edits; `docs/projects.md` |
 | 26 | Tests, Clippy, rustfmt | done | 1 | `scripts/verify/wp-26.sh`; per-test processes, Clippy + rustfmt in rustc-multi; doc tests deferred (`docs/test-tools.md`) |
-| 27 | Incremental compilation | ready | 0 | check-on-idle moved to the Appendix |
+| 27a | Warm latency budgets | done | 1 | `scripts/verify/wp-27.sh`; check 241–288 ms, edit → run 1.1–1.3 s (debuginfo 0 default); `bench/warm.md` |
+| 27b | Incremental compilation in OPFS | blocked | 0 | **[H]** rustc change: incremental sessions need file locks on WASI (`docs/incremental.md`) |
 | 28 | First-visit performance | deferred | 0 | Appendix (human-only) |
 | 38 | Agent tool API + local relay (M2) | blocked | 0 | new 2026-10-24: MCP ⇄ Python relay ⇄ WebSocket ⇄ page |
 | 40 | Hands-on demo | blocked | 0 | new 2026-10-25 (user): after WP-38; all v1 features in the app UI |
@@ -219,6 +229,7 @@
 | 37 | Release-train rebase | blocked | 0 | recurring |
 
 ## Measurements
+- 2026-10-25 WP-27a (Chromium, release 1.99.1-6c798e2613f0): 500-line benchmark warm `cargo check` 235–288 ms, warm edit → run 1.1–1.3 s (debuginfo 0; 2.0 s with debuginfo 2); with serde derive/serde_json/thiserror deps: check ~300 ms, edit → run ~0.6 s. `bench/warm.md`.
 - 2026-10-25 WP-26 (Chromium, release 1.99.1-6c798e2613f0): cargo test of a small crate: build 3.0 s cold, 7 tests each in its own process 130–151 ms; one test by name 88–96 ms; Clippy 58–67 ms after the build; rustfmt < 1 ms.
 - 2026-10-25 WP-22 (Chromium, release 1.99.1-7520bf319596): top 100 crates by downloads, default features: 96/100 build (4 fail natively for wasm32-wasip1 too); whole list 6.5 min on 4 workers with L1 carried over; storage stays under ~0.86 GiB with LRU eviction.
 - 2026-10-25 WP-20 (Chromium, release 1.99.1-fda536abb2a3): cold `cargo build` of serde derive + serde_json + thiserror (28 units) 21 s on 4 workers, runs like native; reload + edit main.rs → build 1.45 s (macro modules from L1).

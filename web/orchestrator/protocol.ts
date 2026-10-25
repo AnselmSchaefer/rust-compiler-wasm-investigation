@@ -41,6 +41,8 @@ export type Ops = {
    * `filter` (+ `exact`): only the tests whose name contains (equals) it.
    */
   test: { args: Ops['build']['args'] & { filter?: string; exact?: boolean; includeIgnored?: boolean }; result: TestRun };
+  /** `cargo check` (WP-27): `build` with metadata only for target-side units; diagnostics in `errors`/units. */
+  check: { args: Ops['build']['args']; result: BuildResult };
   /** `cargo clippy` (WP-26): the primary packages' diagnostics, Clippy's lints included. */
   clippy: { args: Ops['build']['args']; result: ClippyRun };
   /**

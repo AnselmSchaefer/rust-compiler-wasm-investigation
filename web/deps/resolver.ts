@@ -36,6 +36,8 @@ export interface PlanInput {
   host_args?: string[]; build_script_args?: string[];
   /** Plan `cargo test` (WP-26): dev-dependencies, examples, test harnesses. */
   test?: boolean;
+  /** Plan `cargo check` (WP-27). */
+  check?: boolean;
 }
 export type UnitKind = 'lib' | 'bin' | 'custom-build' | 'run-custom-build' | 'test' | 'example';
 export interface PlanUnit {

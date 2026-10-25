@@ -364,15 +364,25 @@ These are taken as defaults so work can start. Changing one later only affects t
   - *2026-10-25 (done, session 22): planner `cargo test` units golden-identical to `cargo test --no-run -vv`; tests run one per sandbox process (wasm32-wasip1 aborts on panic), libtest JSON → per-test results; Clippy and rustfmt linked into rustc-multi (bootstrap-built crates, no source changes). **Doc tests deferred:** rustdoc for the wasm host needs libtest in the host sysroot, which bootstrap only builds with a native stage-1 compiler. See `docs/test-tools.md`.*
 
 #### WP-27 Incremental compilation
+*Split 2026-10-25 (session 22): rustc.wasm can't start an incremental session (no file locks on WASI, a rustc change for the user), but the budgets were met without it. So 27a = the budgets, 27b = incremental.*
 - **Depends:** WP-25 · **Est.:** 2 sessions
 - **Tasks**
   - Persist rustc's incremental directory in OPFS.
   - Profile pass against the PROPOSAL §6 budgets. An agent iterates edit → check many times, so warm latency matters most.
 - **Done when:** a warm `check` of the user crate takes < 1 s and warm edit → run < 2 s on the 500-line benchmark, in Chromium.
 
+#### WP-27a Warm latency budgets
+- **Done when:** as WP-27's: warm `check` < 1 s, warm edit → run < 2 s on the 500-line benchmark in Chromium.
+  - *2026-10-25 (done, session 22): planner `cargo check` mode (golden-identical); warm check 241–288 ms, warm edit → run 1.1–1.3 s, after making debuginfo 0 the browser's default (2.0 s with cargo's debuginfo 2: codegen dominates). See `docs/incremental.md`, `bench/warm.md`.*
+
+#### WP-27b Incremental compilation in OPFS
+- **Depends:** WP-27a, **[H]** a rustc change so that an incremental session can start on a WASI host (file locks; `docs/incremental.md`) · **Est.:** 1 session after the change
+- **Tasks:** check the rest of the incremental path under wasmtime; turn on `-C incremental` for path packages; mirror `/target/**/incremental` to OPFS (WP-11 persister); measure with `INCREMENTAL=1` in `tests/e2e/warm.spec.ts`.
+- **Done when:** after a reload, a warm edit → run of the benchmark recompiles only the changed codegen units, and is faster than without incremental.
+
 #### WP-38 Agent tool API and local relay → **M2**
 *Decided 2026-10-24: the agent runs on this machine and reaches the browser through a local relay. Shape: agent ⇄ MCP (stdio) ⇄ Python relay ⇄ WebSocket ⇄ the IDE page in Chromium, which does the work with the toolchain it already has.*
-- **Depends:** WP-22, WP-26, WP-27 · **Est.:** 2 sessions
+- **Depends:** WP-22, WP-26, WP-27a · **Est.:** 2 sessions
 - **Tasks**
   - **Page side:** a tool layer over the orchestrator: list/read/write/delete files; resolve dependencies; check; build; run (stdin, timeout, exit code, output); test (all or one, structured results); Clippy; rustfmt. Every result is JSON, with rustc diagnostics in their JSON form. The IDE shows what the agent does (file changes, terminal output), so a human can watch.
   - **Python relay** (`tools/relay/`, Python 3, as few dependencies as possible):

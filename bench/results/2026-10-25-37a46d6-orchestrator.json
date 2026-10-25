@@ -1,0 +1,90 @@
+{
+ "date": "2026-10-25",
+ "commit": "37a46d6",
+ "browser": "chromium",
+ "release": "1.99.1-6c798e2613f0",
+ "first": {
+  "init": {
+   "rustcId": "1.99.1-6c798e2613f0",
+   "ms": 5033,
+   "loads": [
+    {
+     "file": "sysroot-wasm32-wasip1-meta.tar.br",
+     "bytes": 84408320,
+     "fromCache": false,
+     "ms": 3003
+    },
+    {
+     "file": "rustc.wasm.br",
+     "bytes": 160733016,
+     "fromCache": false,
+     "ms": 4629
+    }
+   ]
+  },
+  "firstBuildMs": 4368,
+  "buildHello": {
+   "rustc": 2185.7,
+   "link": 1695,
+   "total": 4364
+  },
+  "rebuild": {
+   "rustc": 399,
+   "link": 144,
+   "total": 547
+  },
+  "check": {
+   "rustc": 76.2,
+   "link": 0,
+   "total": 78
+  },
+  "buildMedium": {
+   "rustc": 2508,
+   "link": 118,
+   "total": 2627
+  },
+  "runHello": 53
+ },
+ "second": {
+  "init": {
+   "rustcId": "1.99.1-6c798e2613f0",
+   "ms": 1030,
+   "loads": [
+    {
+     "file": "rustc.wasm.br",
+     "bytes": 160733016,
+     "fromCache": true,
+     "ms": 613
+    },
+    {
+     "file": "sysroot-wasm32-wasip1-meta.tar.br",
+     "bytes": 84408320,
+     "fromCache": true,
+     "ms": 889
+    }
+   ]
+  },
+  "firstBuildMs": 948,
+  "buildHello": {
+   "rustc": 263.5,
+   "link": 564,
+   "total": 947
+  },
+  "rebuild": {
+   "rustc": 194.2,
+   "link": 137,
+   "total": 333
+  },
+  "check": {
+   "rustc": 53.1,
+   "link": 0,
+   "total": 54
+  },
+  "buildMedium": {
+   "rustc": 1787.5,
+   "link": 153,
+   "total": 1942
+  },
+  "runHello": 25
+ }
+}

@@ -40,6 +40,9 @@ const handlers: { [O in keyof Ops]: (a: Ops[O]['args']) => Promise<Ops[O]['resul
   async build(a) {
     return cargoBuild(host(), await buildOptions(a));
   },
+  async check(a) {
+    return cargoBuild(host(), { ...await buildOptions(a), check: true });
+  },
   async test(a) {
     return cargoTest(host(), { ...await buildOptions(a), filter: a.filter, exact: a.exact, includeIgnored: a.includeIgnored });
   },

@@ -1,0 +1,357 @@
+{
+  "release": "1.99.1-6c798e2613f0",
+  "units": [
+    {
+      "id": 0,
+      "name": "anyhow",
+      "version": "1.0.104",
+      "kind": "custom-build",
+      "key": "6cb87c4b0df25514c35634e222457c0a4bb70dac9a4b969bcfd5e6bd6bb0be8d",
+      "start": 2440,
+      "end": 6038,
+      "rustcMs": 488,
+      "files": {
+        "/target/debug/build/anyhow-a2100fd5f5279dee/build_script_build-a2100fd5f5279dee.wasm": "5b9762592b608897ed31a27737f38e01fafe6f5a2b3ba9f69eac8b999e936526"
+      },
+      "warnings": []
+    },
+    {
+      "id": 9,
+      "name": "linkb",
+      "version": "0.1.0",
+      "kind": "custom-build",
+      "key": "2c9b25486435f96212a55fefc006f537414bae71db8555a8060477cd6135662f",
+      "start": 2441,
+      "end": 5996,
+      "rustcMs": 359.5,
+      "files": {
+        "/target/debug/build/linkb-47def2a3b43c127d/build_script_build-47def2a3b43c127d.wasm": "e8d419747c0fd137c8e6f7dd6dc49b87d95f5bfa15416589b0745e43cd25d852"
+      },
+      "warnings": []
+    },
+    {
+      "id": 6,
+      "name": "linka",
+      "version": "0.1.0",
+      "kind": "custom-build",
+      "key": "48a5a1bad9de3e3b76c1f16d92ebdd53a474f9291cb2ab1d623db0acaf68ffe6",
+      "start": 2441,
+      "end": 6002,
+      "rustcMs": 427.4,
+      "files": {
+        "/target/debug/build/linka-e297e87b9b554018/build_script_build-e297e87b9b554018.wasm": "254a3e3b9356d3ebd1a08d12591649fd5c928c82588731b19045a3f52e68c01b"
+      },
+      "warnings": []
+    },
+    {
+      "id": 3,
+      "name": "libc",
+      "version": "0.2.191",
+      "kind": "custom-build",
+      "key": "6f1888c2e0df2844815e440549b676e94fac8ad9307d4b7ec00368edcc61fc38",
+      "start": 2441,
+      "end": 6016,
+      "rustcMs": 1023.2,
+      "files": {
+        "/target/debug/build/libc-f395f24143d6cab5/build_script_build-f395f24143d6cab5.wasm": "02e8d0877d8426dd27d8b817a44a2c2ddd704b04d888065490afeb62aec89d57"
+      },
+      "warnings": []
+    },
+    {
+      "id": 16,
+      "name": "unicode-ident",
+      "version": "1.0.27",
+      "kind": "lib",
+      "key": "cca676532fd0bcfa7875e744db19cb4440b73384ce58fed645598545a09a3504",
+      "start": 2441,
+      "end": 6315,
+      "rustcMs": 311.7,
+      "files": {
+        "/target/wasm32-wasip1/debug/deps/libunicode_ident-c2ae137d48e0b84f.rlib": "213b0b2d8364161bc1dc1ee6b15b9aee394ae98646a48f43e14234f4043808e7",
+        "/target/wasm32-wasip1/debug/deps/libunicode_ident-c2ae137d48e0b84f.rmeta": "ec5487fd222a1b214ab4486327e0b4323cee6d6c371274f12d6102d274a469c2"
+      },
+      "warnings": []
+    },
+    {
+      "id": 17,
+      "name": "proc-macro2",
+      "version": "1.0.107",
+      "kind": "custom-build",
+      "key": "67f8286409b241138cb2f921c6a4a6f02d93de904f16255425f5bdde03f49b9b",
+      "start": 2441,
+      "end": 6573,
+      "rustcMs": 407.2,
+      "files": {
+        "/target/debug/build/proc-macro2-9617875114676492/build_script_build-9617875114676492.wasm": "d338a21694ef598194e5b8975401b33c656d6822dbf855788d6abce63e614c5f"
+      },
+      "warnings": []
+    },
+    {
+      "id": 20,
+      "name": "rustversion",
+      "version": "1.0.23",
+      "kind": "custom-build",
+      "key": "299c37585dcebf85c6bb64828ce7a17cc2a31445fe508a3368669f85942c4f56",
+      "start": 2441,
+      "end": 6794,
+      "rustcMs": 530.4,
+      "files": {
+        "/target/debug/build/rustversion-0bfd867c1e26c208/build_script_build-0bfd867c1e26c208.wasm": "e6fa4ef7e6b11d192f6e7a09f77cf4a27adf77527e7d038492469fbc79465e1b"
+      },
+      "warnings": []
+    },
+    {
+      "id": 12,
+      "name": "autocfg",
+      "version": "1.5.1",
+      "kind": "lib",
+      "key": "60cc67b42a9e60d6674c21b94a314d35c1a850febcfd56ca18ab209e4bdff357",
+      "start": 2441,
+      "end": 7064,
+      "rustcMs": 1065.7,
+      "files": {
+        "/target/debug/deps/libautocfg-61e4a7f0eb3f8334.rlib": "095a443c9b21d7ea48752dbce4ad32faadf8af22808a7c5b13863767947d80b8",
+        "/target/debug/deps/libautocfg-61e4a7f0eb3f8334.rmeta": "95560615c69632bf497ac354c1d58032d2ffb9938153ff14f57568e480b55a62"
+      },
+      "warnings": []
+    },
+    {
+      "id": 7,
+      "name": "linka",
+      "version": "0.1.0",
+      "kind": "run-custom-build",
+      "key": "24e42848b7ca83bbacbac5b1f29aec65805339961627345617447660c3658ef6",
+      "start": 6002,
+      "end": 6142,
+      "files": {},
+      "stdout": "cargo:rustc-link-search=native=/target/wasm32-wasip1/debug/build/linka-22bcce77a30a53ec/out/lib\ncargo:greeting=hello from linka\ncargo:include=/target/wasm32-wasip1/debug/build/linka-22bcce77a30a53ec/out/include\ncargo:rustc-env=LINKA_CWD=linka\n",
+      "warnings": []
+    },
+    {
+      "id": 4,
+      "name": "libc",
+      "version": "0.2.191",
+      "kind": "run-custom-build",
+      "key": "7f3331fcf675bebbe20a910f205c9fae864714e7afd407af4b713b4c8fd55b72",
+      "start": 6016,
+      "end": 6453,
+      "files": {},
+      "stdout": "cargo:rerun-if-changed=build.rs\ncargo:rerun-if-env-changed=LIBC_BUILD_VERBOSE\ncargo:rerun-if-env-changed=RUST_LIBC_UNSTABLE_FREEBSD_VERSION\ncargo:rustc-check-cfg=cfg(libc_deny_warnings)\ncargo:rustc-check-cfg=cfg(emscripten_old_stat_abi)\ncargo:rustc-check-cfg=cfg(emscripten_fsblkcnt_is_32bit)\ncargo:rustc-check-cfg=cfg(emscripten_sigset_large)\ncargo:rustc-check-cfg=cfg(emscripten_nfds_is_ulong)\ncargo:rustc-check-cfg=cfg(espidf_picolibc)\ncargo:rustc-check-cfg=cfg(espidf_time32)\ncargo:rustc-check-cfg=cfg(freebsd10)\ncargo:rustc-check-cfg=cfg(freebsd11)\ncargo:rustc-check-cfg=cfg(freebsd12)\ncargo:rustc-check-cfg=cfg(freebsd13)\ncargo:rustc-check-cfg=cfg(freebsd14)\ncargo:rustc-check-cfg=cfg(freebsd15)\ncargo:rustc-check-cfg=cfg(libc_elfv2)\ncargo:rustc-check-cfg=cfg(vxworks_lt_25_09)\ncargo:rustc-check-cfg=cfg(libc_pauthtest)\ncargo:rustc-check-cfg=cfg(gnu_file_offset_bits64)\ncargo:rustc-check-cfg=cfg(gnu_time_bits64)\ncargo:rustc-check-cfg=cfg(linux_time_bits64)\ncargo:rustc-check-cfg=cfg(musl_v1_2)\ncargo:rustc-check-cfg=cfg(musl32_time64)\ncargo:rustc-check-cfg=cfg(musl_redir_time64)\ncargo:rustc-check-cfg=cfg(uclibc32_time64)\ncargo:rustc-check-cfg=cfg(target_os,values(\"switch\",\"aix\",\"ohos\",\"hurd\",\"rtems\",\"visionos\",\"nuttx\",\"cygwin\",\"qurt\",\"qnx\",\"helenos\"))\ncargo:rustc-check-cfg=cfg(target_env,values(\"illumos\",\"wasi\",\"aix\",\"ohos\",\"nto71_iosock\"))\ncargo:rustc-check-cfg=cfg(target_arch,values(\"loongarch64\",\"mips32r6\",\"mips64r6\",\"csky\"))\n",
+      "warnings": []
+    },
+    {
+      "id": 1,
+      "name": "anyhow",
+      "version": "1.0.104",
+      "kind": "run-custom-build",
+      "key": "9da4071ab0a165a7991a3f3826f9ead1bdeb638fecc6c404d217737915874357",
+      "start": 6038,
+      "end": 6526,
+      "files": {},
+      "stdout": "cargo:rerun-if-changed=src/nightly.rs\ncargo:rerun-if-env-changed=RUSTC_BOOTSTRAP\ncargo:rustc-check-cfg=cfg(anyhow_build_probe)\ncargo:rustc-check-cfg=cfg(anyhow_nightly_testing)\ncargo:rustc-check-cfg=cfg(anyhow_no_clippy_format_args)\ncargo:rustc-check-cfg=cfg(anyhow_no_core_error)\ncargo:rustc-check-cfg=cfg(error_generic_member_access)\n",
+      "warnings": []
+    },
+    {
+      "id": 10,
+      "name": "linkb",
+      "version": "0.1.0",
+      "kind": "run-custom-build",
+      "key": "aad88b926820e66fb8ef6e693c1b1c93192bc25148451501531a92021ff753c4",
+      "start": 6142,
+      "end": 6189,
+      "files": {},
+      "stdout": "cargo:rustc-env=LINKB_GREETING=hello from linka\ncargo:rustc-env=LINKB_INCLUDE_DIR=true\n",
+      "warnings": []
+    },
+    {
+      "id": 8,
+      "name": "linka",
+      "version": "0.1.0",
+      "kind": "lib",
+      "key": "606e467f6ff073877b113cefbc8a06503a2109784e2fbccd4a3766829cddf2d2",
+      "start": 6142,
+      "end": 6357,
+      "rustcMs": 40.8,
+      "files": {
+        "/target/wasm32-wasip1/debug/deps/liblinka-03ddc6f334ca6a9a.rlib": "250ddde0457a4e37632aefa8486a7a982dbb26f6f43b1dd9121994c3bd38c29c",
+        "/target/wasm32-wasip1/debug/deps/liblinka-03ddc6f334ca6a9a.rmeta": "5ee44ac97a45f290c98d32a239cc99453bbc7fa02bc90e8e3c30d2106742b849"
+      },
+      "warnings": []
+    },
+    {
+      "id": 11,
+      "name": "linkb",
+      "version": "0.1.0",
+      "kind": "lib",
+      "key": "6d3a29d228981bc2b2bafd0d3d15aea32eef8ed5f86488ab0793275a07876cb0",
+      "start": 6357,
+      "end": 6520,
+      "rustcMs": 75.1,
+      "files": {
+        "/target/wasm32-wasip1/debug/deps/liblinkb-d015115fc92f8df0.rlib": "6bd640aa269c44e11b87821b391b638d57e8f6b5346c2a4ac56ff9aa0e920e5c",
+        "/target/wasm32-wasip1/debug/deps/liblinkb-d015115fc92f8df0.rmeta": "2eba0d795d58cae5d61275b67d57d52bd2f18eeeffbbad35ebe495311e6b7fca"
+      },
+      "warnings": []
+    },
+    {
+      "id": 5,
+      "name": "libc",
+      "version": "0.2.191",
+      "kind": "lib",
+      "key": "c2df8f310fe7a2e4866c3619e1e638fda935b34d8457c7fa4f5e43043381e98e",
+      "start": 6453,
+      "end": 7072,
+      "rustcMs": 544.9,
+      "files": {
+        "/target/wasm32-wasip1/debug/deps/liblibc-773c30128a32e261.rlib": "8ff3582e227baffa3bb59c075e735c1ed13d04e52f7e16ed26e773b511ff305d",
+        "/target/wasm32-wasip1/debug/deps/liblibc-773c30128a32e261.rmeta": "d89cedb1cd2bf46ede093eb36c4968abff6995f70b8372c32200968a18c75e5d"
+      },
+      "warnings": []
+    },
+    {
+      "id": 2,
+      "name": "anyhow",
+      "version": "1.0.104",
+      "kind": "lib",
+      "key": "5fe28e69d2040ec3c00b7277cb05abc9c8e4a75b026ec0e4ef95b302cb3d4bcb",
+      "start": 6526,
+      "end": 7544,
+      "rustcMs": 969.4,
+      "files": {
+        "/target/wasm32-wasip1/debug/deps/libanyhow-476be13c08dcc519.rlib": "6c775bc26327e8a1fa46203517f97265824d9c2a1a30c1d3ddf33577f4394853",
+        "/target/wasm32-wasip1/debug/deps/libanyhow-476be13c08dcc519.rmeta": "7e0cdeca42c94164ebb40d0eb80e70604570d6b277f46e489c5398b0cc38c729"
+      },
+      "warnings": []
+    },
+    {
+      "id": 18,
+      "name": "proc-macro2",
+      "version": "1.0.107",
+      "kind": "run-custom-build",
+      "key": "9a8a8b437b6c0c20acfec4146432b8da9539f5aa7e652a8cc2ab0653db000aef",
+      "start": 6573,
+      "end": 7121,
+      "files": {},
+      "stdout": "cargo:rustc-check-cfg=cfg(fuzzing)\ncargo:rustc-check-cfg=cfg(no_is_available)\ncargo:rustc-check-cfg=cfg(no_literal_byte_character)\ncargo:rustc-check-cfg=cfg(no_literal_c_string)\ncargo:rustc-check-cfg=cfg(no_source_text)\ncargo:rustc-check-cfg=cfg(proc_macro_span)\ncargo:rustc-check-cfg=cfg(proc_macro_span_file)\ncargo:rustc-check-cfg=cfg(proc_macro_span_location)\ncargo:rustc-check-cfg=cfg(procmacro2_backtrace)\ncargo:rustc-check-cfg=cfg(procmacro2_build_probe)\ncargo:rustc-check-cfg=cfg(procmacro2_nightly_testing)\ncargo:rustc-check-cfg=cfg(procmacro2_semver_exempt)\ncargo:rustc-check-cfg=cfg(randomize_layout)\ncargo:rustc-check-cfg=cfg(span_locations)\ncargo:rustc-check-cfg=cfg(super_unstable)\ncargo:rustc-check-cfg=cfg(wrap_proc_macro)\ncargo:rerun-if-changed=src/probe/proc_macro_span.rs\ncargo:rustc-cfg=wrap_proc_macro\ncargo:rerun-if-changed=src/probe/proc_macro_span_location.rs\ncargo:rustc-cfg=proc_macro_span_location\ncargo:rerun-if-changed=src/probe/proc_macro_span_file.rs\ncargo:rustc-cfg=proc_macro_span_file\ncargo:rerun-if-env-changed=RUSTC_BOOTSTRAP\n",
+      "warnings": []
+    },
+    {
+      "id": 21,
+      "name": "rustversion",
+      "version": "1.0.23",
+      "kind": "run-custom-build",
+      "key": "08a7c1ae01c536cff25729ec544efba1e042a7cd4f5a63381382a74d417fdfc0",
+      "start": 6794,
+      "end": 6918,
+      "files": {
+        "/target/debug/build/rustversion-ff76cf352f58faf4/out/version.expr": "b1036b166285b5cab9624e81d5edb437ab94c1f802a29a0343b90a04eccb4467"
+      },
+      "stdout": "cargo:rerun-if-changed=build/build.rs\ncargo:rustc-check-cfg=cfg(cfg_macro_not_allowed)\ncargo:rustc-check-cfg=cfg(host_os, values(\"windows\"))\n",
+      "warnings": []
+    },
+    {
+      "id": 22,
+      "name": "rustversion",
+      "version": "1.0.23",
+      "kind": "lib",
+      "key": "79a10b7f92baac6a0a85649a050f6c6c11e3b789ac930f4d44c3e99a4dfec05b",
+      "start": 6918,
+      "end": 7897,
+      "rustcMs": 824.2,
+      "files": {
+        "/target/debug/deps/rustversion-111ddd5302a691a7.wasm": "0737db60fb24b7113276b59bebe9f8cab77a1708ccd31e112ff9727a5ff1bb59"
+      },
+      "warnings": []
+    },
+    {
+      "id": 13,
+      "name": "num-traits",
+      "version": "0.2.19",
+      "kind": "custom-build",
+      "key": "839cf8ea2952f62328c04c60dc61126dac334602e773ce583f46ffee4dda418b",
+      "start": 7064,
+      "end": 7340,
+      "rustcMs": 84.1,
+      "files": {
+        "/target/debug/build/num-traits-1442910b3a7a2f8a/build_script_build-1442910b3a7a2f8a.wasm": "e93d9570ae4e1b81d3a56ec3dea66ebdf9ef3f77194d9e9f62238cc71ac39176"
+      },
+      "warnings": []
+    },
+    {
+      "id": 19,
+      "name": "proc-macro2",
+      "version": "1.0.107",
+      "kind": "lib",
+      "key": "e045ef39392f58fb9e244b0424c2cf4a86b126a39f7f25afec978a9c85bd3e85",
+      "start": 7122,
+      "end": 8537,
+      "rustcMs": 1410.5,
+      "files": {
+        "/target/wasm32-wasip1/debug/deps/libproc_macro2-ab8cb71222073d6f.rlib": "febf7229f9efc3ac9f9ae7345ef686d33a568c11d4a9f211d8dd08b904b6b166",
+        "/target/wasm32-wasip1/debug/deps/libproc_macro2-ab8cb71222073d6f.rmeta": "9deb6224515f84422dfb41c5a35035c5287ee1ea8333f066b9dcee1f048be4c2"
+      },
+      "warnings": []
+    },
+    {
+      "id": 14,
+      "name": "num-traits",
+      "version": "0.2.19",
+      "kind": "run-custom-build",
+      "key": "4861ae03e1832ef9b6f7580467a042c5887cdec24ee34888cf26a95df3b86cd6",
+      "start": 7340,
+      "end": 7469,
+      "files": {},
+      "stdout": "cargo:rustc-check-cfg=cfg(has_total_cmp)\ncargo:rustc-cfg=has_total_cmp\ncargo:rerun-if-changed=build.rs\n",
+      "warnings": []
+    },
+    {
+      "id": 15,
+      "name": "num-traits",
+      "version": "0.2.19",
+      "kind": "lib",
+      "key": "b6f06ed0180cca6ea45cada188640038f432f4587425dfb4e23a0693636b9e52",
+      "start": 7469,
+      "end": 9107,
+      "rustcMs": 1626.5,
+      "files": {
+        "/target/wasm32-wasip1/debug/deps/libnum_traits-238dbf39bbe6961e.rlib": "0b4f79e04396bbcc543b3ec15d83abc361b5c10b42cbea1a00834bd7f869cf76",
+        "/target/wasm32-wasip1/debug/deps/libnum_traits-238dbf39bbe6961e.rmeta": "f2bb259ed9faa5a73a322ea96d25d4a7099bc5b18c3d298bec2466e8d49c8ef1"
+      },
+      "warnings": []
+    },
+    {
+      "id": 23,
+      "name": "scripts",
+      "version": "0.1.0",
+      "kind": "bin",
+      "key": "24f207f3c99751b2862c562c8c50d050c3ad9e01701e4f9a683f66de83698f0b",
+      "start": 9107,
+      "end": 9391,
+      "rustcMs": 152.5,
+      "files": {
+        "/target/wasm32-wasip1/debug/deps/scripts-86ae41631134df1e.wasm": "1b785cc7a48a2b70f58981c0d7a724204cdd241e1dd60feafccc48589ac93ced"
+      },
+      "warnings": []
+    }
+  ],
+  "ms": {
+    "deps": 2403,
+    "plan": 29,
+    "build": 6967,
+    "store": 64,
+    "total": 9462
+  },
+  "edit": {
+    "deps": 68,
+    "plan": 10,
+    "build": 848,
+    "store": 35,
+    "total": 961
+  },
+  "run": {
+    "code": 0,
+    "stdout": "rustc >= 1.80\nnum-traits: 1.4142135 7.0\nlibc: EINVAL=28\nproc-macro2: fn f () -> u8 { 1 }\nlinkb: hello from linka (include dir: true, linka cwd: linka)\nanyhow: with context: an error\n",
+    "stderr": "",
+    "ms": 21
+  }
+}

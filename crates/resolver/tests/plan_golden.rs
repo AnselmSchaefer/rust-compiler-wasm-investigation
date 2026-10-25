@@ -171,6 +171,7 @@ fn check_case(case: &Path, index: &Path) -> Vec<String> {
         build_script_args: Vec::new(),
         // record.sh's command for the case: `cargo test --no-run` plans test units (WP-26).
         test: std::fs::read_to_string(case.join("record.cmd")).is_ok_and(|c| c.starts_with("test")),
+        check: std::fs::read_to_string(case.join("record.cmd")).is_ok_and(|c| c.starts_with("check")),
     };
     let p = plan(&input).unwrap_or_else(|e| panic!("{}: {e}", case.display()));
 

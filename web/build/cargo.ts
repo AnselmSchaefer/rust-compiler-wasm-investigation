@@ -70,8 +70,10 @@ export interface BuildOptions {
   features?: string[];
   /** `cargo test`'s units (WP-26): dev-dependencies, examples, test harnesses. */
   test?: boolean;
+  /** `cargo check` (WP-27): target-side units only emit metadata; no executables. */
+  check?: boolean;
   defaultFeatures?: boolean;
-  /** Overrides of cargo's dev profile. Default: no incremental (WP-27). */
+  /** Overrides of cargo's dev profile. Default: no incremental, debuginfo 0 (WP-27). */
   profile?: PlanInput['profile'];
   /** Build scripts that don't run (overrides.ts); default: the built-in list. */
   overrides?: Override[];
@@ -215,7 +217,7 @@ export async function cargoBuild(host: BuildHost, opts: BuildOptions): Promise<B
   if (failed && !(failed.reason instanceof UnitError)) throw failed.reason;
 
   const bins: Record<string, string> = {};
-  if (!failed) {
+  if (!failed && !opts.check) {
     // cargo "uplifts" executables out of deps/ to target/<triple>/<profile>/<name>.wasm.
     for (const [name, id] of plan.bins) {
       const from = plan.units[id].outputs[0];
@@ -262,10 +264,14 @@ function planInput(vfs: BuildFs, opts: BuildOptions, deps: DepsResult, host: Bui
     packages, roots: deps.workspace?.default_members, resolver: deps.workspace?.resolver,
     target: TARGET, host: TARGET, target_flag_for_host: true, target_dir: opts.targetDir ?? '/target',
     rustc_id: host.rustcId, features: opts.features, default_features: opts.defaultFeatures ?? true,
-    profile: { incremental: false, ...opts.profile },
+    // cargo's dev profile, but without debug info (WP-27): DWARF costs 45% of a warm edit → run of
+    // the 500-line benchmark (2.0 → 1.1 s), and nothing here reads it yet (panics take file:line
+    // from Location; wasm32-wasip1 has no symbolized backtraces; no debugger). Incremental needs
+    // file locks in rustc on WASI (docs/incremental.md).
+    profile: { incremental: false, debuginfo: 0, ...opts.profile },
     tools: { rustc: '/sysroot/bin/rustc', jobs: host.workers },
     proc_macro_args: PROC_MACRO_ARGS,
-    host_args: ['--extern', `std=${std}`], test: opts.test,
+    host_args: ['--extern', `std=${std}`], test: opts.test, check: opts.check,
     build_script_args: BUILD_SCRIPT_ARGS,
   };
 }
