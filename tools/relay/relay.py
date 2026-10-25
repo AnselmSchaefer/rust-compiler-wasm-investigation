@@ -12,7 +12,8 @@ The agent starts the relay as an MCP server (stdio). The relay
     static.crates.io allow any origin);
   * starts Chromium through Playwright (tools/relay/browser.mjs), headed to watch or headless,
     with a profile of its own (build/relay/profile) so projects and caches survive; or, with
-    --browser none, prints the URL to open.
+    --browser none, prints the URL to open (also in build/relay/url.txt). The browser starts on
+    the first MCP initialize. If the port is taken, a free one is used.
 
 Security: it listens on 127.0.0.1 only. The page connects with a token made for this run, and the
 WebSocket's Origin must be the relay's own, because any website could otherwise talk to a
@@ -245,6 +246,9 @@ class Relay:
             return  # a notification (notifications/initialized, cancelled, ...)
         try:
             if method == 'initialize':
+                # Not at startup: Claude Code starts a server once just to probe it and closes it
+                # before initialize; that one shouldn't open a window or lock the browser profile.
+                self.start_browser()
                 result = {
                     'protocolVersion': params.get('protocolVersion', PROTOCOL),
                     'capabilities': {'tools': {'listChanged': False}},
@@ -323,9 +327,18 @@ async def main():
     stop = asyncio.Event()
     for sig in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
         loop.add_signal_handler(sig, stop.set)
-    server = await asyncio.start_server(relay.serve, '127.0.0.1', a.port)
+    try:
+        server = await asyncio.start_server(relay.serve, '127.0.0.1', a.port)
+    except OSError as e:
+        # The port is taken (another relay, or one still shutting down): any free port works,
+        # since the page's URL comes from here.
+        server = await asyncio.start_server(relay.serve, '127.0.0.1', 0)
+        relay.port = server.sockets[0].getsockname()[1]
+        relay.origin = f'http://127.0.0.1:{relay.port}'
+        log(f'port {a.port} is in use ({e.strerror}); using {relay.port}')
     log(f'serving {relay.origin}; the IDE page: {relay.url}')
-    relay.start_browser()
+    (REPO / 'build/relay').mkdir(parents=True, exist_ok=True)
+    (REPO / 'build/relay/url.txt').write_text(relay.url + '\n')
     try:
         mcp = asyncio.ensure_future(relay.mcp())
         await asyncio.wait([mcp, asyncio.ensure_future(stop.wait())], return_when=asyncio.FIRST_COMPLETED)
