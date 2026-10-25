@@ -29,8 +29,8 @@ const RUSTC_ARGV0 = '/sysroot/bin/rustc';
 // rustc's main thread needs more than the default stack for deep expressions (as in WP-01).
 const ENV = ['RUST_MIN_STACK=16777216'];
 
-/** A job's working directory and stdin (WP-21). */
-export interface JobIo { cwd?: string; stdin?: string }
+/** A job's working directory and stdin (WP-21), and the tool that runs it (WP-26: clippy). */
+export interface JobIo { cwd?: string; stdin?: string; tool?: 'clippy' }
 
 export class Orchestrator {
   private jobs = 0;
@@ -99,6 +99,15 @@ export class Orchestrator {
     this.running.add(job);
     job.finally(() => this.running.delete(job)).catch(() => {});
     return job;
+  }
+
+  /**
+   * rustfmt on `source` (WP-26), on a compile server: rustfmt is linked into rustc-multi.
+   * `args`: `--edition E`, `--check`, `--config k=v`; rustfmt.toml is looked up from `cwd`.
+   */
+  async rustfmt(source: string, args: string[] = [], cwd?: string) {
+    const s = await this.acquire();
+    try { return await s.rustfmt(args, source, cwd); } finally { this.releaseServer(s); }
   }
 
   private async run(server: CompileServer, user: string[], env?: Record<string, string>, io?: JobIo): Promise<RustcResult> {
@@ -222,18 +231,29 @@ class CompileServer {
     }, workerUrl, () => this.wake?.());
   }
 
-  async request(args: string[], env?: Record<string, string>, io?: JobIo): Promise<{ exit: number; ms: number; stderr: string; stdout: string }> {
+  async request(args: string[], env?: Record<string, string>, io?: JobIo): Promise<{ exit: number; ms: number; stderr: string; stdout: string; out?: string }> {
     const id = ++this.nextId;
-    this.vfs.appendFile(this.stdin, JSON.stringify({ id, args, ...(env && { env }), ...(io?.cwd && { cwd: io.cwd }), ...(io?.stdin !== undefined && { stdin: io.stdin }) }) + '\n');
+    this.vfs.appendFile(this.stdin, JSON.stringify({ id, args, ...(env && { env }), ...(io?.cwd && { cwd: io.cwd }), ...(io?.stdin !== undefined && { stdin: io.stdin }), ...(io?.tool && { tool: io.tool }) }) + '\n');
     const answer = await this.answer(id);
     const e = this.vfs.readText(this.stderr), mark = `\x1e${id}\n`, at = e.indexOf(mark, this.errPos);
     const stderr = e.slice(this.errPos, at);
     this.errPos = at + mark.length;
-    return { exit: answer.exit, ms: answer.ms, stderr, stdout: answer.stdout };
+    return { exit: answer.exit, ms: answer.ms, stderr, stdout: answer.stdout, out: answer.out };
+  }
+
+  /** rustfmt (WP-26): formats `source`; `out` is the result (or a diff with --check). */
+  async rustfmt(args: string[], source: string, cwd?: string): Promise<{ exit: number; ms: number; stderr: string; out: string }> {
+    const id = ++this.nextId;
+    this.vfs.appendFile(this.stdin, JSON.stringify({ id, args, stdin: source, tool: 'rustfmt', ...(cwd && { cwd }) }) + '\n');
+    const answer = await this.answer(id);
+    const e = this.vfs.readText(this.stderr), mark = `\x1e${id}\n`, at = e.indexOf(mark, this.errPos);
+    const stderr = e.slice(this.errPos, at);
+    this.errPos = at + mark.length;
+    return { exit: answer.exit, ms: answer.ms, stderr, out: answer.out ?? '' };
   }
 
   /** The answer line, and rustc's own stdout before it (e.g. -V). */
-  private async answer(id: number): Promise<{ exit: number; ms: number; stdout: string }> {
+  private async answer(id: number): Promise<{ exit: number; ms: number; stdout: string; out?: string }> {
     let stdout = '';
     for (;;) {
       const text = this.vfs.readText(this.stdout);

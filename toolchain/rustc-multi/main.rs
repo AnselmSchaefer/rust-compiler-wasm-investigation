@@ -3,6 +3,8 @@
 //   rustc-multi <args>                        exactly like `rustc <args>`
 //   rustc-multi <args> --next <args> ...      each group runs like `rustc <args>`; prints
 //                                             `rustc-multi: exit <code>` to stderr after each
+//   rustc-multi --clippy <args>               `clippy-driver <args>` (tools.rs, WP-26)
+//   rustc-multi --rustfmt <args> < source     `rustfmt --emit stdout <args>` on stdin (tools.rs)
 //   rustc-multi --server [--follow]           compile server: one JSON request per line on stdin,
 //                                             {"id": 1, "args": [...], "env": {...}, "cwd": "/dir",
 //                                             "stdin": "..."} or
@@ -15,6 +17,8 @@
 // for that request only, e.g. OUT_DIR and CARGO_PKG_* for env!() (the build planner, WP-17).
 // "cwd" and "stdin" (optional, WP-21) are a build script's `rustc` probe: its working directory,
 // and the source it pipes in for an input of `-` (the server's own stdin carries the requests).
+// "tool" (optional, WP-26): "clippy" runs the args as Clippy; "rustfmt" formats "stdin" and puts
+// the result in the answer's "out" (formatted code can't share stdout with the answer lines).
 //
 // Each invocation goes through the same catch_with_exit_code that rustc_driver::main uses, plus a
 // catch_unwind for ICEs, which catch_with_exit_code re-raises. Built out of tree against
@@ -29,6 +33,12 @@
 #![allow(internal_features)]
 
 extern crate rustc_driver;
+// Clippy's and rustfmt's crates (toolchain/build-rustc-tools.sh).
+extern crate clippy_config;
+extern crate clippy_lints;
+extern crate clippy_utils;
+extern crate declare_clippy_lint;
+extern crate rustfmt_nightly;
 extern crate rustc_interface;
 extern crate rustc_metadata;
 extern crate rustc_proc_macro;
@@ -38,6 +48,7 @@ extern crate serde_json;
 
 #[cfg(not(rust_pm_stub))]
 mod pm;
+mod tools;
 
 use std::io::{BufRead, Write};
 use std::process::ExitCode;
@@ -59,11 +70,15 @@ struct Callbacks {
     /// Entered once the session options are built: rustc looks for `lib/rustlib` relative to
     /// the working directory when it finds its sysroot (there's no dll_path on WASI).
     cwd: Option<String>,
+    clippy: bool,
 }
 impl rustc_driver::Callbacks for Callbacks {
     fn config(&mut self, config: &mut rustc_interface::Config) {
         // Proc macros are wasm32-wasip1 modules here (pm.rs); no `-Z` flag or RUSTC_BOOTSTRAP needed.
         config.opts.unstable_opts.wasm_proc_macros = true;
+        if self.clippy {
+            tools::clippy_config(config);
+        }
         if let Some(d) = &self.cwd {
             if let Err(e) = std::env::set_current_dir(d) {
                 eprintln!("rustc-multi: cwd {d}: {e}");
@@ -80,12 +95,15 @@ impl rustc_driver::Callbacks for Callbacks {
 
 /// Runs one rustc invocation; `argv[0]` is the program name. Returns 0, 1 (errors) or 101 (ICE).
 fn compile(argv: &[String]) -> u8 {
-    compile_with(argv, Callbacks { stdin: None, cwd: None })
+    compile_with(argv, Callbacks { stdin: None, cwd: None, clippy: false })
 }
 
 /// With a request's stdin (the source for an input of `-`) and working directory.
 fn compile_with(argv: &[String], mut callbacks: Callbacks) -> u8 {
     let mut argv = argv.to_vec();
+    if callbacks.clippy {
+        tools::clippy_args(&mut argv);
+    }
     if callbacks.stdin.is_some() {
         if let Some(i) = argv.iter().rposition(|a| a == "-") {
             argv[i] = STDIN_INPUT.into();
@@ -149,9 +167,23 @@ fn serve(argv0: &str, follow: bool) -> ExitCode {
         let saved = env.map(|e| set_env(e)).unwrap_or_default();
         let cwd = req.get("cwd").and_then(Value::as_str).map(String::from);
         let stdin = req.get("stdin").and_then(Value::as_str).map(String::from);
+        let tool = req.get("tool").and_then(Value::as_str).unwrap_or("rustc");
         let home = std::env::current_dir().ok();
         let t0 = Instant::now();
-        let code = compile_with(&argv, Callbacks { stdin, cwd });
+        let mut formatted = None;
+        let code = match tool {
+            "rustfmt" => {
+                if let Some(d) = &cwd {
+                    let _ = std::env::set_current_dir(d);
+                }
+                let (code, out, err) = tools::rustfmt(&argv[1..], stdin.unwrap_or_default());
+                eprint!("{err}");
+                formatted = Some(String::from_utf8_lossy(&out).into_owned());
+                code
+            }
+            "clippy" => compile_with(&argv, Callbacks { stdin, cwd, clippy: true }),
+            _ => compile_with(&argv, Callbacks { stdin, cwd, clippy: false }),
+        };
         if let Some(h) = home {
             let _ = std::env::set_current_dir(h);
         }
@@ -159,7 +191,11 @@ fn serve(argv0: &str, follow: bool) -> ExitCode {
         let ms = t0.elapsed().as_secs_f64() * 1000.0;
         eprintln!("\x1e{id}");
         let mut out = std::io::stdout().lock();
-        let _ = writeln!(out, "{}", json!({ "id": id, "exit": code, "ms": (ms * 10.0).round() / 10.0 }));
+        let mut answer = json!({ "id": id, "exit": code, "ms": (ms * 10.0).round() / 10.0 });
+        if let Some(f) = formatted {
+            answer["out"] = Value::String(f);
+        }
+        let _ = writeln!(out, "{answer}");
         let _ = out.flush();
     }
 }
@@ -197,6 +233,21 @@ fn main() -> ExitCode {
     let args = rustc_driver::args::raw_args(&early_dcx);
     if args.get(1).map(String::as_str) == Some("--server") {
         return serve(&args[0], args.get(2).map(String::as_str) == Some("--follow"));
+    }
+    if args.get(1).map(String::as_str) == Some("--clippy") {
+        let argv: Vec<String> = std::iter::once(args[0].clone()).chain(args[2..].iter().cloned()).collect();
+        return ExitCode::from(compile_with(&argv, Callbacks { stdin: None, cwd: None, clippy: true }));
+    }
+    if args.get(1).map(String::as_str) == Some("--rustfmt") {
+        let mut input = String::new();
+        if let Err(e) = std::io::Read::read_to_string(&mut std::io::stdin(), &mut input) {
+            eprintln!("rustfmt: reading stdin: {e}");
+            return ExitCode::FAILURE;
+        }
+        let (code, out, err) = tools::rustfmt(&args[2..], input);
+        let _ = std::io::stdout().write_all(&out);
+        eprint!("{err}");
+        return ExitCode::from(code);
     }
     // Without --next it is a plain rustc: same output, same exit code (what release.sh ships).
     if !args.iter().any(|a| a == "--next") {

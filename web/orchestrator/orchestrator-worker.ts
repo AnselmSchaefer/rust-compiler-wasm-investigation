@@ -1,7 +1,8 @@
 // Worker entry: owns the orchestrator and answers the typed requests of protocol.ts.
 import { Orchestrator } from './orchestrator';
 import { runSandboxed } from '../sandbox/sandbox';
-import { cargoBuild } from '../build/cargo';
+import { type BuildOptions, cargoBuild } from '../build/cargo';
+import { cargoClippy, cargoTest } from '../build/test';
 import { browserHost } from '../build/browser-host';
 import { UnitCache } from '../build/cache';
 import { FileCache } from '../deps/cache';
@@ -37,12 +38,21 @@ const handlers: { [O in keyof Ops]: (a: Ops[O]['args']) => Promise<Ops[O]['resul
   ls: a => need().vfs.readdir(a.path).map(e => e.name),
   rustc: a => need().rustcJob(a.args, a.env),
   async build(a) {
-    const resolver = await resolverFor(a.resolverUrl);
-    const units = new UnitCache(a.cache?.l1 === false ? null : await FileCache.open(BUILD_CACHE), a.cache?.l2 ?? null);
-    return cargoBuild(browserHost(need(), { workerUrl: sandboxUrl!, vfsUrl: vfsUrl! }), {
-      project: a.project, resolver, index: a.index, dl: a.dl, features: a.features, defaultFeatures: a.defaultFeatures,
-      profile: a.profile, units, targetDir: a.targetDir,
-    });
+    return cargoBuild(host(), await buildOptions(a));
+  },
+  async test(a) {
+    return cargoTest(host(), { ...await buildOptions(a), filter: a.filter, exact: a.exact, includeIgnored: a.includeIgnored });
+  },
+  async clippy(a) {
+    return cargoClippy(host(), await buildOptions(a));
+  },
+  async fmt(a) {
+    const vfs = need().vfs, src = vfs.readText(a.path), dir = a.path.slice(0, a.path.lastIndexOf('/')) || '/';
+    const args = [...(a.edition ? ['--edition', a.edition] : []), ...(a.check ? ['--check'] : [])];
+    const r = await need().rustfmt(src, args, dir);
+    const changed = !a.check && r.exit === 0 && r.out !== src;
+    if (changed) vfs.writeFile(a.path, r.out);
+    return { exit: r.exit, changed, out: r.out, stderr: r.stderr, ms: r.ms };
   },
   projectList: () => listProjects(need().vfs),
   async projectImport(a) {
@@ -70,6 +80,16 @@ const handlers: { [O in keyof Ops]: (a: Ops[O]['args']) => Promise<Ops[O]['resul
   stats: () => need().stats(),
   close: async () => ({ code: (await need().close()).code }),
 };
+
+const host = () => browserHost(need(), { workerUrl: sandboxUrl!, vfsUrl: vfsUrl! });
+
+async function buildOptions(a: Ops['build']['args']): Promise<BuildOptions> {
+  const units = new UnitCache(a.cache?.l1 === false ? null : await FileCache.open(BUILD_CACHE), a.cache?.l2 ?? null);
+  return {
+    project: a.project, resolver: await resolverFor(a.resolverUrl), index: a.index, dl: a.dl, features: a.features,
+    defaultFeatures: a.defaultFeatures, profile: a.profile, units, targetDir: a.targetDir,
+  };
+}
 
 /** A fresh resolver instance (the planner keeps its last plan; resolve state stays small). */
 async function resolverFor(url: string): Promise<Resolver> {

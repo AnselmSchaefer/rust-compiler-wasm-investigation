@@ -1,5 +1,5 @@
 //! One package's Cargo.toml and file list → what the planner needs: its dependencies and
-//! feature map (as the resolver sees them), its targets (lib, bins, build script) with cargo's
+//! feature map (as the resolver sees them), its targets (lib, bins, examples, tests, build script) with cargo's
 //! auto-detection, and the metadata cargo hands to rustc and build scripts as `CARGO_PKG_*`.
 
 use crate::manifest::gather;
@@ -19,6 +19,10 @@ pub struct Target {
     pub crate_types: Vec<String>,
     pub edition: String,
     pub required_features: Vec<String>,
+    /// Built as a test harness by `cargo test` (`test = false` turns it off; examples: off).
+    pub test: bool,
+    /// With libtest's harness (`harness = false`: the target has its own main).
+    pub harness: bool,
 }
 
 #[derive(Debug, Default)]
@@ -42,6 +46,10 @@ pub struct Package {
     pub links: Option<String>,
     pub lib: Option<Target>,
     pub bins: Vec<Target>,
+    /// `examples/` (built by `cargo test`, WP-26).
+    pub examples: Vec<Target>,
+    /// Integration tests, `tests/`.
+    pub tests: Vec<Target>,
     /// The build script, relative to `dir`.
     pub build: Option<String>,
     pub meta: Meta,
@@ -56,7 +64,7 @@ impl Package {
         let version = Version::parse(version).map_err(|e| format!("{name} {version}: {e}"))?;
         let summary = Summary::new(name.into(), version, source, Vec::new(), &BTreeMap::new(), None, None)?;
         let meta = Meta::default();
-        Ok(Package { summary, dir: dir.into(), edition: "2015".into(), links: None, lib: None, bins: Vec::new(), build: None, meta, lint_args: Vec::new(), missing: true })
+        Ok(Package { summary, dir: dir.into(), edition: "2015".into(), links: None, lib: None, bins: Vec::new(), examples: Vec::new(), tests: Vec::new(), build: None, meta, lint_args: Vec::new(), missing: true })
     }
 
     pub fn name(&self) -> &str {
@@ -125,6 +133,8 @@ pub fn parse_package(text: &str, source: Source, dir: &str, files: &[String]) ->
             crate_types,
             edition: t.edition.clone().unwrap_or_else(|| edition.clone()),
             required_features: t.required_features.clone().unwrap_or_default(),
+            test: t.test.unwrap_or(kind != "example"),
+            harness: t.harness.unwrap_or(true),
         })
     };
 
@@ -167,6 +177,36 @@ pub fn parse_package(text: &str, source: Source, dir: &str, files: &[String]) ->
         }
     }
 
+    // Examples and integration tests: declared ones, then (unless autoexamples/autotests = false)
+    // <dir>/<name>.rs and <dir>/<name>/main.rs.
+    let auto_targets = |declared: &Option<Vec<TomlTarget>>, dir_name: &str, auto: Option<bool>, kind: &str| -> Result<Vec<Target>, String> {
+        let mut out = Vec::new();
+        for t in declared.iter().flatten() {
+            let n = t.name.clone().ok_or_else(|| format!("{dir}/Cargo.toml: a [[{kind}]] needs a name"))?;
+            let guess = [format!("{dir_name}/{n}.rs"), format!("{dir_name}/{n}/main.rs")].into_iter().find(|p| files.contains(p.as_str()));
+            out.push(target(t, &n, guess, kind)?);
+        }
+        if auto != Some(false) {
+            let mut inferred: Vec<(String, String)> = Vec::new();
+            for f in &files {
+                let Some(rest) = f.strip_prefix(&format!("{dir_name}/")) else { continue };
+                if let Some(stem) = rest.strip_suffix(".rs").filter(|s| !s.contains('/')) {
+                    inferred.push((stem.into(), f.to_string()));
+                } else if let Some(d) = rest.strip_suffix("/main.rs").filter(|s| !s.contains('/')) {
+                    inferred.push((d.into(), f.to_string()));
+                }
+            }
+            for (n, path) in inferred {
+                if !out.iter().any(|t| t.name == n || t.path == path) {
+                    out.push(target(&TomlTarget::new(), &n, Some(path), kind)?);
+                }
+            }
+        }
+        Ok(out)
+    };
+    let examples = auto_targets(&toml.example, "examples", pkg.autoexamples, "example")?;
+    let tests = auto_targets(&toml.test, "tests", pkg.autotests, "test")?;
+
     let build = match &pkg.build {
         None => files.contains("build.rs").then(|| "build.rs".to_string()),
         Some(TomlPackageBuild::Auto(false)) => None,
@@ -192,7 +232,7 @@ pub fn parse_package(text: &str, source: Source, dir: &str, files: &[String]) ->
         rust_version: rust_version.map(|r| r.to_string()).unwrap_or_default(),
     };
     let lint_args = lint_args(toml.normalized_lints().map_err(err)?);
-    Ok(Package { summary, dir: dir.to_string(), edition, links, lib, bins, build, meta, lint_args, missing: false })
+    Ok(Package { summary, dir: dir.to_string(), edition, links, lib, bins, examples, tests, build, meta, lint_args, missing: false })
 }
 
 /// cargo's `lints_to_rustflags` plus `check_cfg_args`' lint part: by priority, then by the

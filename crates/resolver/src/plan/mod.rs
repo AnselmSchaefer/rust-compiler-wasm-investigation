@@ -11,7 +11,10 @@
 //! Build-script output can only be applied once the script ran: `finish` adds it to a unit.
 //! A run unit gets `DEP_<LINKS>_*` from its `links` dependencies' scripts, and a compile unit the
 //! `-L` paths of every script in its linkable closure (WP-21).
-//! Not covered yet: dev units (tests, WP-26), `[lints]` check-cfg, `[profile]` sections.
+//! With `test` (`cargo test`, WP-26): the roots' dev-dependencies, examples, and a test harness
+//! (`--test`) per lib, bin and integration test; `Plan.tests` lists the harnesses to run.
+//! Not covered yet: doc tests (no rustdoc for the wasm host yet), benches, `[lints]` check-cfg,
+//! `[profile]` sections.
 
 pub mod build_output;
 pub mod cfg;
@@ -66,6 +69,9 @@ pub struct PlanInput {
     /// Appended to build-script compiles (WP-21: its link arguments).
     #[serde(default)]
     pub build_script_args: Vec<String>,
+    /// Plan `cargo test` instead of `cargo build` (WP-26).
+    #[serde(default)]
+    pub test: bool,
 }
 
 fn yes() -> bool {
@@ -137,6 +143,10 @@ pub enum UnitKind {
     Bin,
     /// Compiling a build script.
     CustomBuild,
+    /// A test harness: a lib, bin or integration test compiled with `--test` (WP-26).
+    Test,
+    /// An example (`cargo test` builds them).
+    Example,
     /// Running it.
     RunCustomBuild,
 }
@@ -177,6 +187,28 @@ pub struct Plan {
     pub units: Vec<Unit>,
     /// The roots' executables: (bin name, unit id).
     pub bins: Vec<(String, usize)>,
+    /// `test` plans: the harnesses to run, in cargo's order (lib, bins, integration tests).
+    pub tests: Vec<TestExe>,
+}
+
+#[derive(Serialize, Debug)]
+pub struct TestExe {
+    /// The package and what cargo prints: `unittests src/lib.rs`, `tests/x.rs`.
+    pub package: String,
+    pub name: String,
+    pub unit: usize,
+    /// lib, bin or test.
+    pub target: &'static str,
+    /// The package dir: tests run there, as under cargo.
+    pub cwd: String,
+}
+
+/// Which target of a package a test harness is built from.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+enum TestOf {
+    Lib,
+    Bin(usize),
+    Integration(usize),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -185,6 +217,8 @@ enum Key {
     Bin(usize, usize),
     CustomBuild(usize, FeaturesFor),
     Run(usize, bool, FeaturesFor),
+    Test(usize, TestOf),
+    Example(usize, usize),
 }
 
 struct Builder<'a> {
@@ -213,10 +247,11 @@ pub fn plan(input: &PlanInput) -> Result<Plan, String> {
             None => Package::missing(&p.name, &p.version, source, &p.dir)?,
         });
     }
-    let edges = resolve_edges(&pkgs, input)?;
+    let roots: Vec<usize> = if input.roots.is_empty() { input.root.into_iter().collect() } else { input.roots.clone() };
+    // cargo test: the roots' dev-dependencies count, for edges and for feature unification.
+    let edges = resolve_edges(&pkgs, input, if input.test { &roots } else { &[] })?;
     let target = TargetInfo::new(&input.target)?;
     let host = TargetInfo::new(&input.host)?;
-    let roots: Vec<usize> = if input.roots.is_empty() { input.root.into_iter().collect() } else { input.roots.clone() };
     let &first = roots.first().ok_or("nothing to build: no root package")?;
     let resolver = match input.resolver {
         Some(r) => r,
@@ -237,18 +272,49 @@ pub fn plan(input: &PlanInput) -> Result<Plan, String> {
     )?;
     let mut b = Builder { input, roots: roots.clone(), pkgs, edges, features, target, host, decouple_host, units: Vec::new(), memo: HashMap::new() };
     let mut bins = Vec::new();
+    let mut tests = Vec::new();
     for &r in &roots {
         if b.pkgs[r].lib.is_some() {
             b.unit(Key::Lib(r, false, FeaturesFor::Normal))?;
         }
         let enabled = b.features.of(r, FeaturesFor::Normal);
-        for (i, bin) in b.pkgs[r].bins.clone().iter().enumerate() {
-            if bin.required_features.iter().all(|f| enabled.contains(f)) {
+        let has = |t: &Target| t.required_features.iter().all(|f| enabled.contains(f));
+        let p = &b.pkgs[r];
+        let (lib, pbins, examples, itests) = (p.lib.clone(), p.bins.clone(), p.examples.clone(), p.tests.clone());
+        // cargo test builds the bins only for integration tests (CARGO_BIN_EXE_<name>).
+        let build_bins = !input.test || itests.iter().any(|t| t.test && has(t));
+        for (i, bin) in pbins.iter().enumerate() {
+            if has(bin) && build_bins {
                 bins.push((bin.name.clone(), b.unit(Key::Bin(r, i))?));
             }
         }
+        if !input.test {
+            continue;
+        }
+        for (i, e) in examples.iter().enumerate() {
+            if has(e) {
+                b.unit(Key::Example(r, i))?;
+            }
+        }
+        let name = b.pkgs[r].name().to_string();
+        let cwd = b.pkgs[r].dir.clone();
+        let mut add = |b: &mut Builder, of: TestOf, t: &Target, kind: &'static str| -> Result<(), String> {
+            let unit = b.unit(Key::Test(r, of))?;
+            let label = if kind == "test" { t.path.clone() } else { format!("unittests {}", t.path) };
+            tests.push(TestExe { package: name.clone(), name: label, unit, target: kind, cwd: cwd.clone() });
+            Ok(())
+        };
+        if let Some(l) = lib.filter(|l| l.test) {
+            add(&mut b, TestOf::Lib, &l, "lib")?;
+        }
+        for (i, t) in pbins.iter().enumerate().filter(|(_, t)| t.test && has(t)) {
+            add(&mut b, TestOf::Bin(i), t, "bin")?;
+        }
+        for (i, t) in itests.iter().enumerate().filter(|(_, t)| t.test && has(t)) {
+            add(&mut b, TestOf::Integration(i), t, "test")?;
+        }
     }
-    Ok(Plan { units: b.units, bins })
+    Ok(Plan { units: b.units, bins, tests })
 }
 
 /// The manifest's `resolver` setting, or the edition's default.
@@ -264,11 +330,12 @@ fn root_resolver(manifest: &str, edition: &str) -> Result<u32, String> {
 
 /// Matches each manifest dependency to the resolved package it stands for (same name, version
 /// in range). Optional dependencies the resolve didn't enable have no package and no edge.
-fn resolve_edges(pkgs: &[Package], input: &PlanInput) -> Result<Edges, String> {
+/// `dev`: the packages whose dev-dependencies count (`cargo test`'s roots).
+fn resolve_edges(pkgs: &[Package], input: &PlanInput, dev: &[usize]) -> Result<Edges, String> {
     let mut edges = Vec::new();
     for (i, p) in pkgs.iter().enumerate() {
         let mut e = Vec::new();
-        for dep in p.summary.deps.iter().filter(|d| d.kind != DepKind::Development) {
+        for dep in p.summary.deps.iter().filter(|d| d.kind != DepKind::Development || dev.contains(&i)) {
             let found = input.packages[i].deps.iter().copied().find(|&d| {
                 let q = &pkgs[d].summary;
                 *q.name == *dep.package && dep.req.matches(&q.version)
@@ -370,8 +437,48 @@ impl Builder<'_> {
                     crate_types: vec!["bin".into()],
                     edition: p.edition.clone(),
                     required_features: Vec::new(),
+                    test: false,
+                    harness: false,
                 };
                 self.compile(pkg, true, fk, UnitKind::CustomBuild, &target, externs, None)
+            }
+            Key::Example(pkg, i) => {
+                let externs = self.test_externs(pkg)?;
+                let target = self.pkgs[pkg].examples[i].clone();
+                let run = self.run_for(pkg, false, FeaturesFor::Normal)?;
+                self.compile(pkg, false, FeaturesFor::Normal, UnitKind::Example, &target, externs, run)
+            }
+            Key::Test(pkg, of) => {
+                let mut externs = self.test_externs(pkg)?;
+                let p = &self.pkgs[pkg];
+                let target = match of {
+                    TestOf::Lib => {
+                        // A lib's harness is the lib itself, so not its own dependency.
+                        let own = p.lib.as_ref().unwrap().crate_name.clone();
+                        externs.retain(|(n, _)| *n != own);
+                        p.lib.clone().unwrap()
+                    }
+                    TestOf::Bin(i) => p.bins[i].clone(),
+                    TestOf::Integration(i) => p.tests[i].clone(),
+                };
+                let run = self.run_for(pkg, false, FeaturesFor::Normal)?;
+                let mut unit = self.compile(pkg, false, FeaturesFor::Normal, UnitKind::Test, &target, externs, run);
+                if let TestOf::Integration(_) = of {
+                    // The package's bins, as CARGO_BIN_EXE_<name>: built first, at their uplifted paths.
+                    let enabled = self.features.of(pkg, FeaturesFor::Normal);
+                    for (i, b) in self.pkgs[pkg].bins.clone().iter().enumerate() {
+                        if b.required_features.iter().all(|f| enabled.contains(f)) {
+                            let id = self.unit(Key::Bin(pkg, i))?;
+                            unit.deps.push(id);
+                            let exe = format!("{}/{}{}", self.layout(false), b.name, self.target.exe_suffix);
+                            unit.env.insert(format!("CARGO_BIN_EXE_{}", b.name), exe);
+                        }
+                    }
+                    unit.deps.sort();
+                    unit.deps.dedup();
+                    unit.env.insert("CARGO_TARGET_TMPDIR".into(), format!("{}/{}/tmp", self.input.target_dir, self.target.triple));
+                }
+                unit
             }
             Key::Run(pkg, host, fk) => {
                 let script = self.unit(Key::CustomBuild(pkg, fk))?;
@@ -390,6 +497,25 @@ impl Builder<'_> {
         self.units.push(Unit { id, ..unit });
         self.memo.insert(key, id);
         Ok(id)
+    }
+
+    /// What a test harness or example links: the package's lib, its dependencies and its
+    /// dev-dependencies.
+    fn test_externs(&mut self, pkg: usize) -> Result<Vec<(String, usize)>, String> {
+        let mut externs = Vec::new();
+        for kind in [DepKind::Normal, DepKind::Development] {
+            for (name, k) in self.lib_deps(pkg, false, FeaturesFor::Normal, kind)? {
+                let id = self.unit(k)?;
+                if !externs.iter().any(|(n, d)| *n == name && *d == id) {
+                    externs.push((name, id));
+                }
+            }
+        }
+        if let Some(lib) = &self.pkgs[pkg].lib {
+            let name = lib.crate_name.clone();
+            externs.push((name, self.unit(Key::Lib(pkg, false, FeaturesFor::Normal))?));
+        }
+        Ok(externs)
     }
 
     fn run_for(&mut self, pkg: usize, host: bool, fk: FeaturesFor) -> Result<Option<usize>, String> {
@@ -460,13 +586,16 @@ impl Builder<'_> {
         let mut deps: Vec<usize> = externs.iter().map(|e| e.1).chain(run).collect();
         deps.sort();
         deps.dedup();
-        let hash = self.hash(pkg, host, kind, &target.name, &features, &deps);
+        // A lib and a bin can share a name; their harnesses can't share a hash.
+        let hash_name = if kind == UnitKind::Test { format!("{}:{}", target.path, target.name) } else { target.name.clone() };
+        let hash = self.hash(pkg, host, kind, &hash_name, &features, &deps);
         let proc_macro = kind == UnitKind::Lib && target.crate_types.iter().any(|t| t == "proc-macro");
         // A lib's dependents only need its metadata (pipelining); a proc macro is linked.
         let is_lib = kind == UnitKind::Lib && !proc_macro;
         let layout = self.layout(host);
         let out_dir = match kind {
             UnitKind::CustomBuild => format!("{layout}/build/{}-{hash}", p.name()),
+            UnitKind::Example => format!("{layout}/examples"),
             _ => format!("{layout}/deps"),
         };
 
@@ -475,8 +604,10 @@ impl Builder<'_> {
         push(&["--crate-name", &target.crate_name, &format!("--edition={}", target.edition)]);
         push(&[&format!("{}/{}", p.dir, target.path)]);
         push(&["--error-format=json", "--json=diagnostic-rendered-ansi,artifacts,future-incompat"]);
-        for t in &target.crate_types {
-            push(&["--crate-type", t]);
+        if kind != UnitKind::Test {
+            for t in &target.crate_types {
+                push(&["--crate-type", t]);
+            }
         }
         push(&[if is_lib { "--emit=dep-info,metadata,link" } else { "--emit=dep-info,link" }]);
         if proc_macro {
@@ -495,6 +626,9 @@ impl Builder<'_> {
         }
         if prof.overflow_checks != opt0 {
             push(&["-C", if prof.overflow_checks { "overflow-checks=on" } else { "overflow-checks=off" }]);
+        }
+        if kind == UnitKind::Test {
+            push(&["--test"]);
         }
         a.extend(p.lint_args.iter().cloned());
         let mut push = |s: &[&str]| a.extend(s.iter().map(|x| x.to_string()));
@@ -551,7 +685,9 @@ impl Builder<'_> {
                 env.insert("OUT_DIR".into(), self.units[r].out_dir.clone().unwrap());
             }
         }
-        if kind == UnitKind::Bin {
+        // Bins, examples and a bin's harness (not a lib's, nor an integration test's).
+        let is_bin_target = p.bins.iter().any(|b| b.path == target.path) || kind == UnitKind::Example;
+        if kind == UnitKind::Bin || kind == UnitKind::Example || (kind == UnitKind::Test && is_bin_target) {
             env.insert("CARGO_BIN_NAME".into(), target.name.clone());
         }
         if is_root {

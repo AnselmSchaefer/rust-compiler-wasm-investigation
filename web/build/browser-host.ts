@@ -9,6 +9,13 @@ import { type BuildHost, filesBelow } from './cargo';
 
 export function browserHost(orch: Orchestrator, sandbox: { workerUrl: string; vfsUrl: string }): BuildHost {
   const vfs = orch.vfs;
+  // A harness runs once per test (test.ts): compile it once. A host lasts one operation.
+  const modules = new Map<string, Promise<WebAssembly.Module>>();
+  const module = (path: string) => {
+    let m = modules.get(path);
+    if (!m) modules.set(path, m = WebAssembly.compile(vfs.readFile(path) as Uint8Array<ArrayBuffer>));
+    return m;
+  };
   return {
     vfs, rustcId: orch.release.id, workers: orch.workers,
     rustc: (args, env, io) => orch.rustcJob(args, env, io),
@@ -37,6 +44,13 @@ export function browserHost(orch: Orchestrator, sandbox: { workerUrl: string; vf
         },
       }).result;
       return { code: r.code, trap: r.trap, stdout: r.stdout, stderr: r.stderr, files: r.files };
+    },
+    // A test harness (WP-26): the package's files, nothing written back.
+    async runProgram(o) {
+      const files: Record<string, Uint8Array> = {};
+      for (const p of filesBelow(vfs, o.pkgDir)) files[p] = vfs.readFile(p);
+      const r = await runSandboxed({ ...sandbox, program: await module(o.program), args: o.args, env: o.env, files, timeoutMs: o.timeoutMs }).result;
+      return { code: r.code, trap: r.trap, stdout: r.stdout, stderr: r.stderr, ms: r.ms };
     },
   };
 }

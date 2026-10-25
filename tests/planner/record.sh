@@ -13,12 +13,14 @@ ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 source "$ROOT/toolchain/versions.env"
 CASE=$1; SRC="$ROOT/tests/planner/cases/$CASE"; W="$ROOT/build/wp-17/record/$CASE"; PORT=8797
 [ -d "$ROOT/build/wp-15/index" ] || { mkdir -p "$ROOT/build/wp-15"; zstd -dc "$ROOT/tests/resolver/index-snapshot.tar.zst" | tar -x -C "$ROOT/build/wp-15"; }
-rm -rf "$W"; mkdir -p "$W/home"; cp -r "$SRC" "$W/root"; rm -rf "$W/root/crates" "$W/root/build-output" "$W/root/cargo-vv.jsonl"
+rm -rf "$W"; mkdir -p "$W/home"; cp -r "$SRC" "$W/root"; rm -rf "$W/root/crates" "$W/root/build-output" "$W/root/cargo-vv.jsonl" "$W/root/record.cmd"
 printf '[source.crates-io]\nreplace-with = "snap"\n[source.snap]\nregistry = "sparse+http://localhost:%s/"\n' "$PORT" > "$W/home/config.toml"
 node "$ROOT/tests/resolver/index-proxy.mjs" replay "$ROOT/build/wp-15/index" "$PORT" > "$W/proxy.log" & proxy=$!
 trap 'kill $proxy 2>/dev/null' EXIT
 for _ in $(seq 50); do grep -q 'index proxy' "$W/proxy.log" 2>/dev/null && break; sleep 0.1; done
-(cd "$W/root" && CARGO_HOME="$W/home" cargo "+$RUST_TAG" build -vv --target wasm32-wasip1) > "$W/build.log" 2>&1 || { tail -20 "$W/build.log"; exit 1; }
+# A case may record another command than `build` (record.cmd, e.g. `test --no-run`, WP-26).
+CMD=$(cat "$SRC/record.cmd" 2>/dev/null || echo build)
+(cd "$W/root" && CARGO_HOME="$W/home" cargo "+$RUST_TAG" $CMD -vv --target wasm32-wasip1) > "$W/build.log" 2>&1 || { tail -20 "$W/build.log"; exit 1; }
 REG=$(ls -d "$W"/home/registry/src/*/)
 REG=${REG%/}
 TC=$(dirname "$(rustup +"$RUST_TAG" which rustc)")
@@ -29,7 +31,7 @@ python3 -I - "$W/build.log" > "$W/vv.jsonl" <<'PY'
 import json, re, shlex, sys
 for m in re.finditer(r'^ *Running `(.*?)`$', open(sys.argv[1]).read(), re.M | re.S):
     w = shlex.split(m.group(1))
-    n = next(i for i, x in enumerate(w) if not re.match(r'^[A-Z_][A-Z0-9_]*=', x))
+    n = next(i for i, x in enumerate(w) if not re.match(r'^[A-Za-z_][A-Za-z0-9_]*=', x))
     print(json.dumps({'env': dict(x.split('=', 1) for x in w[:n]), 'program': w[n], 'args': w[n + 1:]}))
 PY
 norm < "$W/vv.jsonl" > "$SRC/cargo-vv.jsonl"

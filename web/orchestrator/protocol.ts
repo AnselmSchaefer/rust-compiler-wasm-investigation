@@ -2,6 +2,7 @@
 import type { RustcResult } from './orchestrator';
 import type { LoadStats } from './toolchain';
 import type { BuildResult } from '../build/cargo';
+import type { ClippyRun, TestRun } from '../build/test';
 import type { ManifestEdit, PlanInput } from '../deps/resolver';
 import type { EditResult } from '../project/projects';
 
@@ -35,6 +36,18 @@ export type Ops = {
     };
     result: BuildResult;
   };
+  /**
+   * `cargo test` (WP-26; web/build/test.ts): every test in a process of its own, results per test.
+   * `filter` (+ `exact`): only the tests whose name contains (equals) it.
+   */
+  test: { args: Ops['build']['args'] & { filter?: string; exact?: boolean; includeIgnored?: boolean }; result: TestRun };
+  /** `cargo clippy` (WP-26): the primary packages' diagnostics, Clippy's lints included. */
+  clippy: { args: Ops['build']['args']; result: ClippyRun };
+  /**
+   * rustfmt (WP-26) on a file, in place; rustfmt.toml from the file's directory up. `check`: only
+   * report (a diff in `out`, exit 1 if the file isn't formatted).
+   */
+  fmt: { args: { path: string; edition?: string; check?: boolean }; result: { exit: number; changed: boolean; out: string; stderr: string; ms: number } };
   /** Projects (WP-25) live at /projects/<name>; build one with `build` and that path. */
   projectList: { args: Record<string, never>; result: string[] };
   projectImport: { args: { name: string; source: ProjectSource }; result: { files: number; skipped: string[]; ms: number } };

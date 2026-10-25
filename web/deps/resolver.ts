@@ -34,8 +34,10 @@ export interface PlanInput {
   proc_macro_args?: string[];
   /** Extra rustc arguments for every host-side compile, and for build-script compiles (WP-21). */
   host_args?: string[]; build_script_args?: string[];
+  /** Plan `cargo test` (WP-26): dev-dependencies, examples, test harnesses. */
+  test?: boolean;
 }
-export type UnitKind = 'lib' | 'bin' | 'custom-build' | 'run-custom-build';
+export type UnitKind = 'lib' | 'bin' | 'custom-build' | 'run-custom-build' | 'test' | 'example';
 export interface PlanUnit {
   id: number; pkg: number; name: string; version: string; kind: UnitKind; crate_name: string; host: boolean;
   features: string[]; hash: string; deps: number[]; args: string[]; env: Record<string, string>;
@@ -43,7 +45,9 @@ export interface PlanUnit {
   /** Run units: the package's `links`. */
   links: string | null;
 }
-export interface Plan { units: PlanUnit[]; bins: [string, number][] }
+/** A test harness to run: `name` as cargo prints it (`unittests src/lib.rs`, `tests/x.rs`). */
+export interface TestExe { package: string; name: string; unit: number; target: 'lib' | 'bin' | 'test'; cwd: string }
+export interface Plan { units: PlanUnit[]; bins: [string, number][]; tests: TestExe[] }
 export interface Finished { args: string[]; env: Record<string, string>; warnings: string[] }
 
 type Exports = {

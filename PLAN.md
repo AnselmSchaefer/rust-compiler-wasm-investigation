@@ -360,6 +360,7 @@ These are taken as defaults so work can start. Changing one later only affects t
   - `cargo test`: build the test harnesses, run them in the sandbox, parse libtest's JSON output into per-test results (status, output, duration); run one test by name; doc tests.
   - Build Clippy (a rustc driver, so it uses the same patches) and rustfmt for Wasm; JSON diagnostics.
 - **Done when:** an e2e test runs a crate's tests, reruns a single failing test by name with structured results, and Clippy lints and rustfmt formats a file.
+  - *2026-10-25 (done, session 22): planner `cargo test` units golden-identical to `cargo test --no-run -vv`; tests run one per sandbox process (wasm32-wasip1 aborts on panic), libtest JSON → per-test results; Clippy and rustfmt linked into rustc-multi (bootstrap-built crates, no source changes). **Doc tests deferred:** rustdoc for the wasm host needs libtest in the host sysroot, which bootstrap only builds with a native stage-1 compiler. See `docs/test-tools.md`.*
 
 #### WP-27 Incremental compilation
 - **Depends:** WP-25 · **Est.:** 2 sessions

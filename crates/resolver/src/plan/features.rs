@@ -105,9 +105,7 @@ impl<'a> FeatureResolver<'a> {
     ) -> Result<Vec<(usize, Rc<Dependency>, FeaturesFor)>, String> {
         let mut out = Vec::new();
         for (dep_pkg, dep) in &edges[pkg] {
-            if dep.kind == DepKind::Development {
-                continue;
-            }
+            // Dev-dependency edges exist only for `cargo test`'s roots (mod.rs), and count there.
             if let Some(t) = &dep.target {
                 let info = if dep.kind == DepKind::Build || fk == FeaturesFor::Host { platforms.host } else { platforms.target };
                 if !info.matches(t)? {

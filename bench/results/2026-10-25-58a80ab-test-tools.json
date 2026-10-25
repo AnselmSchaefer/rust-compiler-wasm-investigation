@@ -1,0 +1,92 @@
+{
+  "release": "1.99.1-6c798e2613f0",
+  "test": {
+    "build": 6752,
+    "run": 297
+  },
+  "one": {
+    "build": 28,
+    "run": 129
+  },
+  "perTest": [
+    "unit::adds 0.09",
+    "unit::failing 46",
+    "unit::finds 0.3",
+    "unit::formats_with_a_dev_dependency 0.4",
+    "unit::ignored 0",
+    "bin_test 0.11",
+    "integration 0.35"
+  ],
+  "clippy": {
+    "build": 38,
+    "clippy": 85
+  },
+  "fmt": 0.9,
+  "tests": [
+    {
+      "suite": "unittests src/lib.rs",
+      "package": "tests",
+      "name": "unit::adds",
+      "status": "ok",
+      "ms": 0.09,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "suite": "unittests src/lib.rs",
+      "package": "tests",
+      "name": "unit::failing",
+      "status": "failed",
+      "ms": 46,
+      "stdout": "output of the failing test\n",
+      "stderr": "\nthread 'main' (1) panicked at /tests/src/lib.rs:39:9:\nassertion `left == right` failed: one plus one\n  left: 2\n right: 3\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+      "message": "panicked at /tests/src/lib.rs:39:9:\nassertion `left == right` failed: one plus one\n  left: 2\n right: 3"
+    },
+    {
+      "suite": "unittests src/lib.rs",
+      "package": "tests",
+      "name": "unit::finds",
+      "status": "ok",
+      "ms": 0.3,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "suite": "unittests src/lib.rs",
+      "package": "tests",
+      "name": "unit::formats_with_a_dev_dependency",
+      "status": "ok",
+      "ms": 0.4,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "suite": "unittests src/lib.rs",
+      "package": "tests",
+      "name": "unit::ignored",
+      "status": "ignored",
+      "ms": 0,
+      "stdout": "",
+      "stderr": "",
+      "ignored": "#[ignore]"
+    },
+    {
+      "suite": "unittests src/main.rs",
+      "package": "tests",
+      "name": "bin_test",
+      "status": "ok",
+      "ms": 0.11,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "suite": "tests/integration.rs",
+      "package": "tests",
+      "name": "integration",
+      "status": "ok",
+      "ms": 0.35,
+      "stdout": "",
+      "stderr": ""
+    }
+  ]
+}

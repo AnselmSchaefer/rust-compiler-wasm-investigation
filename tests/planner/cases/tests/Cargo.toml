@@ -1,0 +1,13 @@
+# WP-26 planner case: `cargo test`. Test harnesses for the lib, a bin and an integration test, an
+# example (cargo test builds examples), a dev-dependency (itoa) next to a normal one (memchr), and a
+# doc test. One test fails on purpose (`failing`), for rerunning a single test by name.
+[package]
+name = "tests"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+memchr = "2"
+
+[dev-dependencies]
+itoa = "1"

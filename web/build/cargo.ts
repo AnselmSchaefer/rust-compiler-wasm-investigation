@@ -39,7 +39,7 @@ export interface BuildHost {
    * rustc with these args and env, linking if needed; outputs land where the args say. `io`: a
    * build script's probe, with its working directory and stdin (an input of `-`).
    */
-  rustc(args: string[], env: Record<string, string>, io?: { cwd?: string; stdin?: string }):
+  rustc(args: string[], env: Record<string, string>, io?: { cwd?: string; stdin?: string; tool?: 'clippy' }):
     Promise<{ code: number; stderr: string; stdout?: string; ms: { rustc: number } }>;
   /**
    * A build script (wasm32-wasip1) with its package dir readable and an empty `outDir`; returns
@@ -49,6 +49,9 @@ export interface BuildHost {
    */
   runScript(o: { program: string; args: string[]; env: string[]; pkgDir: string; outDir: string; call: (req: Uint8Array) => Promise<Uint8Array> }):
     Promise<{ code: number | null; trap?: string; stdout: string; stderr: string; files: Record<string, Uint8Array> }>;
+  /** A program (a test harness, WP-26) with the files below `pkgDir` readable; no host calls. */
+  runProgram?(o: { program: string; args: string[]; env: string[]; pkgDir: string; timeoutMs?: number }):
+    Promise<{ code: number | null; trap?: string; stdout: string; stderr: string; ms: number }>;
 }
 
 export interface BuildOptions {
@@ -65,6 +68,8 @@ export interface BuildOptions {
   /** Default /target, shared by all projects, so registry crates' outputs don't depend on the project. */
   targetDir?: string;
   features?: string[];
+  /** `cargo test`'s units (WP-26): dev-dependencies, examples, test harnesses. */
+  test?: boolean;
   defaultFeatures?: boolean;
   /** Overrides of cargo's dev profile. Default: no incremental (WP-27). */
   profile?: PlanInput['profile'];
@@ -101,6 +106,9 @@ export interface BuildResult {
   workers: number;
   cache: UnitCache['stats'] | null;
   ms: { deps: number; plan: number; build: number; store: number; total: number };
+  /** The plan, and what each build script printed (run unit id → stdout): for test.ts. */
+  plan: Plan;
+  scriptOutputs: Record<number, string>;
 }
 
 const TARGET = 'wasm32-wasip1';
@@ -200,7 +208,8 @@ export async function cargoBuild(host: BuildHost, opts: BuildOptions): Promise<B
     }
     return p;
   };
-  const roots = plan.bins.map(([, id]) => plan.units[id]);
+  // A test plan's roots are its harnesses, examples and bins: everything.
+  const roots = opts.test ? [] : plan.bins.map(([, id]) => plan.units[id]);
   const results = await Promise.allSettled((roots.length ? roots : plan.units).map(unit));
   const failed = results.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined;
   if (failed && !(failed.reason instanceof UnitError)) throw failed.reason;
@@ -222,6 +231,7 @@ export async function cargoBuild(host: BuildHost, opts: BuildOptions): Promise<B
     ok: !failed, bins, errors: [...new Set(errors)].join('\n'), units: units.sort((a, b) => a.start - b.start), skipped: plan.units.length - units.length,
     packages: deps.packages.length, workers: host.workers, cache: opts.units?.stats ?? null,
     ms: { deps: Math.round(t1 - t0), plan: Math.round(t2 - t1), build: Math.round(t3 - t2), store: Math.round(t4 - t3), total: Math.round(t4 - t0) },
+    plan, scriptOutputs: outputs,
   };
 }
 
@@ -255,7 +265,7 @@ function planInput(vfs: BuildFs, opts: BuildOptions, deps: DepsResult, host: Bui
     profile: { incremental: false, ...opts.profile },
     tools: { rustc: '/sysroot/bin/rustc', jobs: host.workers },
     proc_macro_args: PROC_MACRO_ARGS,
-    host_args: ['--extern', `std=${std}`],
+    host_args: ['--extern', `std=${std}`], test: opts.test,
     build_script_args: BUILD_SCRIPT_ARGS,
   };
 }

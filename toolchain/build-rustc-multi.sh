@@ -4,6 +4,7 @@
 # same stage-0 rustc, flags and libraries, but our own main. Output: build/rustc-wasm/rustc-multi.wasm
 # (and rustc-multi-wasmtime.wasm, for the wasmtime CLI; see main.rs)
 # WP-20: the function table is exported (the proc-macro host calls back through it; pm.rs).
+# WP-26: Clippy and rustfmt are linked in (tools.rs).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${RUSTC_WASM_OUT:-$ROOT/build/rustc-wasm}" # another dir: a second, independent build (WP-10 reproducibility)
@@ -25,6 +26,16 @@ for c in "$REL"/build/*/; do
   [ -n "$f" ] || continue
   while read -r p; do native+=(-L "$p"); done < <(sed -n 's/^cargo:rustc-link-search=//p' "$f")
 done
+# Clippy's and rustfmt's crates and their dependencies (WP-26; toolchain/build-rustc-tools.sh).
+TOOLS="$OUT/build/x86_64-unknown-linux-gnu/stage1-tools/wasm32-wasip1-threads/release/build"
+tool() { ls -t "$TOOLS"/$1/*/out/lib$2-*.rlib 2>/dev/null | head -1; }
+tools=()
+for c in clippy_lints:clippy_lints clippy_config:clippy_config clippy_utils:clippy_utils declare_clippy_lint:declare_clippy_lint rustfmt-nightly:rustfmt_nightly; do
+  f=$(tool "${c%%:*}" "${c##*:}"); [ -n "$f" ] || { echo "no ${c##*:} rlib: run toolchain/build-rustc-tools.sh" >&2; exit 1; }
+  tools+=(--extern "${c##*:}=$f")
+done
+# Their proc macros were built for the build machine (stage1-tools/release, no target triple).
+for d in "$TOOLS"/*/*/out "$OUT"/build/x86_64-unknown-linux-gnu/stage1-tools/release/build/*/*/out; do tools+=(-L "dependency=$d"); done
 # The host rustflags, exactly as build-rustc.sh gave them to bootstrap.
 mapfile -t flags < <(sed -n '/^rustflags = \[/,/\]$/p' "$OUT/bootstrap.toml" | grep -o '"[^"]*"' | tr -d '"')
 
@@ -36,7 +47,7 @@ build() {
     "${flags[@]}" "${deps[@]}" "${native[@]}" \
     --extern rustc_driver="$DRIVER" --extern rustc_session="$(lib rustc_session)" --extern serde_json="$(lib serde_json)" \
     --extern rustc_interface="$(lib rustc_interface)" --extern rustc_metadata="$(lib rustc_metadata)" \
-    --extern rustc_proc_macro="$(lib rustc_proc_macro)" --extern rustc_span="$(lib rustc_span)" \
+    --extern rustc_proc_macro="$(lib rustc_proc_macro)" --extern rustc_span="$(lib rustc_span)" "${tools[@]}" \
     -C link-arg=-Wl,--export-table --check-cfg 'cfg(rust_pm_stub)' "$@"
 }
 build "$ROOT/toolchain/rustc-multi/main.rs" -o "$OUT/rustc-multi.wasm"

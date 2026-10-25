@@ -3,11 +3,18 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** WP-22 **done** (session 22): **M1 reached**, 96/100 top crates build in Chromium. Next: **WP-26** (tests, Clippy, rustfmt), then WP-27, WP-38 (→ M2).
+- **Active WP:** WP-26 **done** (session 22). Next: **WP-27** (incremental compilation), then WP-38 (→ M2). M1 reached (WP-22).
 - **Last session:** 2026-10-25 (session 22). WP-21 done: build scripts with autocfg, rustc probes, libc, proc-macro2, anyhow and `links` metadata build in the browser and print what they print natively. Release **1.99.1-7520bf319596**.
 - **Rule for rustc source:** rust-lang's agent policy (`build/rust/AGENTS.md`) applies. Claude does not write or edit rustc source, and does not draft rust-lang issues, PRs or Zulip posts. The user writes those, or applies existing **human-written** patches (bjorn3/oligamiq), which the user prefers whenever one exists. **danlapid 0005–0007 are LLM-generated** (Claude co-author trailers), so they don't qualify even if the user applies them; design reference only (`docs/patches.md`). Claude reviews, builds and explains. Everything outside `build/rust` is Claude's, including out-of-tree drivers using `rustc_driver` (`toolchain/rustc-multi`).
-- **Next step:** WP-26: `cargo test` (build test harnesses, run them in the sandbox, libtest JSON → per-test results, run one test by name, doc tests), then Clippy and rustfmt for Wasm. Open follow-ups: Wasm proc macros in prebuild/L2 (WP-20), top-500 matrix (tracked through Phase E), caching compiled macro modules across page loads.
+- **Next step:** WP-27: persist rustc's incremental directory in OPFS (planner `profile.incremental` is already there, off in the browser), then profile warm `check` and edit → run on the 500-line benchmark against PROPOSAL §6 (< 1 s check, < 2 s edit → run). Open follow-ups: doc tests (rustdoc needs libtest for the wasm host), Wasm proc macros in prebuild/L2 (WP-20), top-500 matrix.
 - **Running background jobs:** none
+
+## Current session (2026-10-25, session 22, cont. 2): WP-26 done
+- **cargo test:** planner test mode (`PlanInput.test`: dev-dependency edges for the roots, examples, `--test` harnesses for lib/bins/integration tests, bins with `CARGO_BIN_EXE_*` + `CARGO_TARGET_TMPDIR`, `Plan.tests`). Golden case `tests/planner/cases/tests` from `cargo test --no-run -vv` (`record.cmd`): 10 units identical; 8/8 cases. `record.sh` fix: env names with lowercase letters. Runner `web/build/test.ts`: `--list`, then each test in its own sandbox process (wasm32-wasip1 aborts on panic, like -Zpanic-abort-tests), libtest JSON with `RUSTC_BOOTSTRAP=1` at run time, `--nocapture` output separated from events, panic message from stderr; should_panic → ignored (libtest's own behaviour on panic=abort). Ops `test` (filter, exact, includeIgnored), `clippy`, `fmt`.
+- **Clippy, rustfmt:** `toolchain/build-rustc-tools.sh` (bootstrap for the wasm host; found: the tool sysroot lacks rustc_driver on a wasm host, fixed out of tree by a stage-0 wrapper adding a plain `-L`; `-L crate=`/`dependency=` alone each fail), linked into rustc-multi (`toolchain/rustc-multi/tools.rs`: Clippy driver callbacks, rustfmt_nightly Session; requests `"tool"`, CLI `--clippy`/`--rustfmt`). rustc.wasm 142 → 160 MB (22.3 MB br). Release **1.99.1-6c798e2613f0**.
+- **Doc tests deferred:** rustdoc stops at `extern crate test` (no libtest in the wasm host's stage-0 sysroot; bootstrap would build it with a native stage-1 compiler).
+- **Measured** (Chromium, `tests/e2e/test-tools.spec.ts`): cargo test of the case: build 3.0–3.1 s cold, 7 tests in their own processes 130–151 ms; failing test alone by name 88–96 ms; Clippy 58–67 ms after the build; rustfmt < 1 ms.
+- `scripts/verify/wp-26.sh` passes; on the new release WP-20 and WP-21 (with WP-18's determinism check) verify, full Chromium suite 18 passed + 1 skipped (ecosystem, needs ECO=1). Docs: `docs/test-tools.md`.
 
 ## Current session (2026-10-25, session 22, cont.): WP-22 done (M1)
 - Asked by the user: commit + push, then WP-22. Pushed `6904652..92af35d`.
@@ -199,7 +206,7 @@
 | 23 | rust-analyzer in Wasm | deferred | 0 | Appendix (human-only), 2026-10-24 |
 | 24 | Editor integration | deferred | 0 | Appendix (human-only) |
 | 25 | Projects and workspaces | done | 1 | `scripts/verify/wp-25.sh` passes. Workspaces golden-identical to cargo (2 cases + lockfiles); OPFS projects, zip/GitHub import, Cargo.toml edits; `docs/projects.md` |
-| 26 | Tests, Clippy, rustfmt | ready | 0 | depends on WP-25 (done) |
+| 26 | Tests, Clippy, rustfmt | done | 1 | `scripts/verify/wp-26.sh`; per-test processes, Clippy + rustfmt in rustc-multi; doc tests deferred (`docs/test-tools.md`) |
 | 27 | Incremental compilation | ready | 0 | check-on-idle moved to the Appendix |
 | 28 | First-visit performance | deferred | 0 | Appendix (human-only) |
 | 38 | Agent tool API + local relay (M2) | blocked | 0 | new 2026-10-24: MCP ⇄ Python relay ⇄ WebSocket ⇄ page |
@@ -211,6 +218,7 @@
 | 37 | Release-train rebase | blocked | 0 | recurring |
 
 ## Measurements
+- 2026-10-25 WP-26 (Chromium, release 1.99.1-6c798e2613f0): cargo test of a small crate: build 3.0 s cold, 7 tests each in its own process 130–151 ms; one test by name 88–96 ms; Clippy 58–67 ms after the build; rustfmt < 1 ms.
 - 2026-10-25 WP-22 (Chromium, release 1.99.1-7520bf319596): top 100 crates by downloads, default features: 96/100 build (4 fail natively for wasm32-wasip1 too); whole list 6.5 min on 4 workers with L1 carried over; storage stays under ~0.86 GiB with LRU eviction.
 - 2026-10-25 WP-20 (Chromium, release 1.99.1-fda536abb2a3): cold `cargo build` of serde derive + serde_json + thiserror (28 units) 21 s on 4 workers, runs like native; reload + edit main.rs → build 1.45 s (macro modules from L1).
 - 2026-10-25 WP-21 (Chromium, release 1.99.1-7520bf319596): cold `cargo build` of the build-scripts case (num-traits/autocfg, rustversion, libc, proc-macro2, anyhow, links pair; 24 units) 8.7–9.0 s on 4 workers, every script prints what it prints natively; reload + edit main.rs → 1.0 s.

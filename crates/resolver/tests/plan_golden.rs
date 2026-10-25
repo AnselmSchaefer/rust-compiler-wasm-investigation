@@ -61,14 +61,22 @@ fn cargo_invocations(case: &Path) -> BTreeMap<String, Invocation> {
         // -vv makes cargo show dependencies' warnings (--cap-lints warn); a plain build allows.
         let args = args.into_iter().map(|a| if a == "warn" { "allow".to_string() } else { a }).collect::<Vec<_>>();
         let key = if v["program"] == "rustc" {
-            let at = |f: &str| args.iter().position(|a| a == f).map(|i| args[i + 1].clone()).unwrap();
-            format!("rustc {pkg} {} {}", at("--crate-name"), at("--crate-type"))
+            rustc_key(&pkg, &args)
         } else {
             format!("run {pkg}")
         };
         assert!(out.insert(key.clone(), Invocation { args, env }).is_none(), "{key} twice");
     }
     out
+}
+
+/// A compile's identity: package, crate, crate type (or `--test`, WP-26), and the source file,
+/// since a lib and a bin's harnesses can share a crate name.
+fn rustc_key(pkg: &str, args: &[String]) -> String {
+    let at = |f: &str| args.iter().position(|a| a == f).map(|i| args[i + 1].clone());
+    let kind = at("--crate-type").unwrap_or_else(|| "--test".into());
+    let src = args.iter().find(|a| a.ends_with(".rs")).cloned().unwrap_or_default();
+    format!("rustc {pkg} {} {kind} {}", at("--crate-name").unwrap(), src.rsplit('/').take(2).collect::<Vec<_>>().join("<"))
 }
 
 /// The case's own files below `dir` (relative), without the recordings and without the
@@ -161,6 +169,8 @@ fn check_case(case: &Path, index: &Path) -> Vec<String> {
         proc_macro_args: Vec::new(),
         host_args: Vec::new(),
         build_script_args: Vec::new(),
+        // record.sh's command for the case: `cargo test --no-run` plans test units (WP-26).
+        test: std::fs::read_to_string(case.join("record.cmd")).is_ok_and(|c| c.starts_with("test")),
     };
     let p = plan(&input).unwrap_or_else(|e| panic!("{}: {e}", case.display()));
 
@@ -179,10 +189,7 @@ fn check_case(case: &Path, index: &Path) -> Vec<String> {
         let env: BTreeMap<String, String> = f.env.iter().map(|(k, v)| (k.clone(), unhash(v))).collect();
         let key = match u.kind {
             UnitKind::RunCustomBuild => format!("run {}", u.name),
-            _ => {
-                let at = |flag: &str| f.args.iter().position(|a| a == flag).map(|i| f.args[i + 1].clone()).unwrap();
-                format!("rustc {} {} {}", u.name, u.crate_name, at("--crate-type"))
-            }
+            _ => rustc_key(&u.name, &f.args),
         };
         let args = f.args.iter().map(|a| unhash(a)).collect();
         assert!(ours.insert(key.clone(), Invocation { args, env }).is_none(), "{key} twice in our plan");
