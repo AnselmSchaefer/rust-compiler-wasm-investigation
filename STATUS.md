@@ -193,7 +193,7 @@
 | 24 | Editor integration | deferred | 0 | Appendix (human-only) |
 | 25 | Projects and workspaces | done | 1 | `scripts/verify/wp-25.sh` passes. Workspaces golden-identical to cargo (2 cases + lockfiles); OPFS projects, zip/GitHub import, Cargo.toml edits; `docs/projects.md` |
 | 26 | Tests, Clippy, rustfmt | ready | 0 | depends on WP-25 (done) |
-| 27 | Incremental compilation | blocked | 0 | check-on-idle moved to the Appendix |
+| 27 | Incremental compilation | ready | 0 | check-on-idle moved to the Appendix |
 | 28 | First-visit performance | deferred | 0 | Appendix (human-only) |
 | 38 | Agent tool API + local relay (M2) | blocked | 0 | new 2026-10-24: MCP ⇄ Python relay ⇄ WebSocket ⇄ page |
 | 29 | Public deploy (optional) | blocked | 0 | after M2; only to share beyond this machine |
