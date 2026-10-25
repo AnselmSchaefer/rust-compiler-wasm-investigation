@@ -3,11 +3,18 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** WP-21 **done** (session 22). Next: **WP-22** (ecosystem matrix → M1), or WP-26 (tests, Clippy, rustfmt) on the way to M2.
+- **Active WP:** WP-22 **done** (session 22): **M1 reached**, 96/100 top crates build in Chromium. Next: **WP-26** (tests, Clippy, rustfmt), then WP-27, WP-38 (→ M2).
 - **Last session:** 2026-10-25 (session 22). WP-21 done: build scripts with autocfg, rustc probes, libc, proc-macro2, anyhow and `links` metadata build in the browser and print what they print natively. Release **1.99.1-7520bf319596**.
 - **Rule for rustc source:** rust-lang's agent policy (`build/rust/AGENTS.md`) applies. Claude does not write or edit rustc source, and does not draft rust-lang issues, PRs or Zulip posts. The user writes those, or applies existing **human-written** patches (bjorn3/oligamiq), which the user prefers whenever one exists. **danlapid 0005–0007 are LLM-generated** (Claude co-author trailers), so they don't qualify even if the user applies them; design reference only (`docs/patches.md`). Claude reviews, builds and explains. Everything outside `build/rust` is Claude's, including out-of-tree drivers using `rustc_driver` (`toolchain/rustc-multi`).
-- **Next step:** WP-22: `tests/ecosystem`: build the top 100 crates (default features) with tools/prebuild under wasmtime, a sample in Chromium; table of pass/fail + reason class; fix the largest class each session. Expect cc-based `-sys` crates to need override-list entries (`web/build/overrides.ts`, empty now). Open follow-ups: Wasm proc macros in prebuild/L2 (WP-20), caching compiled macro modules across page loads.
+- **Next step:** WP-26: `cargo test` (build test harnesses, run them in the sandbox, libtest JSON → per-test results, run one test by name, doc tests), then Clippy and rustfmt for Wasm. Open follow-ups: Wasm proc macros in prebuild/L2 (WP-20), top-500 matrix (tracked through Phase E), caching compiled macro modules across page loads.
 - **Running background jobs:** none
+
+## Current session (2026-10-25, session 22, cont.): WP-22 done (M1)
+- Asked by the user: commit + push, then WP-22. Pushed `6904652..92af35d`.
+- **Matrix:** `tests/ecosystem/` (top100.json from crates.io by downloads, wrappers.mjs, native.sh, report.mjs, index-snapshot.tar.zst: 173 files, 517 KB), `tests/e2e/ecosystem.spec.ts` (`ECO=1`, one page per crate, L1 carried over), `/eco-index/` in playwright.config.ts. Run in Chromium, not wasmtime: prebuild can't host proc macros yet.
+- **Result:** native wasm32-wasip1 96/100 (cpufeatures, linux-raw-sys, socket2 reject the target; rustls's default aws-lc-sys needs C). **Browser 96/100 = all natively buildable ones**, 6.5 min for the whole list. `tests/ecosystem/results.md`, `docs/ecosystem.md`.
+- **Fixed class:** the first run lost 30 crates to `QuotaExceededError` at the first cache write. Reproduced with the old code: writes fail at ~0.85–0.93 GiB used although `estimate()` reports ~11 GiB (Playwright's ephemeral context; cause not confirmed). `FileCache` now has a byte budget (half the quota, ≤ 2 GiB) with LRU eviction (`.lru.json`), evicts and retries once on QuotaExceededError, and never throws; `UnitCache.put` doesn't either. The fixed run evicted 3 times and finished.
+- `scripts/verify/wp-22.sh` passes (strict: passes/100 ≥ 90). Full Chromium suite 18 passed (ecosystem spec skipped without ECO), WP-16 and WP-18 verify pass.
 
 ## Current session (2026-10-25, session 22): WP-21 done
 - Goals: (1) golden case `scripts` (num-traits/autocfg, rustversion, libc, proc-macro2, anyhow, a `links` pair) and planner fixes for `DEP_<links>_*` and dependencies' `-L`. (2) `std::process` for build scripts without touching the Rust tree: a stand-in `std` crate (`--extern std=`, re-exports the real std, own `process` module) whose `Command` calls a host import; the host routes `rustc` to a compile server. (3) Build scripts run with the package dir as working directory. (4) rustc-multi: per-request stdin (`rustc -` probes) and stdout (`rustc --version`). (5) Same in tools/prebuild (Node host for build scripts) so L2 stays consistent. (6) Override list; browser e2e: build-script outputs = native's; `scripts/verify/wp-21.sh`.
@@ -60,7 +67,7 @@
 - **Measured** (`bench/cache.md`): cold 7.0 / 8.2 / 3.7 s. Second build after a reload, all L1: 120 / 219 / 83 ms. Edit → run: **278 ms** in session, 575 ms after a reload (closure from OPFS). Empty L1 + L2 with edited mains: 576–700 ms. Prebuild: 29 s for the 3 cases; 47 bundles = 110 MB raw, 17 MB brotli.
 - Also: `build.spec.ts` stays cold (`l1: false`, its own target dir per project). Unit `start` is now taken after the dependencies finish (the WP-17 semantics). Cold builds measured 6.9–7.5 s today vs 10.9 s recorded in session 19, with no change to the compile path; cause not investigated (`bench/cache.md`).
 - `scripts/verify/wp-18.sh` passes; WP-17 verify passes; full Chromium suite 15 passed. Design: `docs/cache.md`.
-- **Known gaps:** no L1 eviction or size limit; cached units' warnings aren't replayed; L2 integrity trusts the L2 host (per-file sha256 sits in the same bundle); bundles aren't compressed on the L2 side; proc-macro artifacts (WP-20) still need keys.
+- **Known gaps:** ~~no L1 eviction or size limit~~ (WP-22: LRU budget); cached units' warnings aren't replayed; L2 integrity trusts the L2 host (per-file sha256 sits in the same bundle); bundles aren't compressed on the L2 side; proc-macro artifacts (WP-20) still need keys.
 
 ## Current session (2026-10-25, session 19): done
 - Goals (met): WP-17. (1) Golden: native `cargo build -vv --target wasm32-wasip1` of a serde_json demo on the snapshot index (`build/wp-17/native/`). (2) Planner in Rust (`crates/resolver/src/plan/`): cargo's v2 feature resolution per (package, host/target), units, rustc args + env; native golden test against the recorded invocations. (3) `rustc-multi`: per-request env (`OUT_DIR`, `CARGO_PKG_*`) and N compile servers in the orchestrator. (4) Executor `web/build/`: parallel scheduling; build scripts compiled to wasm32-wasip1 and run in the sandbox with `cargo:` directives parsed (a basic slice of WP-21, needed because zmij, serde_core and serde_json all have build scripts). (5) Browser e2e + `scripts/verify/wp-17.sh`.
@@ -188,7 +195,7 @@
 | 19 | Proc-macro bridge prototype | done | 1 | `scripts/verify/wp-19.sh` passes. serde_derive in Wasm = native token for token; ~2.0–2.1× per call (~1.7× without the proxy hop); `docs/proc-macro.md` |
 | 20 | Proc macros inside rustc.wasm | done | 1 | `scripts/verify/wp-20.sh` passes. serde derive + thiserror build and run in Chromium; bjorn3 #160981 + user's loader hook + rustc-multi slots + JS host; `docs/proc-macro.md` |
 | 21 | Build scripts | done | 1 | session 22: build-script std (Command → compile server), cwd, DEP_*, -L, override list; `scripts/verify/wp-21.sh` |
-| 22 | Ecosystem matrix (M1) | ready | 0 | |
+| 22 | Ecosystem matrix (M1) | done | 1 | **M1**: 96/100 in Chromium (4 fail natively too); `scripts/verify/wp-22.sh`; `tests/ecosystem/results.md` |
 | 23 | rust-analyzer in Wasm | deferred | 0 | Appendix (human-only), 2026-10-24 |
 | 24 | Editor integration | deferred | 0 | Appendix (human-only) |
 | 25 | Projects and workspaces | done | 1 | `scripts/verify/wp-25.sh` passes. Workspaces golden-identical to cargo (2 cases + lockfiles); OPFS projects, zip/GitHub import, Cargo.toml edits; `docs/projects.md` |
@@ -204,6 +211,7 @@
 | 37 | Release-train rebase | blocked | 0 | recurring |
 
 ## Measurements
+- 2026-10-25 WP-22 (Chromium, release 1.99.1-7520bf319596): top 100 crates by downloads, default features: 96/100 build (4 fail natively for wasm32-wasip1 too); whole list 6.5 min on 4 workers with L1 carried over; storage stays under ~0.86 GiB with LRU eviction.
 - 2026-10-25 WP-20 (Chromium, release 1.99.1-fda536abb2a3): cold `cargo build` of serde derive + serde_json + thiserror (28 units) 21 s on 4 workers, runs like native; reload + edit main.rs → build 1.45 s (macro modules from L1).
 - 2026-10-25 WP-21 (Chromium, release 1.99.1-7520bf319596): cold `cargo build` of the build-scripts case (num-traits/autocfg, rustversion, libc, proc-macro2, anyhow, links pair; 24 units) 8.7–9.0 s on 4 workers, every script prints what it prints natively; reload + edit main.rs → 1.0 s.
 - 2026-10-25 WP-25 (Chromium): workspace zip import (9 files) → reload restores 9 files from OPFS (init 0.5–1.3 s) → build 15 units ~7.5 s cold → runs; Cargo.toml edit + re-resolve with lockfile diff; GitHub import (trees API + raw) 16 files 1–3 s.

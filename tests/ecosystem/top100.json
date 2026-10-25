@@ -1,0 +1,606 @@
+{
+ "fetched": "2026-10-25",
+ "source": "https://crates.io/api/v1/crates?sort=downloads&per_page=100",
+ "crates": [
+  {
+   "rank": 1,
+   "name": "hashbrown",
+   "version": "0.17.1",
+   "downloads": 2838902678
+  },
+  {
+   "rank": 2,
+   "name": "syn",
+   "version": "3.0.9",
+   "downloads": 2784232422
+  },
+  {
+   "rank": 3,
+   "name": "getrandom",
+   "version": "0.4.3",
+   "downloads": 2367930716
+  },
+  {
+   "rank": 4,
+   "name": "bitflags",
+   "version": "2.13.2",
+   "downloads": 2103196835
+  },
+  {
+   "rank": 5,
+   "name": "rand_core",
+   "version": "0.10.1",
+   "downloads": 2011544646
+  },
+  {
+   "rank": 6,
+   "name": "rand",
+   "version": "0.10.3",
+   "downloads": 1994034323
+  },
+  {
+   "rank": 7,
+   "name": "libc",
+   "version": "0.2.191",
+   "downloads": 1842502566
+  },
+  {
+   "rank": 8,
+   "name": "quote",
+   "version": "1.0.47",
+   "downloads": 1828888480
+  },
+  {
+   "rank": 9,
+   "name": "proc-macro2",
+   "version": "1.0.107",
+   "downloads": 1820668126
+  },
+  {
+   "rank": 10,
+   "name": "base64",
+   "version": "0.23.1",
+   "downloads": 1807165859
+  },
+  {
+   "rank": 11,
+   "name": "windows-sys",
+   "version": "0.61.2",
+   "downloads": 1793102602
+  },
+  {
+   "rank": 12,
+   "name": "indexmap",
+   "version": "2.14.2",
+   "downloads": 1753202761
+  },
+  {
+   "rank": 13,
+   "name": "itertools",
+   "version": "0.15.0",
+   "downloads": 1710508104
+  },
+  {
+   "rank": 14,
+   "name": "thiserror-impl",
+   "version": "2.0.21",
+   "downloads": 1698549654
+  },
+  {
+   "rank": 15,
+   "name": "thiserror",
+   "version": "2.0.21",
+   "downloads": 1698377588
+  },
+  {
+   "rank": 16,
+   "name": "cfg-if",
+   "version": "1.0.5",
+   "downloads": 1635207825
+  },
+  {
+   "rank": 17,
+   "name": "memchr",
+   "version": "2.8.3",
+   "downloads": 1614482211
+  },
+  {
+   "rank": 18,
+   "name": "regex-syntax",
+   "version": "0.8.11",
+   "downloads": 1603309201
+  },
+  {
+   "rank": 19,
+   "name": "serde",
+   "version": "1.0.229",
+   "downloads": 1586487795
+  },
+  {
+   "rank": 20,
+   "name": "unicode-ident",
+   "version": "1.0.27",
+   "downloads": 1575256448
+  },
+  {
+   "rank": 21,
+   "name": "rand_chacha",
+   "version": "0.10.0",
+   "downloads": 1559550283
+  },
+  {
+   "rank": 22,
+   "name": "itoa",
+   "version": "1.0.18",
+   "downloads": 1525868306
+  },
+  {
+   "rank": 23,
+   "name": "serde_derive",
+   "version": "1.0.229",
+   "downloads": 1503636996
+  },
+  {
+   "rank": 24,
+   "name": "serde_json",
+   "version": "1.0.154",
+   "downloads": 1490637319
+  },
+  {
+   "rank": 25,
+   "name": "heck",
+   "version": "0.5.0",
+   "downloads": 1457247743
+  },
+  {
+   "rank": 26,
+   "name": "autocfg",
+   "version": "1.5.1",
+   "downloads": 1456036206
+  },
+  {
+   "rank": 27,
+   "name": "once_cell",
+   "version": "1.21.4",
+   "downloads": 1422184579
+  },
+  {
+   "rank": 28,
+   "name": "log",
+   "version": "0.4.34",
+   "downloads": 1420783876
+  },
+  {
+   "rank": 29,
+   "name": "regex-automata",
+   "version": "0.4.18",
+   "downloads": 1406053409
+  },
+  {
+   "rank": 30,
+   "name": "cc",
+   "version": "1.10.0",
+   "downloads": 1405648172
+  },
+  {
+   "rank": 31,
+   "name": "socket2",
+   "version": "0.6.5",
+   "downloads": 1385250100
+  },
+  {
+   "rank": 32,
+   "name": "smallvec",
+   "version": "1.16.4",
+   "downloads": 1353436710
+  },
+  {
+   "rank": 33,
+   "name": "regex",
+   "version": "1.13.1",
+   "downloads": 1300992661
+  },
+  {
+   "rank": 34,
+   "name": "rustix",
+   "version": "1.1.5",
+   "downloads": 1298200733
+  },
+  {
+   "rank": 35,
+   "name": "aho-corasick",
+   "version": "1.1.5",
+   "downloads": 1288805381
+  },
+  {
+   "rank": 36,
+   "name": "clap",
+   "version": "4.6.7",
+   "downloads": 1263466833
+  },
+  {
+   "rank": 37,
+   "name": "ryu",
+   "version": "1.0.23",
+   "downloads": 1259787551
+  },
+  {
+   "rank": 38,
+   "name": "digest",
+   "version": "0.11.3",
+   "downloads": 1254669466
+  },
+  {
+   "rank": 39,
+   "name": "parking_lot_core",
+   "version": "0.10.0",
+   "downloads": 1229537025
+  },
+  {
+   "rank": 40,
+   "name": "block-buffer",
+   "version": "0.12.1",
+   "downloads": 1227351603
+  },
+  {
+   "rank": 41,
+   "name": "windows_x86_64_msvc",
+   "version": "0.53.1",
+   "downloads": 1226075976
+  },
+  {
+   "rank": 42,
+   "name": "linux-raw-sys",
+   "version": "0.12.1",
+   "downloads": 1225390461
+  },
+  {
+   "rank": 43,
+   "name": "strsim",
+   "version": "0.11.1",
+   "downloads": 1199762440
+  },
+  {
+   "rank": 44,
+   "name": "parking_lot",
+   "version": "0.13.0",
+   "downloads": 1198962679
+  },
+  {
+   "rank": 45,
+   "name": "bytes",
+   "version": "1.12.1",
+   "downloads": 1185690619
+  },
+  {
+   "rank": 46,
+   "name": "windows_x86_64_gnu",
+   "version": "0.53.1",
+   "downloads": 1181729465
+  },
+  {
+   "rank": 47,
+   "name": "mio",
+   "version": "1.2.4",
+   "downloads": 1175348275
+  },
+  {
+   "rank": 48,
+   "name": "windows_aarch64_msvc",
+   "version": "0.53.1",
+   "downloads": 1174180094
+  },
+  {
+   "rank": 49,
+   "name": "windows_i686_msvc",
+   "version": "0.53.1",
+   "downloads": 1172166847
+  },
+  {
+   "rank": 50,
+   "name": "windows-targets",
+   "version": "0.53.5",
+   "downloads": 1170352864
+  },
+  {
+   "rank": 51,
+   "name": "windows_i686_gnu",
+   "version": "0.53.1",
+   "downloads": 1170086455
+  },
+  {
+   "rank": 52,
+   "name": "pin-project-lite",
+   "version": "0.2.17",
+   "downloads": 1166806160
+  },
+  {
+   "rank": 53,
+   "name": "http",
+   "version": "1.5.0",
+   "downloads": 1160733784
+  },
+  {
+   "rank": 54,
+   "name": "version_check",
+   "version": "0.9.5",
+   "downloads": 1152844325
+  },
+  {
+   "rank": 55,
+   "name": "cpufeatures",
+   "version": "0.3.1",
+   "downloads": 1152276706
+  },
+  {
+   "rank": 56,
+   "name": "num-traits",
+   "version": "0.2.19",
+   "downloads": 1146788424
+  },
+  {
+   "rank": 57,
+   "name": "either",
+   "version": "1.19.0",
+   "downloads": 1142231034
+  },
+  {
+   "rank": 58,
+   "name": "windows_aarch64_gnullvm",
+   "version": "0.53.1",
+   "downloads": 1120288440
+  },
+  {
+   "rank": 59,
+   "name": "windows_x86_64_gnullvm",
+   "version": "0.53.1",
+   "downloads": 1120167099
+  },
+  {
+   "rank": 60,
+   "name": "semver",
+   "version": "1.0.28",
+   "downloads": 1119229093
+  },
+  {
+   "rank": 61,
+   "name": "sha2",
+   "version": "0.11.1",
+   "downloads": 1114043568
+  },
+  {
+   "rank": 62,
+   "name": "lock_api",
+   "version": "0.5.0",
+   "downloads": 1110277097
+  },
+  {
+   "rank": 63,
+   "name": "tokio",
+   "version": "1.54.1",
+   "downloads": 1105815809
+  },
+  {
+   "rank": 64,
+   "name": "lazy_static",
+   "version": "1.5.1",
+   "downloads": 1098744765
+  },
+  {
+   "rank": 65,
+   "name": "anyhow",
+   "version": "1.0.104",
+   "downloads": 1087721088
+  },
+  {
+   "rank": 66,
+   "name": "idna",
+   "version": "1.1.0",
+   "downloads": 1074792431
+  },
+  {
+   "rank": 67,
+   "name": "winnow",
+   "version": "1.0.4",
+   "downloads": 1067301955
+  },
+  {
+   "rank": 68,
+   "name": "scopeguard",
+   "version": "1.2.0",
+   "downloads": 1064648358
+  },
+  {
+   "rank": 69,
+   "name": "futures-core",
+   "version": "0.3.34",
+   "downloads": 1061580228
+  },
+  {
+   "rank": 70,
+   "name": "slab",
+   "version": "0.4.12",
+   "downloads": 1053700805
+  },
+  {
+   "rank": 71,
+   "name": "zerocopy",
+   "version": "0.8.63",
+   "downloads": 1053505583
+  },
+  {
+   "rank": 72,
+   "name": "crypto-common",
+   "version": "0.2.2",
+   "downloads": 1049910740
+  },
+  {
+   "rank": 73,
+   "name": "toml",
+   "version": "1.1.8+spec-1.1.0",
+   "downloads": 1049895523
+  },
+  {
+   "rank": 74,
+   "name": "futures-util",
+   "version": "0.3.34",
+   "downloads": 1048069454
+  },
+  {
+   "rank": 75,
+   "name": "hyper",
+   "version": "1.12.0",
+   "downloads": 1046158936
+  },
+  {
+   "rank": 76,
+   "name": "futures-task",
+   "version": "0.3.34",
+   "downloads": 1045764395
+  },
+  {
+   "rank": 77,
+   "name": "rustls",
+   "version": "0.23.46",
+   "downloads": 1041151099
+  },
+  {
+   "rank": 78,
+   "name": "fastrand",
+   "version": "2.5.0",
+   "downloads": 1038204105
+  },
+  {
+   "rank": 79,
+   "name": "crossbeam-utils",
+   "version": "0.8.23",
+   "downloads": 1033220115
+  },
+  {
+   "rank": 80,
+   "name": "typenum",
+   "version": "1.20.1",
+   "downloads": 1030756530
+  },
+  {
+   "rank": 81,
+   "name": "miniz_oxide",
+   "version": "0.9.1",
+   "downloads": 1027637656
+  },
+  {
+   "rank": 82,
+   "name": "percent-encoding",
+   "version": "2.3.2",
+   "downloads": 1020881938
+  },
+  {
+   "rank": 83,
+   "name": "generic-array",
+   "version": "1.4.5",
+   "downloads": 1017794163
+  },
+  {
+   "rank": 84,
+   "name": "time",
+   "version": "0.3.55",
+   "downloads": 1006953071
+  },
+  {
+   "rank": 85,
+   "name": "ppv-lite86",
+   "version": "0.2.21",
+   "downloads": 1003237108
+  },
+  {
+   "rank": 86,
+   "name": "futures-sink",
+   "version": "0.3.34",
+   "downloads": 998188216
+  },
+  {
+   "rank": 87,
+   "name": "http-body",
+   "version": "1.1.0",
+   "downloads": 998011491
+  },
+  {
+   "rank": 88,
+   "name": "futures-channel",
+   "version": "0.3.34",
+   "downloads": 997499640
+  },
+  {
+   "rank": 89,
+   "name": "url",
+   "version": "2.5.8",
+   "downloads": 990112220
+  },
+  {
+   "rank": 90,
+   "name": "clap_lex",
+   "version": "1.1.1",
+   "downloads": 989318241
+  },
+  {
+   "rank": 91,
+   "name": "shlex",
+   "version": "2.0.1",
+   "downloads": 985156712
+  },
+  {
+   "rank": 92,
+   "name": "tracing-core",
+   "version": "0.1.36",
+   "downloads": 980102279
+  },
+  {
+   "rank": 93,
+   "name": "tracing",
+   "version": "0.1.44",
+   "downloads": 969674716
+  },
+  {
+   "rank": 94,
+   "name": "errno",
+   "version": "0.3.14",
+   "downloads": 968261666
+  },
+  {
+   "rank": 95,
+   "name": "equivalent",
+   "version": "1.0.3",
+   "downloads": 961826172
+  },
+  {
+   "rank": 96,
+   "name": "futures-io",
+   "version": "0.3.34",
+   "downloads": 950333976
+  },
+  {
+   "rank": 97,
+   "name": "toml_edit",
+   "version": "0.25.17+spec-1.1.0",
+   "downloads": 945220474
+  },
+  {
+   "rank": 98,
+   "name": "toml_datetime",
+   "version": "1.1.2+spec-1.1.0",
+   "downloads": 940882407
+  },
+  {
+   "rank": 99,
+   "name": "rustc-hash",
+   "version": "2.1.3",
+   "downloads": 930826522
+  },
+  {
+   "rank": 100,
+   "name": "tempfile",
+   "version": "3.27.0",
+   "downloads": 923408241
+  }
+ ]
+}

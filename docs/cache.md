@@ -58,5 +58,5 @@ The planner's golden cases (`tests/planner/cases/`) double as cache cases. **New
 - Cargo's `rerun-if-changed`/`rerun-if-env-changed`. Not needed: a build script's key already covers the whole package and its env.
 - Warnings of cached units aren't replayed (cargo replays them).
 - Crates that use Wasm proc macros can't be prebuilt (WP-20: the wasmtime build has no proc-macro host); in the browser they're cached in L1 like any unit.
-- No eviction or size limit for L1. No L2 upload from the browser (L2 is filled only by prebuild). No signing of L2 beyond per-file sha256 (the bundle header itself comes from L2; trust in the L2 host is assumed).
+- L1 eviction (WP-22): a byte budget with LRU eviction in `web/deps/cache.ts`; see `docs/ecosystem.md`. No L2 upload from the browser (L2 is filled only by prebuild). No signing of L2 beyond per-file sha256 (the bundle header itself comes from L2; trust in the L2 host is assumed).
 - Proc-macro artifacts (WP-20) will need the same keying. Their outputs are wasm modules for the host, not rlibs.

@@ -114,7 +114,8 @@ export class UnitCache {
   async put(key: string, bundle: Bundle): Promise<void> {
     if (!this.l1) return;
     const bytes = encodeBundle(bundle);
-    await this.l1.write(bundlePath(key), bytes);
+    // A unit that can't be stored is built again next time; the build itself goes on.
+    try { await this.l1.write(bundlePath(key), bytes); } catch { return; }
     this.stats.stored++;
     this.stats.bytesOut += bytes.length;
   }

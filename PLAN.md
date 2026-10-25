@@ -340,6 +340,7 @@ These are taken as defaults so work can start. Changing one later only affects t
   - Results in a table: pass/fail + reason class.
   - Each session fixes the largest failure class.
 - **Done when:** ≥ 90% of the top 100 pass (M1). The ≥ 95% top-500 target is tracked through Phase E.
+  - *2026-10-25 (done, session 22): **M1 met**, 96/100 in Chromium; the other 4 (cpufeatures, linux-raw-sys, socket2, rustls via aws-lc-sys) fail natively for wasm32-wasip1 too. Run in Chromium rather than wasmtime (prebuild can't host proc macros yet; the whole run is 6.5 min). Fixed class: L1 writes hitting QuotaExceededError (LRU budget, best-effort writes). See `docs/ecosystem.md`, `tests/ecosystem/results.md`.*
 
 ### Phase E: Agent-ready v1
 

@@ -1,0 +1,59 @@
+{
+  "release": "1.99.1-7520bf319596",
+  "import": {
+    "files": 9,
+    "skipped": [],
+    "ms": 17
+  },
+  "flush": {
+    "flushes": 1,
+    "written": 9
+  },
+  "reload": {
+    "restored": 9,
+    "names": [
+      "ws"
+    ],
+    "initMs": 1619
+  },
+  "build": {
+    "units": 15,
+    "packages": 15,
+    "ms": {
+      "deps": 768,
+      "plan": 51,
+      "build": 20362,
+      "store": 28,
+      "total": 21209
+    },
+    "local": [
+      "app bin",
+      "helper lib",
+      "util lib",
+      "ws-core lib"
+    ]
+  },
+  "edits": {
+    "add": [
+      {
+        "name": "smallvec",
+        "to": "1.16.4"
+      }
+    ],
+    "bad": "failed to select a version for `itoa` (required by `app v0.3.1`, version requirement `=0.0.1`)",
+    "remove": [
+      {
+        "name": "smallvec",
+        "from": "1.16.4"
+      }
+    ]
+  },
+  "export": {
+    "bytes": 3163
+  },
+  "github": {
+    "files": 16,
+    "skipped": [],
+    "ms": 905
+  }
+}
