@@ -2,15 +2,23 @@
 import type { RustcResult } from './orchestrator';
 import type { LoadStats } from './toolchain';
 import type { BuildResult } from '../build/cargo';
-import type { PlanInput } from '../deps/resolver';
+import type { ManifestEdit, PlanInput } from '../deps/resolver';
+import type { EditResult } from '../project/projects';
 
-export interface InitResult { rustcId: string; ms: number; loads: LoadStats[] }
+export interface InitResult { rustcId: string; ms: number; loads: LoadStats[]; projects?: { restored: number; names: string[] } }
+
+/** Where a project comes from (web/project): files, a zip, or a public GitHub repository. */
+export type ProjectSource =
+  | { files: Record<string, string | Uint8Array> }
+  | { zip: Uint8Array }
+  | { github: string; subdir?: string };
 export interface RunOutput { code: number; stdout: string; stderr: string; ms: number }
 
 /** Each request names its operation; the answer type is in `Ops`. */
 export type Ops = {
   /** `workers`: compile servers at most (parallel rustc jobs; default 1). */
-  init: { args: { releaseUrl: string; vfsUrl: string; workerUrl: string; sandboxWorkerUrl?: string; workers?: number }; result: InitResult };
+  /** `persist` (WP-25): restore /projects from OPFS and keep mirroring it there. */
+  init: { args: { releaseUrl: string; vfsUrl: string; workerUrl: string; sandboxWorkerUrl?: string; workers?: number; persist?: boolean }; result: InitResult };
   writeFile: { args: { path: string; data: string | Uint8Array }; result: void };
   readFile: { args: { path: string }; result: Uint8Array };
   ls: { args: { path: string }; result: string[] };
@@ -27,6 +35,15 @@ export type Ops = {
     };
     result: BuildResult;
   };
+  /** Projects (WP-25) live at /projects/<name>; build one with `build` and that path. */
+  projectList: { args: Record<string, never>; result: string[] };
+  projectImport: { args: { name: string; source: ProjectSource }; result: { files: number; skipped: string[]; ms: number } };
+  projectExport: { args: { name: string }; result: Uint8Array };
+  projectDelete: { args: { name: string }; result: void };
+  /** Wait until every change so far is in OPFS (before a reload). */
+  projectFlush: { args: Record<string, never>; result: { flushes: number; written: number } };
+  /** Edit a Cargo.toml (`dir` relative to the project) and resolve: lockfile changes, or the error. */
+  manifestEdit: { args: { project: string; dir?: string; edits: ManifestEdit[]; resolverUrl: string; index: string }; result: EditResult };
   /** Run a wasm32-wasip1 program from the VFS in the run sandbox (no stdin; see web/sandbox for more). */
   run: { args: { path: string; args?: string[] }; result: RunOutput };
   /** Sizes of the big memories: the VFS and the compile server's rustc instance (both only grow). */

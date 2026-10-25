@@ -1,0 +1,13 @@
+[package]
+name = "ws-core"
+version = "0.1.0"
+edition.workspace = true
+repository.workspace = true
+
+[lib]
+name = "core_lib"
+
+[dependencies]
+serde_json = { workspace = true, features = ["std"] }
+util = { workspace = true }
+helper = { path = "../../vendor/helper", version = "0.9" }

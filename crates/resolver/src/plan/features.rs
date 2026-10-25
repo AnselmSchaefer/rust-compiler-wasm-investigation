@@ -56,7 +56,7 @@ impl<'a> FeatureResolver<'a> {
         edges: &'a Edges,
         platforms: Platforms<'a>,
         decouple_host: bool,
-        root: usize,
+        roots: &[usize],
         requested: &[String],
         default_features: bool,
     ) -> Result<Features, String> {
@@ -69,21 +69,28 @@ impl<'a> FeatureResolver<'a> {
             processed: HashSet::new(),
             deferred_weak: HashMap::new(),
         };
-        let map = &pkgs[root].summary.features;
-        let mut fvs = Vec::new();
-        for f in requested.iter().flat_map(|f| f.split([' ', ','])).filter(|f| !f.is_empty()) {
-            let fv = FeatureValue::new(f);
-            if let FeatureValue::Feature(name) = &fv {
-                if !map.contains_key(name) {
-                    return Err(format!("the package `{}` does not have the feature `{name}`", pkgs[root].name()));
+        // `--features` names features of the one package being built (cargo needs `-p` otherwise).
+        let requested: Vec<&str> = requested.iter().flat_map(|f| f.split([' ', ','])).filter(|f| !f.is_empty()).collect();
+        if roots.len() > 1 && !requested.is_empty() {
+            return Err("features can only be given when building one package".into());
+        }
+        for &root in roots {
+            let map = &pkgs[root].summary.features;
+            let mut fvs = Vec::new();
+            for f in &requested {
+                let fv = FeatureValue::new(f);
+                if let FeatureValue::Feature(name) = &fv {
+                    if !map.contains_key(name) {
+                        return Err(format!("the package `{}` does not have the feature `{name}`", pkgs[root].name()));
+                    }
                 }
+                fvs.push(fv);
             }
-            fvs.push(fv);
+            if default_features && map.contains_key("default") {
+                fvs.push(FeatureValue::Feature("default".into()));
+            }
+            r.activate_pkg(root, FeaturesFor::Normal, &fvs)?;
         }
-        if default_features && map.contains_key("default") {
-            fvs.push(FeatureValue::Feature("default".into()));
-        }
-        r.activate_pkg(root, FeaturesFor::Normal, &fvs)?;
         Ok(r.out)
     }
 

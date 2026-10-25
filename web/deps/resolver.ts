@@ -9,16 +9,24 @@ export interface ResolvedPackage {
   checksum: string | null; features: string[];
   /** Indices into `packages`. */
   deps: number[];
+  /** A path package's directory. */
+  dir: string | null;
 }
+/** A project for the resolver (WP-25): every Cargo.toml in it, by directory. */
+export interface WorkspaceInput { root: string; manifests: Record<string, string> }
+/** crates/resolver/src/workspace.rs; indices into `packages`. */
+export interface WorkspaceInfo { root: string; members: number[]; default_members: number[]; resolver: number }
 export type ResolveResult =
   | { need: string[] }
-  | { lock: string; packages: ResolvedPackage[] }
+  | { lock: string; packages: ResolvedPackage[]; workspace?: WorkspaceInfo; manifests?: Record<string, string> }
   | { error: string };
 
 /** crates/resolver/src/plan/mod.rs: PlanInput, Unit, Plan, Finished. */
 export interface PlanInput {
   packages: { name: string; version: string; manifest: string | null; dir: string; source: 'path' | 'registry'; files: string[]; deps: number[] }[];
-  root: number; target: string; host: string; target_dir: string; rustc_id: string;
+  /** The packages to build (or `root`, one package). `resolver`: the workspace's setting. */
+  roots?: number[]; root?: number; resolver?: number;
+  target: string; host: string; target_dir: string; rustc_id: string;
   features?: string[]; default_features?: boolean; target_flag_for_host?: boolean;
   profile?: { name?: string; opt_level?: string; debuginfo?: number; debug_assertions?: boolean; overflow_checks?: boolean; incremental?: boolean };
   tools?: { cargo?: string; rustc?: string; rustdoc?: string; jobs?: number };
@@ -40,7 +48,15 @@ type Exports = {
   resolver_resolve(manifest: number, len: number): bigint;
   planner_plan(input: number, len: number): bigint;
   planner_finish(input: number, len: number): bigint;
+  manifest_edit(input: number, len: number): bigint;
 };
+
+/** crates/resolver/src/edit.rs */
+export type ManifestEdit =
+  | { op: 'add'; name: string; version?: string; features?: string[]; optional?: boolean; default_features?: boolean; package?: string; path?: string; kind?: DepKind; target?: string }
+  | { op: 'remove'; name: string; kind?: DepKind; target?: string }
+  | { op: 'set'; key: string[]; value: unknown };
+export type DepKind = 'normal' | 'dev' | 'build';
 
 const enc = new TextEncoder(), dec = new TextDecoder();
 const ERRNO_BADF = 8, ERRNO_NOSYS = 52;
@@ -95,8 +111,9 @@ export class Resolver {
     this.x.resolver_add_index(np, nl, dp, dl, data ? 1 : 0);
   }
 
-  resolve(manifest: string): ResolveResult {
-    return this.call('resolver_resolve', manifest);
+  /** One package's Cargo.toml, or a whole project. */
+  resolve(manifest: string | WorkspaceInput): ResolveResult {
+    return this.call('resolver_resolve', typeof manifest === 'string' ? manifest : JSON.stringify(manifest));
   }
 
   /** Plan a build; the plan stays in the module for `finish`. */
@@ -113,7 +130,12 @@ export class Resolver {
     return r;
   }
 
-  private call<T>(f: 'resolver_resolve' | 'planner_plan' | 'planner_finish', input: string): T {
+  /** Cargo.toml text after `edits` (formatting kept), or an error. */
+  editManifest(manifest: string, edits: ManifestEdit[]): { manifest: string } | { error: string } {
+    return this.call('manifest_edit', JSON.stringify({ manifest, edits }));
+  }
+
+  private call<T>(f: 'resolver_resolve' | 'planner_plan' | 'planner_finish' | 'manifest_edit', input: string): T {
     const [p, l] = this.put(enc.encode(input));
     let r: bigint;
     try {

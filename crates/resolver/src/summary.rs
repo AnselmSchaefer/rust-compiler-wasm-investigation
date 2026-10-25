@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
 use std::rc::Rc;
 
-/// Where a package comes from. Only the root is a path package; everything else is crates.io.
+/// Where a package comes from: a directory (workspace members, path dependencies) or crates.io.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, PartialOrd, Ord)]
 pub enum Source {
     Path,
@@ -38,6 +38,8 @@ pub struct Dependency {
     pub features: Vec<Rc<str>>,
     /// `cfg(...)` or a target triple. The resolver ignores it (the lockfile is platform-independent).
     pub target: Option<String>,
+    /// A path dependency: the package's directory (absolute, normalized).
+    pub path: Option<Rc<str>>,
 }
 
 impl Dependency {
@@ -108,6 +110,8 @@ pub struct Summary {
     pub links: Option<Rc<str>>,
     pub rust_version: Option<RustVersion>,
     pub checksum: Option<String>,
+    /// A path package's directory.
+    pub dir: Option<Rc<str>>,
 }
 
 impl Summary {
@@ -128,7 +132,7 @@ impl Summary {
             }
         }
         let features = build_feature_map(features, &deps)?;
-        Ok(Summary { name, version, source, deps, features, links, rust_version, checksum: None })
+        Ok(Summary { name, version, source, deps, features, links, rust_version, checksum: None, dir: None })
     }
 }
 

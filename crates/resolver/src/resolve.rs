@@ -91,6 +91,8 @@ struct Pool {
     summaries: Vec<Rc<Summary>>,
     yanked: Vec<bool>,
     by_name: HashMap<Rc<str>, Vec<PkgId>>,
+    /// Path packages (workspace members first, then other path dependencies) by directory.
+    by_dir: HashMap<Rc<str>, PkgId>,
 }
 
 impl Pool {
@@ -348,6 +350,15 @@ impl Queryer<'_> {
 
     /// The candidates for `dep`, best first; `None` while its index file is pending.
     fn query(&mut self, dep: &Dependency) -> Result<Option<Rc<Vec<PkgId>>>, String> {
+        if let Some(dir) = &dep.path {
+            // A path dependency has exactly one candidate: the package in that directory.
+            let id = *self.pool.by_dir.get(dir).ok_or_else(|| format!("dependency `{}`: no package at {dir}", dep.name_in_toml))?;
+            let s = self.pool.get(id);
+            if *s.name != *dep.package {
+                return Err(format!("dependency `{}`: {dir} is package `{}`, not `{}`", dep.name_in_toml, s.name, dep.package));
+            }
+            return Ok(Some(Rc::new(if dep.req.matches(&s.version) { vec![id] } else { vec![] })));
+        }
         let key = (dep.package.clone(), dep.req.clone());
         if let Some(c) = self.query_cache.get(&key) {
             return Ok(Some(c.clone()));
@@ -530,6 +541,8 @@ pub struct ResolvedPackage {
     pub version: Version,
     pub source: Source,
     pub checksum: Option<String>,
+    /// A path package's directory.
+    pub dir: Option<Rc<str>>,
     /// Indices into `Resolve::packages`.
     pub deps: Vec<usize>,
     /// The features the dependency resolver enabled (unified across the graph).
@@ -551,6 +564,21 @@ pub fn resolve(root: RootManifest, registry: &dyn Registry) -> Result<Resolve, S
 /// pending (the registry knows which); supply them and resolve again.
 pub fn resolve_cached(root: RootManifest, registry: &dyn Registry, cache: &mut IndexCache) -> Result<Option<Resolve>, String> {
     let RootManifest { summary, behavior, rust_version } = root;
+    resolve_roots(Roots { members: vec![summary], paths: Vec::new(), behavior, rust_version }, registry, cache)
+}
+
+/// What a resolve starts from: the workspace members (each a root, with all features and dev
+/// dependencies, as `cargo generate-lockfile` does) and the other path packages they may reach.
+pub struct Roots {
+    pub members: Vec<Summary>,
+    pub paths: Vec<Summary>,
+    pub behavior: ResolveBehavior,
+    /// The workspace's lowest `rust-version`.
+    pub rust_version: Option<cargo_util_schemas::manifest::RustVersion>,
+}
+
+pub fn resolve_roots(roots: Roots, registry: &dyn Registry, cache: &mut IndexCache) -> Result<Option<Resolve>, String> {
+    let Roots { members, paths, behavior, rust_version } = roots;
     let rust_versions = if behavior >= ResolveBehavior::V3 {
         vec![match &rust_version {
             Some(r) => r.to_partial(),
@@ -562,16 +590,27 @@ pub fn resolve_cached(root: RootManifest, registry: &dyn Registry, cache: &mut I
     } else {
         Vec::new()
     };
+    let n_roots = members.len();
+    let summaries: Vec<Rc<Summary>> = members.into_iter().chain(paths).map(Rc::new).collect();
+    let mut by_dir = HashMap::new();
+    for (i, s) in summaries.iter().enumerate() {
+        if let Some(d) = &s.dir {
+            if by_dir.insert(d.clone(), i as PkgId).is_some() {
+                return Err(format!("two packages at {d}"));
+            }
+        }
+    }
+    let yanked = vec![false; summaries.len()];
     let mut q = Queryer {
         registry,
         cache,
-        pool: Pool { summaries: vec![Rc::new(summary)], yanked: vec![false], by_name: HashMap::new() },
+        pool: Pool { summaries, yanked, by_name: HashMap::new(), by_dir },
         rust_versions,
         query_cache: HashMap::new(),
         deps_cache: HashMap::new(),
         pending: false,
     };
-    let cx = activate_deps_loop(&mut q);
+    let cx = activate_deps_loop(&mut q, n_roots);
     if q.pending {
         // An error may just be the missing constraints' fault; either way, fetch and retry.
         return Ok(None);
@@ -596,6 +635,7 @@ pub fn resolve_cached(root: RootManifest, registry: &dyn Registry, cache: &mut I
                 version: s.version.clone(),
                 source: s.source,
                 checksum: s.checksum.clone(),
+                dir: s.dir.clone(),
                 deps,
                 features: cx.resolve_features.get(&id).map(|f| (**f).clone()).unwrap_or_default(),
             }
@@ -630,8 +670,7 @@ fn activate(
     Ok(Some(DepsFrame { parent: candidate, remaining_siblings: RcVecIter::new(deps.clone()) }))
 }
 
-fn activate_deps_loop(q: &mut Queryer<'_>) -> Result<ResolverContext, String> {
-    const ROOT: PkgId = 0;
+fn activate_deps_loop(q: &mut Queryer<'_>, n_roots: usize) -> Result<ResolverContext, String> {
     let mut cx = ResolverContext::new();
     let mut backtrack_stack: Vec<BacktrackFrame> = Vec::new();
     let mut remaining_deps = RemainingDeps::new();
@@ -640,11 +679,14 @@ fn activate_deps_loop(q: &mut Queryer<'_>) -> Result<ResolverContext, String> {
         dev_deps: true,
         features: RequestedFeatures::Cli { all_features: true, uses_default_features: true },
     };
-    match activate(&mut cx, q, None, ROOT, &root_opts) {
-        Ok(Some(frame)) => remaining_deps.push(frame),
-        Ok(None) => {}
-        Err(ActivateError::Fatal(e)) => return Err(e),
-        Err(ActivateError::Conflict(..)) => unreachable!("the root has no parent to conflict with"),
+    // Pool ids 0..n_roots are the members (cargo activates each workspace member as a root).
+    for root in 0..n_roots as PkgId {
+        match activate(&mut cx, q, None, root, &root_opts) {
+            Ok(Some(frame)) => remaining_deps.push(frame),
+            Ok(None) => {}
+            Err(ActivateError::Fatal(e)) => return Err(e),
+            Err(ActivateError::Conflict(_, _)) => return Err(format!("workspace member `{}` conflicts with another", q.pool.get(root).name)),
+        }
     }
 
     while let Some((mut parent, (mut dep, candidates, mut features))) = remaining_deps.pop_most_constrained() {

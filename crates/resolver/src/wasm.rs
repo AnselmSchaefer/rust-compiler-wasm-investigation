@@ -4,14 +4,21 @@
 //!   loop {
 //!     resolver_resolve(manifest) → JSON
 //!       {"need": [names]}            index files to fetch, then resolver_add_index(...) each, again
-//!       {"lock": "...", "packages": [{name, version, source, checksum, features, deps}]}
+//!       {"lock": "...", "packages": [{name, version, source, checksum, features, deps, dir}]}
 //!       {"error": "..."}
 //!   }
+//!
+//! `manifest` is one package's Cargo.toml, or (WP-25) a workspace as JSON:
+//! `{"root": dir, "manifests": {dir: Cargo.toml text}}` with every Cargo.toml of the project. Its
+//! result also has `workspace`: `{members, default_members}` (indices into `packages`),
+//! `manifests` (dir → Cargo.toml after inheritance, which the planner needs) and `resolver`.
 //!
 //! The build planner (WP-17), on the same kind of JSON:
 //!
 //!   planner_plan(PlanInput) → {"plan": Plan} or {"error"}; the plan is kept for:
 //!   planner_finish({"unit": id, "outputs": {"<run unit id>": "<stdout>"}}) → Finished or {"error"}
+//!
+//! Cargo.toml edits (WP-25): manifest_edit({"manifest", "edits"}) → {"manifest"} or {"error"}.
 //!
 //! Strings and bytes cross as (ptr, len) in this module's memory: JS gets a buffer with
 //! resolver_alloc, writes into it, and passes it in (the callee frees it). A result is returned as
@@ -101,14 +108,32 @@ pub unsafe extern "C" fn resolver_resolve(manifest: *mut u8, len: usize) -> u64 
     give(STATE.with_borrow_mut(|s| run(s, &manifest)).to_string())
 }
 
+#[derive(serde::Deserialize)]
+struct WorkspaceInput {
+    root: String,
+    manifests: std::collections::BTreeMap<String, String>,
+}
+
 fn run(state: &mut State, manifest: &str) -> serde_json::Value {
     use serde_json::json;
-    let root = match crate::parse_manifest(manifest) {
-        Ok(r) => r,
-        Err(e) => return json!({ "error": e }),
-    };
     let registry = Supplied { files: &state.files, missing: RefCell::default() };
-    match resolve_cached(root, &registry, &mut state.cache) {
+    let (result, ws) = if manifest.trim_start().starts_with('{') {
+        let input: WorkspaceInput = match serde_json::from_str(manifest) {
+            Ok(i) => i,
+            Err(e) => return json!({ "error": format!("bad workspace input: {e}") }),
+        };
+        let ws = match crate::workspace::load(&input.root, &input.manifests) {
+            Ok(w) => w,
+            Err(e) => return json!({ "error": e }),
+        };
+        (ws.resolve_cached(&registry, &mut state.cache), Some(ws))
+    } else {
+        match crate::parse_manifest(manifest) {
+            Ok(root) => (resolve_cached(root, &registry, &mut state.cache), None),
+            Err(e) => return json!({ "error": e }),
+        }
+    };
+    match result {
         Err(e) => json!({ "error": e }),
         Ok(None) => json!({ "need": registry.missing.into_inner() }),
         Ok(Some(r)) => {
@@ -123,10 +148,20 @@ fn run(state: &mut State, manifest: &str) -> serde_json::Value {
                         "checksum": p.checksum,
                         "features": p.features.iter().map(|f| &**f).collect::<Vec<_>>(),
                         "deps": p.deps,
+                        "dir": p.dir.as_deref(),
                     })
                 })
                 .collect();
-            json!({ "lock": crate::write_lockfile(&r), "packages": packages })
+            let mut out = json!({ "lock": crate::write_lockfile(&r), "packages": packages });
+            if let Some(ws) = ws {
+                let index = |m: usize| r.packages.iter().position(|p| p.dir.as_deref() == Some(ws.packages[m].dir.as_str()));
+                let members: Vec<usize> = (0..ws.packages.len()).filter(|&m| ws.packages[m].member).filter_map(index).collect();
+                let default_members: Vec<usize> = ws.default_members.iter().filter_map(|&m| index(m)).collect();
+                let manifests: serde_json::Map<String, serde_json::Value> = ws.packages.iter().map(|p| (p.dir.clone(), json!(p.manifest))).collect();
+                out["workspace"] = json!({ "root": ws.root, "members": members, "default_members": default_members, "resolver": ws.resolver });
+                out["manifests"] = json!(manifests);
+            }
+            out
         }
     }
 }
@@ -180,5 +215,27 @@ pub unsafe extern "C" fn planner_finish(input: *mut u8, len: usize) -> u64 {
             Err(e) => json!({ "error": e }),
         }
     });
+    give(out.to_string())
+}
+
+/// `{"manifest": text, "edits": [Edit]}` → `{"manifest": new text}` or `{"error"}` (edit.rs).
+///
+/// # Safety
+/// The input buffer must come from `resolver_alloc` with this length; it is consumed.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn manifest_edit(input: *mut u8, len: usize) -> u64 {
+    use serde_json::json;
+    #[derive(serde::Deserialize)]
+    struct Input {
+        manifest: String,
+        edits: Vec<crate::edit::Edit>,
+    }
+    let out = match serde_json::from_slice::<Input>(&unsafe { take(input, len) }) {
+        Err(e) => json!({ "error": format!("bad edit: {e}") }),
+        Ok(i) => match crate::edit::apply(&i.manifest, &i.edits) {
+            Ok(m) => json!({ "manifest": m }),
+            Err(e) => json!({ "error": e }),
+        },
+    };
     give(out.to_string())
 }

@@ -11,8 +11,8 @@
 // into L1. The host is the browser (browser-host.ts) or wasmtime (tools/prebuild), so both build
 // the same plan with the same keys.
 //
-// Paths: the project at `project`, crates under /deps/<name>-<version>/, outputs under /target/
-// (shared by all projects) in cargo's layout.
+// Paths: the project at `project` (a package or a workspace, WP-25), crates under
+// /deps/<name>-<version>/, outputs under /target/ (shared by all projects) in cargo's layout.
 
 import { fetchDependencies, type DepsOptions, type DepsResult } from '../deps/deps';
 import type { Plan, PlanInput, PlanUnit, Resolver } from '../deps/resolver';
@@ -92,8 +92,12 @@ const inPlace = new WeakMap<object, Map<string, { files: Record<string, string>;
 export async function cargoBuild(host: BuildHost, opts: BuildOptions): Promise<BuildResult> {
   const t0 = performance.now();
   const vfs = host.vfs;
-  const manifest = vfs.readText(`${opts.project}/Cargo.toml`);
-  const deps = await fetchDependencies(manifest, vfs, { resolver: opts.resolver, index: opts.index, dl: opts.dl, cache: opts.cache, dir: '/deps' });
+  // The whole project goes to the resolver, which finds the workspace's members (WP-25).
+  const project = { root: opts.project, manifests: projectManifests(vfs, opts.project) };
+  const deps = await fetchDependencies(project, vfs, { resolver: opts.resolver, index: opts.index, dl: opts.dl, cache: opts.cache, dir: '/deps' });
+  // Like cargo, keep the project's Cargo.lock current (before the planner lists the files).
+  const lockPath = `${opts.project}/Cargo.lock`;
+  if (!vfs.exists(lockPath) || vfs.readText(lockPath) !== deps.lock) vfs.writeFile(lockPath, deps.lock);
   const t1 = performance.now();
   const input = planInput(vfs, opts, deps, host);
   const plan = opts.resolver.plan(input);
@@ -209,21 +213,53 @@ function restore(vfs: BuildFs, u: PlanUnit, b: Bundle, outputs: Record<number, s
 
 function planInput(vfs: BuildFs, opts: BuildOptions, deps: DepsResult, host: BuildHost): PlanInput {
   const packages = deps.packages.map(p => {
-    const dir = p.source === 'path' ? opts.project : `/deps/${p.name}-${p.version}`;
+    const dir = p.dir ?? `/deps/${p.name}-${p.version}`;
     const has = vfs.exists(`${dir}/Cargo.toml`);
     return {
       name: p.name, version: p.version, source: p.source, dir, deps: p.deps,
-      manifest: has ? vfs.readText(`${dir}/Cargo.toml`) : null,
-      files: has ? filesBelow(vfs, dir).map(f => f.slice(dir.length + 1)).filter(f => !f.startsWith('target/')) : [],
+      // Path packages: the manifest after workspace inheritance.
+      manifest: deps.manifests?.[dir] ?? (has ? vfs.readText(`${dir}/Cargo.toml`) : null),
+      files: !has ? [] : p.dir ? packageFiles(vfs, dir) : filesBelow(vfs, dir).map(f => f.slice(dir.length + 1)),
     };
   });
   return {
-    packages, root: deps.packages.findIndex(p => p.source === 'path'),
+    packages, roots: deps.workspace?.default_members, resolver: deps.workspace?.resolver,
     target: TARGET, host: TARGET, target_flag_for_host: true, target_dir: opts.targetDir ?? '/target',
     rustc_id: host.rustcId, features: opts.features, default_features: opts.defaultFeatures ?? true,
     profile: { incremental: false, ...opts.profile },
     tools: { rustc: '/sysroot/bin/rustc', jobs: host.workers },
   };
+}
+
+/** Directories that a project walk skips: build output and hidden ones (.git, ...). */
+const skipDir = (name: string) => name === 'target' || name.startsWith('.');
+
+/** Every Cargo.toml below `project` (by directory), for the resolver's workspace loader. */
+export function projectManifests(vfs: BuildFs, project: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const walk = (dir: string) => {
+    for (const e of vfs.readdir(dir)) {
+      if (e.kind === Kind.Dir && !skipDir(e.name)) walk(`${dir}/${e.name}`);
+      else if (e.kind === Kind.File && e.name === 'Cargo.toml') out[dir] = vfs.readText(`${dir}/Cargo.toml`);
+    }
+  };
+  walk(project);
+  return out;
+}
+
+/** A path package's own files (relative): not those of packages nested in it, nor target/. */
+export function packageFiles(vfs: BuildFs, dir: string): string[] {
+  const out: string[] = [];
+  const walk = (d: string, rel: string) => {
+    for (const e of vfs.readdir(d)) {
+      const p = `${d}/${e.name}`, r = rel ? `${rel}/${e.name}` : e.name;
+      if (e.kind === Kind.Dir) {
+        if (!skipDir(e.name) && !vfs.exists(`${p}/Cargo.toml`)) walk(p, r);
+      } else if (e.kind === Kind.File) out.push(r);
+    }
+  };
+  walk(dir, '');
+  return out.sort();
 }
 
 export function filesBelow(vfs: BuildFs, dir: string): string[] {

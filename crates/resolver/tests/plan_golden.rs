@@ -1,5 +1,5 @@
 //! WP-17 golden test: for each case in tests/planner/cases/ (recorded by tests/planner/record.sh
-//! from native `cargo build -vv --target wasm32-wasip1`), resolve the case's Cargo.toml against
+//! from native `cargo build -vv --target wasm32-wasip1`), load the case as a workspace (WP-25), resolve it against
 //! the index snapshot, plan it, add the recorded build-script outputs, and compare every rustc
 //! invocation and build-script run with cargo's: same units, same arguments in the same order,
 //! same environment. Hashes (16 hex digits) are ours, not cargo's, so both sides compare them as
@@ -7,7 +7,7 @@
 
 use resolver::plan::{InputPackage, PlanInput, Profile, Tools, UnitKind, finish, plan};
 use resolver::summary::Source;
-use resolver::{DirRegistry, parse_manifest, resolve};
+use resolver::{DirRegistry, workspace, write_lockfile};
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
@@ -71,13 +71,19 @@ fn cargo_invocations(case: &Path) -> BTreeMap<String, Invocation> {
     out
 }
 
-fn case_files(dir: &Path) -> Vec<String> {
+/// The case's own files below `dir` (relative), without the recordings and without the
+/// directories of other packages (each package's file list is its own, as in cargo).
+fn case_files(case: &Path, dir: &Path, packages: &[PathBuf]) -> Vec<String> {
     let mut files = Vec::new();
     for e in walk(dir) {
-        let rel = e.strip_prefix(dir).unwrap().to_string_lossy().into_owned();
-        if !["crates/", "build-output/", "cargo-vv.jsonl"].iter().any(|p| rel.starts_with(p)) {
-            files.push(rel);
+        let rel_case = e.strip_prefix(case).unwrap().to_string_lossy().into_owned();
+        if ["crates/", "build-output/", "cargo-vv.jsonl"].iter().any(|p| rel_case.starts_with(p)) {
+            continue;
         }
+        if packages.iter().any(|p| p != dir && p.starts_with(dir) && e.starts_with(p)) {
+            continue;
+        }
+        files.push(e.strip_prefix(dir).unwrap().to_string_lossy().into_owned());
     }
     files.sort();
     files
@@ -93,16 +99,35 @@ fn walk(dir: &Path) -> Vec<PathBuf> {
 }
 
 fn check_case(case: &Path, index: &Path) -> Vec<String> {
-    let manifest = std::fs::read_to_string(case.join("Cargo.toml")).unwrap();
-    let r = resolve(parse_manifest(&manifest).unwrap(), &DirRegistry(index.into())).unwrap();
-    let root = r.packages.iter().position(|p| p.source == Source::Path).unwrap();
+    // Every Cargo.toml of the case (not the recorded registry crates) → the workspace.
+    let dirs: Vec<PathBuf> = walk(case)
+        .into_iter()
+        .filter(|p| p.file_name().is_some_and(|n| n == "Cargo.toml") && !p.strip_prefix(case).unwrap().starts_with("crates"))
+        .map(|p| p.parent().unwrap().to_path_buf())
+        .collect();
+    let virt = |d: &Path| {
+        let rel = d.strip_prefix(case).unwrap().to_string_lossy().into_owned();
+        if rel.is_empty() { "$ROOT".to_string() } else { format!("$ROOT/{rel}") }
+    };
+    let manifests: BTreeMap<String, String> = dirs.iter().map(|d| (virt(d), std::fs::read_to_string(d.join("Cargo.toml")).unwrap())).collect();
+    let ws = workspace::load("$ROOT", &manifests).unwrap_or_else(|e| panic!("{}: {e}", case.display()));
+    let r = ws.resolve(&DirRegistry(index.into())).unwrap();
+    let mut problems = Vec::new();
+    if let Ok(expected) = std::fs::read_to_string(case.join("Cargo.lock")) {
+        if write_lockfile(&r) != expected {
+            problems.push(format!("Cargo.lock differs from cargo's:\n{}", write_lockfile(&r)));
+        }
+    }
+    let ws_pkg = |dir: &str| ws.packages.iter().position(|p| p.dir == dir).unwrap();
+    let roots: Vec<usize> = ws.default_members.iter().map(|&m| r.packages.iter().position(|p| p.dir.as_deref() == Some(ws.packages[m].dir.as_str())).unwrap()).collect();
     let packages = r
         .packages
         .iter()
         .map(|p| {
             let nv = format!("{}-{}", p.name, p.version);
-            let (manifest, dir, files) = if p.source == Source::Path {
-                (Some(manifest.clone()), "$ROOT".to_string(), case_files(case))
+            let (manifest, dir, files) = if let Some(dir) = &p.dir {
+                let real = dirs.iter().find(|d| virt(d) == **dir).unwrap();
+                (Some(ws.packages[ws_pkg(dir)].manifest.clone()), dir.to_string(), case_files(case, real, &dirs))
             } else {
                 let d = case.join("crates").join(&nv);
                 let files = std::fs::read_to_string(d.join("files.txt")).map(|f| f.lines().map(String::from).collect()).unwrap_or_default();
@@ -121,7 +146,9 @@ fn check_case(case: &Path, index: &Path) -> Vec<String> {
         .collect();
     let input = PlanInput {
         packages,
-        root,
+        roots,
+        root: None,
+        resolver: Some(ws.resolver),
         target: "wasm32-wasip1".into(),
         host: "x86_64-unknown-linux-gnu".into(),
         target_dir: "$TARGET".into(),
@@ -159,7 +186,6 @@ fn check_case(case: &Path, index: &Path) -> Vec<String> {
     }
 
     let theirs = cargo_invocations(case);
-    let mut problems = Vec::new();
     for k in theirs.keys().filter(|k| !ours.contains_key(*k)) {
         problems.push(format!("missing unit: {k}"));
     }

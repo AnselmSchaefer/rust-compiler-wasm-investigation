@@ -1,12 +1,15 @@
 //! A Cargo-compatible resolver for the browser IDE (WP-15): root Cargo.toml + sparse index →
-//! the same Cargo.lock that `cargo generate-lockfile` writes. See `docs/resolver.md`.
+//! the same Cargo.lock that `cargo generate-lockfile` writes. See `docs/resolver.md`. Workspaces
+//! (members, path dependencies, inheritance) since WP-25: `workspace.rs`.
 
 pub mod index;
 pub mod lockfile;
 pub mod manifest;
 pub mod plan;
 pub mod resolve;
+pub mod edit;
 pub mod summary;
+pub mod workspace;
 #[cfg(target_family = "wasm")]
 pub mod wasm;
 

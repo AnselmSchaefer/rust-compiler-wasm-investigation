@@ -3,7 +3,7 @@
 //! dependency order. Follows cargo 0.100 (`unit_dependencies.rs`, `compiler/mod.rs`,
 //! `custom_build.rs`); `tests/plan_golden.rs` compares it with `cargo build -vv`.
 //!
-//! Units: a package's lib, the root's bins, a build script's compile and its run. Hashes (`-C
+//! Units: a package's lib, the roots' bins (workspace members, WP-25), a build script's compile and its run. Hashes (`-C
 //! metadata`, file names) are our own: stable over the unit's inputs and its dependencies' hashes,
 //! but not cargo's values. Paths follow cargo's layout under `target_dir`: target units in
 //! `<triple>/<profile>/`, host units (build scripts and what they use) in `<profile>/`.
@@ -28,7 +28,14 @@ use std::collections::{BTreeMap, HashMap};
 #[derive(Deserialize)]
 pub struct PlanInput {
     pub packages: Vec<InputPackage>,
-    pub root: usize,
+    /// The packages to build (workspace members); `root` is the one-package form.
+    #[serde(default)]
+    pub roots: Vec<usize>,
+    #[serde(default)]
+    pub root: Option<usize>,
+    /// The workspace's `resolver` setting (workspace.rs); default: the first root's.
+    #[serde(default)]
+    pub resolver: Option<u32>,
     pub target: String,
     /// Where build scripts run: wasm32-wasip1 in the browser.
     pub host: String,
@@ -79,7 +86,7 @@ pub struct Profile {
     pub debuginfo: u32,
     pub debug_assertions: bool,
     pub overflow_checks: bool,
-    /// `-C incremental` for the root package's units.
+    /// `-C incremental` for path packages' units.
     pub incremental: bool,
 }
 
@@ -154,7 +161,7 @@ pub struct Unit {
 #[derive(Serialize, Debug)]
 pub struct Plan {
     pub units: Vec<Unit>,
-    /// The root's executables: (bin name, unit id).
+    /// The roots' executables: (bin name, unit id).
     pub bins: Vec<(String, usize)>,
 }
 
@@ -168,6 +175,7 @@ enum Key {
 
 struct Builder<'a> {
     input: &'a PlanInput,
+    roots: Vec<usize>,
     pkgs: Vec<Package>,
     edges: Edges,
     features: Features,
@@ -194,31 +202,36 @@ pub fn plan(input: &PlanInput) -> Result<Plan, String> {
     let edges = resolve_edges(&pkgs, input)?;
     let target = TargetInfo::new(&input.target)?;
     let host = TargetInfo::new(&input.host)?;
-    let root = &pkgs[input.root];
-    let root_manifest = input.packages[input.root].manifest.as_deref().ok_or("the root package has no manifest")?;
-    let decouple_host = match root_resolver(root_manifest, &root.edition)? {
-        1 => false,
-        _ => true,
+    let roots: Vec<usize> = if input.roots.is_empty() { input.root.into_iter().collect() } else { input.roots.clone() };
+    let &first = roots.first().ok_or("nothing to build: no root package")?;
+    let resolver = match input.resolver {
+        Some(r) => r,
+        None => {
+            let manifest = input.packages[first].manifest.as_deref().ok_or("the root package has no manifest")?;
+            root_resolver(manifest, &pkgs[first].edition)?
+        }
     };
+    let decouple_host = resolver != 1;
     let features = FeatureResolver::resolve(
         &pkgs,
         &edges,
         Platforms { target: &target, host: &host },
         decouple_host,
-        input.root,
+        &roots,
         &input.features,
         input.default_features,
     )?;
-    let mut b = Builder { input, pkgs, edges, features, target, host, decouple_host, units: Vec::new(), memo: HashMap::new() };
-    let r = input.root;
-    if b.pkgs[r].lib.is_some() {
-        b.unit(Key::Lib(r, false, FeaturesFor::Normal))?;
-    }
-    let enabled = b.features.of(r, FeaturesFor::Normal);
+    let mut b = Builder { input, roots: roots.clone(), pkgs, edges, features, target, host, decouple_host, units: Vec::new(), memo: HashMap::new() };
     let mut bins = Vec::new();
-    for (i, bin) in b.pkgs[r].bins.clone().iter().enumerate() {
-        if bin.required_features.iter().all(|f| enabled.contains(f)) {
-            bins.push((bin.name.clone(), b.unit(Key::Bin(r, i))?));
+    for &r in &roots {
+        if b.pkgs[r].lib.is_some() {
+            b.unit(Key::Lib(r, false, FeaturesFor::Normal))?;
+        }
+        let enabled = b.features.of(r, FeaturesFor::Normal);
+        for (i, bin) in b.pkgs[r].bins.clone().iter().enumerate() {
+            if bin.required_features.iter().all(|f| enabled.contains(f)) {
+                bins.push((bin.name.clone(), b.unit(Key::Bin(r, i))?));
+            }
         }
     }
     Ok(Plan { units: b.units, bins })
@@ -475,8 +488,9 @@ impl Builder<'_> {
         if !host || self.input.target_flag_for_host {
             push(&["--target", &self.info(host).triple]);
         }
-        let is_root = pkg == self.input.root && kind != UnitKind::CustomBuild;
-        if is_root && prof.incremental {
+        // cargo: incremental for local (path) packages; primary for the packages being built.
+        let is_root = self.roots.contains(&pkg) && kind != UnitKind::CustomBuild;
+        if p.summary.source == Source::Path && kind != UnitKind::CustomBuild && prof.incremental {
             push(&["-C", &format!("incremental={layout}/incremental")]);
         }
         push(&["-L", &format!("dependency={layout}/deps")]);

@@ -349,6 +349,7 @@ These are taken as defaults so work can start. Changing one later only affects t
   - Zip import/export; import of a public GitHub repo (archive download).
   - Projects persisted in OPFS (the WP-11 persister).
 - **Done when:** an imported workspace with ≥ 2 members survives a reload and builds.
+  - *2026-10-25 (done, session 21):* workspaces in resolver + planner, golden-identical to cargo on 2 workspace cases (incl. Cargo.lock); projects under /projects persisted in OPFS; zip import/export; Cargo.toml edits with lockfile changes. GitHub import uses the git-trees API + raw files, because codeload (archives) has no CORS for us. See `docs/projects.md`.
 
 #### WP-26 Tests, Clippy, rustfmt
 - **Depends:** WP-25 · **Est.:** 2–3 sessions

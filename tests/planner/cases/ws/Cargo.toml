@@ -1,0 +1,21 @@
+# WP-25 planner case: a virtual workspace. app (bin) → core, util (libs/*) → helper, a path
+# dependency that is excluded from the workspace. Inheritance: package fields, dependencies, lints.
+[workspace]
+members = ["app", "libs/*"]
+exclude = ["vendor"]
+resolver = "2"
+
+[workspace.package]
+version = "0.3.1"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["Ferris <ferris@example.com>"]
+repository = "https://example.com/ws"
+
+[workspace.dependencies]
+itoa = "1"
+serde_json = { version = "1", default-features = false, features = ["alloc"] }
+util = { path = "libs/util" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"

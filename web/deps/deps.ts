@@ -5,7 +5,7 @@
 import { type ByteStore, FileCache } from './cache';
 import { SparseIndex } from './index';
 import { CRATES_IO_DL, type CrateStats, fetchCrate, unpackCrate } from './crates';
-import { Resolver, type ResolvedPackage } from './resolver';
+import { Resolver, type ResolvedPackage, type WorkspaceInfo, type WorkspaceInput } from './resolver';
 import type { Vfs } from '../vfs/vfs';
 
 export interface DepsOptions {
@@ -25,6 +25,9 @@ export interface DepsOptions {
 export interface DepsResult {
   lock: string;
   packages: ResolvedPackage[];
+  /** For a workspace input: members and the manifests after inheritance. */
+  workspace?: WorkspaceInfo;
+  manifests?: Record<string, string>;
   rounds: number;
   index: SparseIndex['stats'];
   crates: CrateStats[];
@@ -38,7 +41,7 @@ async function inParallel<T>(items: T[], n: number, f: (x: T) => Promise<void>) 
   }));
 }
 
-export async function resolveManifest(manifest: string, opts: DepsOptions): Promise<Omit<DepsResult, 'crates' | 'ms'> & { ms: number }> {
+export async function resolveManifest(manifest: string | WorkspaceInput, opts: DepsOptions): Promise<Omit<DepsResult, 'crates' | 'ms'> & { ms: number }> {
   const t0 = performance.now();
   const cache = opts.cache ?? await FileCache.open();
   const resolver = opts.resolver instanceof Resolver ? opts.resolver : await Resolver.load(opts.resolver);
@@ -46,12 +49,12 @@ export async function resolveManifest(manifest: string, opts: DepsOptions): Prom
   for (let rounds = 1; ; rounds++) {
     const r = resolver.resolve(manifest);
     if ('error' in r) throw new Error(r.error);
-    if ('lock' in r) return { lock: r.lock, packages: r.packages, rounds, index: index.stats, ms: Math.round(performance.now() - t0) };
+    if ('lock' in r) return { lock: r.lock, packages: r.packages, workspace: r.workspace, manifests: r.manifests, rounds, index: index.stats, ms: Math.round(performance.now() - t0) };
     await inParallel(r.need, opts.concurrency ?? 16, async name => resolver.addIndex(name, await index.file(name)));
   }
 }
 
-export async function fetchDependencies(manifest: string, vfs: Pick<Vfs, 'writeFile'>, opts: DepsOptions): Promise<DepsResult> {
+export async function fetchDependencies(manifest: string | WorkspaceInput, vfs: Pick<Vfs, 'writeFile'>, opts: DepsOptions): Promise<DepsResult> {
   const cache = opts.cache ?? await FileCache.open();
   const r = await resolveManifest(manifest, { ...opts, cache });
   const t0 = performance.now();

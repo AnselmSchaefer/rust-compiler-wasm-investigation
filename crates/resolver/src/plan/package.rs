@@ -89,13 +89,13 @@ pub fn parse_package(text: &str, source: Source, dir: &str, files: &[String]) ->
     let mut deps = Vec::new();
     // Dev dependencies never take part in `cargo build` (the planner gives them no edges), but
     // features may name them, so the feature map needs them.
-    gather(&mut deps, toml.dependencies.as_ref(), DepKind::Normal, None)?;
-    gather(&mut deps, toml.dev_dependencies(), DepKind::Development, None)?;
-    gather(&mut deps, toml.build_dependencies(), DepKind::Build, None)?;
+    gather(&mut deps, toml.dependencies.as_ref(), DepKind::Normal, None, dir)?;
+    gather(&mut deps, toml.dev_dependencies(), DepKind::Development, None, dir)?;
+    gather(&mut deps, toml.build_dependencies(), DepKind::Build, None, dir)?;
     for (target, platform) in toml.target.iter().flatten() {
-        gather(&mut deps, platform.dependencies.as_ref(), DepKind::Normal, Some(target))?;
-        gather(&mut deps, platform.build_dependencies(), DepKind::Build, Some(target))?;
-        gather(&mut deps, platform.dev_dependencies(), DepKind::Development, Some(target))?;
+        gather(&mut deps, platform.dependencies.as_ref(), DepKind::Normal, Some(target), dir)?;
+        gather(&mut deps, platform.build_dependencies(), DepKind::Build, Some(target), dir)?;
+        gather(&mut deps, platform.dev_dependencies(), DepKind::Development, Some(target), dir)?;
     }
     let features: BTreeMap<Rc<str>, Vec<Rc<str>>> = toml
         .features

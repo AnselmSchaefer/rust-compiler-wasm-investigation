@@ -24,6 +24,12 @@ pub struct RootManifest {
 }
 
 pub fn parse_manifest(text: &str) -> Result<RootManifest, String> {
+    parse_manifest_at(text, "")
+}
+
+/// A package's Cargo.toml in `dir`, after workspace inheritance (`workspace.rs`); `path`
+/// dependencies are resolved against `dir`.
+pub fn parse_manifest_at(text: &str, dir: &str) -> Result<RootManifest, String> {
     let toml: TomlManifest = toml::from_str(text).map_err(|e| format!("parsing Cargo.toml: {e}"))?;
     let pkg = toml.package.as_ref().or(toml.project.as_ref()).ok_or("Cargo.toml has no [package]")?;
     let name: Rc<str> = pkg.normalized_name().map_err(|e| e.to_string())?.as_str().into();
@@ -46,13 +52,13 @@ pub fn parse_manifest(text: &str) -> Result<RootManifest, String> {
     };
 
     let mut deps = Vec::new();
-    gather(&mut deps, toml.dependencies.as_ref(), DepKind::Normal, None)?;
-    gather(&mut deps, toml.dev_dependencies(), DepKind::Development, None)?;
-    gather(&mut deps, toml.build_dependencies(), DepKind::Build, None)?;
+    gather(&mut deps, toml.dependencies.as_ref(), DepKind::Normal, None, dir)?;
+    gather(&mut deps, toml.dev_dependencies(), DepKind::Development, None, dir)?;
+    gather(&mut deps, toml.build_dependencies(), DepKind::Build, None, dir)?;
     for (target, platform) in toml.target.iter().flatten() {
-        gather(&mut deps, platform.dependencies.as_ref(), DepKind::Normal, Some(target))?;
-        gather(&mut deps, platform.build_dependencies(), DepKind::Build, Some(target))?;
-        gather(&mut deps, platform.dev_dependencies(), DepKind::Development, Some(target))?;
+        gather(&mut deps, platform.dependencies.as_ref(), DepKind::Normal, Some(target), dir)?;
+        gather(&mut deps, platform.build_dependencies(), DepKind::Build, Some(target), dir)?;
+        gather(&mut deps, platform.dev_dependencies(), DepKind::Development, Some(target), dir)?;
     }
 
     let features: BTreeMap<Rc<str>, Vec<Rc<str>>> = toml
@@ -61,7 +67,8 @@ pub fn parse_manifest(text: &str) -> Result<RootManifest, String> {
         .flatten()
         .map(|(k, v)| (k.as_str().into(), v.iter().map(|s| s.as_str().into()).collect()))
         .collect();
-    let summary = Summary::new(name, version, Source::Path, deps, &features, pkg.links.as_deref().map(Into::into), rust_version.clone())?;
+    let mut summary = Summary::new(name, version, Source::Path, deps, &features, pkg.links.as_deref().map(Into::into), rust_version.clone())?;
+    summary.dir = Some(dir.into());
     Ok(RootManifest { summary, behavior, rust_version })
 }
 
@@ -70,17 +77,20 @@ pub(crate) fn gather(
     table: Option<&BTreeMap<PackageName, InheritableDependency>>,
     kind: DepKind,
     target: Option<&String>,
+    dir: &str,
 ) -> Result<(), String> {
     for (key, dep) in table.into_iter().flatten() {
         let InheritableDependency::Value(dep) = dep else {
-            return Err(format!("dependency `{key}` inherits from a workspace, which isn't supported"));
+            return Err(format!("dependency `{key}` inherits from a workspace that wasn't applied (workspace.rs)"));
         };
+        let mut path = None;
         let (req, package, optional, default_features, features) = match dep {
             TomlDependency::Simple(v) => (Some(v.as_str()), None, false, true, Vec::new()),
             TomlDependency::Detailed(d) => {
-                if d.path.is_some() || d.git.is_some() || d.registry.is_some() || d.registry_index.is_some() {
-                    return Err(format!("dependency `{key}`: only crates.io dependencies are supported"));
+                if d.git.is_some() || d.registry.is_some() || d.registry_index.is_some() {
+                    return Err(format!("dependency `{key}`: only crates.io and path dependencies are supported"));
                 }
+                path = d.path.as_deref().map(|p| Rc::from(crate::workspace::join(dir, p)));
                 (
                     d.version.as_deref(),
                     d.package.as_ref().map(|p| p.as_str()),
@@ -96,6 +106,7 @@ pub(crate) fn gather(
         };
         let name_in_toml: Rc<str> = key.as_str().into();
         out.push(Rc::new(Dependency {
+            path,
             package: package.map(Into::into).unwrap_or_else(|| name_in_toml.clone()),
             name_in_toml,
             req,

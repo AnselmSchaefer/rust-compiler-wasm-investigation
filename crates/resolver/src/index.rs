@@ -92,6 +92,7 @@ fn parse_line(line: &[u8]) -> Option<IndexEntry> {
             _ => DepKind::Normal,
         };
         deps.push(Rc::new(Dependency {
+            path: None,
             package,
             name_in_toml,
             req,

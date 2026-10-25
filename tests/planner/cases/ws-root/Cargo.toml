@@ -1,0 +1,11 @@
+# WP-25 planner case: a root package that is also a workspace. `parts/greet` is a path
+# dependency inside the workspace, so it becomes a member without being listed.
+[package]
+name = "hello-ws"
+version = "1.2.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+greet = { path = "parts/greet", features = ["loud"] }
