@@ -375,7 +375,8 @@ These are taken as defaults so work can start. Changing one later only affects t
 - **Done when:** as WP-27's: warm `check` < 1 s, warm edit → run < 2 s on the 500-line benchmark in Chromium.
   - *2026-10-25 (done, session 22): planner `cargo check` mode (golden-identical); warm check 241–288 ms, warm edit → run 1.1–1.3 s, after making debuginfo 0 the browser's default (2.0 s with cargo's debuginfo 2: codegen dominates). See `docs/incremental.md`, `bench/warm.md`.*
 
-#### WP-27b Incremental compilation in OPFS
+#### WP-27b Incremental compilation in OPFS (optional, deferred)
+*Deferred 2026-10-25 by the user: the budgets are met without it (WP-27a). Worth it for large edited crates (every edit recompiles the whole crate); revisit if edit → run gets slow on bigger projects, e.g. run tests/e2e/warm.spec.ts on a ~5,000-line crate.*
 - **Depends:** WP-27a, **[H]** a rustc change so that an incremental session can start on a WASI host (file locks; `docs/incremental.md`) · **Est.:** 1 session after the change
 - **Tasks:** check the rest of the incremental path under wasmtime; turn on `-C incremental` for path packages; mirror `/target/**/incremental` to OPFS (WP-11 persister); measure with `INCREMENTAL=1` in `tests/e2e/warm.spec.ts`.
 - **Done when:** after a reload, a warm edit → run of the benchmark recompiles only the changed codegen units, and is faster than without incremental.

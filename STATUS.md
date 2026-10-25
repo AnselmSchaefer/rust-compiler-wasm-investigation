@@ -3,10 +3,10 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** WP-27a **done** (session 22; WP-27 split). Next: **WP-38** (agent tool API + local relay → M2), then WP-40 (hands-on demo). WP-27b (incremental) blocked on **[H]**.
+- **Active WP:** WP-27a **done** (session 22; WP-27 split). Next: **WP-38** (agent tool API + local relay → M2), then WP-40 (hands-on demo). WP-27b (incremental) deferred (optional).
 - **Last session:** 2026-10-25 (session 22). WP-21 done: build scripts with autocfg, rustc probes, libc, proc-macro2, anyhow and `links` metadata build in the browser and print what they print natively. Release **1.99.1-7520bf319596**.
 - **Rule for rustc source:** rust-lang's agent policy (`build/rust/AGENTS.md`) applies. Claude does not write or edit rustc source, and does not draft rust-lang issues, PRs or Zulip posts. The user writes those, or applies existing **human-written** patches (bjorn3/oligamiq), which the user prefers whenever one exists. **danlapid 0005–0007 are LLM-generated** (Claude co-author trailers), so they don't qualify even if the user applies them; design reference only (`docs/patches.md`). Claude reviews, builds and explains. Everything outside `build/rust` is Claude's, including out-of-tree drivers using `rustc_driver` (`toolchain/rustc-multi`).
-- **Next step:** WP-38: page-side tool layer over the orchestrator ops (files, resolve, check, build, run, test, clippy, fmt; JSON results), Python relay `tools/relay/` (MCP on stdio, WebSocket to the page, serves the app with COOP/COEP, proxies `/index/` to index.crates.io, 127.0.0.1 + per-run token + Origin check), headed/headless Chromium via Playwright. Open follow-ups: WP-27b (needs the rustc file-lock change), doc tests, Wasm proc macros in prebuild/L2, top-500 matrix.
+- **Next step:** WP-38: page-side tool layer over the orchestrator ops (files, resolve, check, build, run, test, clippy, fmt; JSON results), Python relay `tools/relay/` (MCP on stdio, WebSocket to the page, serves the app with COOP/COEP, proxies `/index/` to index.crates.io, 127.0.0.1 + per-run token + Origin check), headed/headless Chromium via Playwright. Open follow-ups: doc tests, Wasm proc macros in prebuild/L2, top-500 matrix.
 - **Running background jobs:** none
 
 ## Current session (2026-10-25, session 22, cont. 3): WP-27a done, WP-27b blocked [H]
@@ -172,7 +172,7 @@
 - [ ] **Possible upstream rustc bug** (user to report, if wanted): `filesearch.rs` `from_env_args_next` checks `lib/rustlib` relative to the *working directory*, not next to argv[0] (see `~/Projects/rustc-wasm-host-source-changes.md` §6).
 
 ## Human actions needed
-- [ ] **[H] WP-27b rustc change (2026-10-25):** incremental compilation can't start on a WASI host: `rustc_data_structures::flock` has no lock for WASI and `rustc_incremental`'s `lock_directory` treats that as fatal. What the change must achieve, and the follow-up steps: `docs/incremental.md`. No human-written patch exists. Not blocking M2 (budgets met without it).
+- [x] **WP-27b (2026-10-25):** deferred by the user (optional). If it's picked up again: incremental compilation can't start on a WASI host (`rustc_data_structures::flock` has no lock for WASI, `rustc_incremental`'s `lock_directory` makes that fatal); the rustc change is the user's to write, see `docs/incremental.md`.
 - [x] **[H] WP-20 rustc changes** (2026-10-25): applied by the user (bjorn3 #160981 + tuple wasip1; change 2 written by the user); rustc.wasm rebuilt and the lookup/registration path verified. Open, optional: the `": "` separator in change 2's error message.
 - [x] **Scope (2026-10-24):** v1 targets agentic development; human-only browser-IDE WPs moved to the PLAN.md Appendix.
 - [x] **Agent setup (2026-10-24):** the agent runs on this machine and reaches the browser page through a local Python relay (MCP ⇄ WebSocket). WP-38 updated; WP-29 deploy is optional now.
@@ -217,7 +217,7 @@
 | 25 | Projects and workspaces | done | 1 | `scripts/verify/wp-25.sh` passes. Workspaces golden-identical to cargo (2 cases + lockfiles); OPFS projects, zip/GitHub import, Cargo.toml edits; `docs/projects.md` |
 | 26 | Tests, Clippy, rustfmt | done | 1 | `scripts/verify/wp-26.sh`; per-test processes, Clippy + rustfmt in rustc-multi; doc tests deferred (`docs/test-tools.md`) |
 | 27a | Warm latency budgets | done | 1 | `scripts/verify/wp-27.sh`; check 241–288 ms, edit → run 1.1–1.3 s (debuginfo 0 default); `bench/warm.md` |
-| 27b | Incremental compilation in OPFS | blocked | 0 | **[H]** rustc change: incremental sessions need file locks on WASI (`docs/incremental.md`) |
+| 27b | Incremental compilation in OPFS (optional) | deferred | 0 | user, 2026-10-25: budgets met without it; needs a rustc change for file locks on WASI (`docs/incremental.md`) |
 | 28 | First-visit performance | deferred | 0 | Appendix (human-only) |
 | 38 | Agent tool API + local relay (M2) | blocked | 0 | new 2026-10-24: MCP ⇄ Python relay ⇄ WebSocket ⇄ page |
 | 40 | Hands-on demo | blocked | 0 | new 2026-10-25 (user): after WP-38; all v1 features in the app UI |
