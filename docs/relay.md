@@ -11,6 +11,8 @@ The browser does all the work with the toolchain it already has: rustc.wasm with
 
 ## Use it from Claude Code
 
+Step by step, with the pitfalls: `docs/relay-manual-guide.md`.
+
 Build the app once (`pnpm build:app`, which needs a release in `build/release`), then register the relay as an MCP server, e.g. in a project's `.mcp.json`:
 
 ```json
