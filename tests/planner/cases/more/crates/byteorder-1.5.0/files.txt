@@ -1,0 +1,14 @@
+.cargo_vcs_info.json
+.github/workflows/ci.yml
+.gitignore
+CHANGELOG.md
+COPYING
+Cargo.toml
+Cargo.toml.orig
+LICENSE-MIT
+README.md
+UNLICENSE
+benches/bench.rs
+rustfmt.toml
+src/io.rs
+src/lib.rs

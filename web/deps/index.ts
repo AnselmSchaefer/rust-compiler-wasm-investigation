@@ -3,7 +3,7 @@
 // scripts/serve.mjs; when deployed, a same-origin proxy or CORS mirror ([H], see docs/deps.md).
 // Network first, so the index stays fresh; the OPFS copy answers when offline.
 
-import type { FileCache } from './cache';
+import type { ByteStore } from './cache';
 
 /** The path of a package's file in the index, e.g. `se/rd/serde`, `3/s/syn`, `2/cc`. */
 export function indexPath(name: string): string {
@@ -20,7 +20,7 @@ export class SparseIndex {
   readonly stats: IndexStats = { fetched: 0, fromCache: 0, missing: 0, bytes: 0 };
 
   /** `base`: the index root, ending in '/'. */
-  constructor(readonly base: string, private readonly cache: FileCache) {}
+  constructor(readonly base: string, private readonly cache: ByteStore) {}
 
   /** The index file of `name`, or null if the package doesn't exist. */
   async file(name: string): Promise<Uint8Array | null> {

@@ -1,0 +1,11 @@
+.cargo_vcs_info.json
+Cargo.lock
+Cargo.toml
+Cargo.toml.orig
+LICENSE-APACHE
+LICENSE-MIT
+README.md
+src/arbitrary.rs
+src/lib.rs
+src/specialization.rs
+src/tests.rs

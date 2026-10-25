@@ -37,7 +37,9 @@ test('cargo build in the browser: serde_json and mix build, run', async ({ page 
       const project = `/${c.name}`;
       await o.call('writeFile', { path: `${project}/Cargo.toml`, data: c.manifest });
       await o.call('writeFile', { path: `${project}/src/main.rs`, data: c.main });
-      const build = await o.call('build', { project, resolverUrl: here('resolver.wasm'), index: new URL('/index/', location.href).href, profile });
+      // Cold: no build cache (WP-18 measures that in cache.spec.ts), and a target dir per project,
+      // so mix doesn't reuse serde_json's units.
+      const build = await o.call('build', { project, resolverUrl: here('resolver.wasm'), index: new URL('/index/', location.href).href, profile, cache: { l1: false }, targetDir: `${project}/target` });
       const bin = Object.values(build.bins)[0] as string | undefined;
       const run = bin ? await o.call('run', { path: bin }) : null;
       out.push({ name: c.name, build, run });

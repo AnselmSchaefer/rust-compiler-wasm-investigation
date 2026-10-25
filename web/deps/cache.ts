@@ -1,7 +1,13 @@
 // A small file cache in OPFS (WP-16): index files and .crate files, so a second load works
-// offline. Keys are slash-separated paths below one OPFS directory.
+// offline. Keys are slash-separated paths below one OPFS directory. WP-18's build cache uses it too.
 
-export class FileCache {
+/** What the caches need of a store; tools/prebuild has one on disk. */
+export interface ByteStore {
+  read(path: string): Promise<Uint8Array | null>;
+  write(path: string, data: Uint8Array): Promise<void>;
+}
+
+export class FileCache implements ByteStore {
   private constructor(private readonly root: FileSystemDirectoryHandle | null) {}
 
   /** `name`: the OPFS directory. Without OPFS (e.g. a private window) everything misses. */

@@ -8,7 +8,7 @@
 
 1. **Dependencies** (WP-16): `fetchDependencies` resolves Cargo.toml and unpacks every registry package to `/deps/<name>-<version>/`.
 2. **Plan**: `crates/resolver/src/plan/` (in `resolver.wasm`; `Resolver.plan`) turns the resolve plus each package's Cargo.toml and file list into units, with their rustc arguments and environment, in dependency order.
-3. **Execute**: each unit starts once its dependencies finish. Compiles go to the orchestrator, which now runs up to `workers` compile servers at once (started on demand). Build scripts run in the run sandbox. `Resolver.finish` adds a build script's `cargo:` output to its package's invocation. Executables are copied ("uplifted") to `target/wasm32-wasip1/debug/<name>.wasm`, as cargo does.
+3. **Execute**: each unit starts once its dependencies finish. Compiles go to the orchestrator, which now runs up to `workers` compile servers at once (started on demand). Build scripts run in the run sandbox. `Resolver.finish` adds a build script's `cargo:` output to its package's invocation. Executables are copied ("uplifted") to `target/wasm32-wasip1/debug/<name>.wasm`, as cargo does. Since WP-18 the target dir is `/target` by default, shared by all projects (`docs/cache.md`).
 
 ## Planner (Rust, `crates/resolver/src/plan/`)
 
@@ -29,6 +29,7 @@ It is ported from cargo 0.100, so that it produces cargo's invocations, not just
 | Case | Packages | Units | What it covers | Result |
 |---|---|---|---|---|
 | `serde_json` | 12 | 12 | three build scripts (zmij, serde_core, serde_json), `cfg`/`check-cfg` output, OUT_DIR | identical |
+| `more` (WP-18) | 17 | 17 | 16 crates without build scripts (itertools, indexmap + hashbrown, semver, base64, bytes, typenum, …) | identical |
 | `mix` | 24 | 22 | rand 0.10 (`cfg(target)` deps: getrandom, cpufeatures, libc not built), regex without default features, renamed `json = { package = "serde_json" }`, `[lints]` tables incl. clippy and priority | identical |
 
 ## Build scripts (a slice of WP-21, moved forward)

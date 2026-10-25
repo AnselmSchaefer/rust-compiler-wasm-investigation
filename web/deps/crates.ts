@@ -3,7 +3,7 @@
 // Cargo.lock) records, cached in OPFS (crates are immutable), gunzipped with the browser's
 // DecompressionStream and untarred into the VFS.
 
-import type { FileCache } from './cache';
+import type { ByteStore } from './cache';
 import type { Vfs } from '../vfs/vfs';
 import { readTar } from '../orchestrator/tar';
 
@@ -15,7 +15,7 @@ const sha256 = async (d: Uint8Array) => hex(await crypto.subtle.digest('SHA-256'
 export interface CrateStats { name: string; version: string; bytes: number; fromCache: boolean; files: number; ms: number }
 
 /** The verified .crate bytes of `name` `version`. */
-export async function fetchCrate(name: string, version: string, checksum: string, cache: FileCache, dl = CRATES_IO_DL): Promise<{ data: Uint8Array; fromCache: boolean }> {
+export async function fetchCrate(name: string, version: string, checksum: string, cache: ByteStore, dl = CRATES_IO_DL): Promise<{ data: Uint8Array; fromCache: boolean }> {
   const key = `crates/${name}-${version}.crate`;
   const cached = await cache.read(key);
   if (cached && await sha256(cached) === checksum) return { data: cached, fromCache: true };
@@ -37,7 +37,7 @@ export async function gunzip(data: Uint8Array): Promise<Uint8Array> {
  * Unpacks a .crate into `dir` (cargo's layout: the archive's top-level `<name>-<version>/` becomes
  * `dir/<name>-<version>/`). Entries outside that directory are refused, as cargo does.
  */
-export async function unpackCrate(crate: Uint8Array, vfs: Vfs, dir: string, name: string, version: string): Promise<number> {
+export async function unpackCrate(crate: Uint8Array, vfs: Pick<Vfs, 'writeFile'>, dir: string, name: string, version: string): Promise<number> {
   const top = `${name}-${version}/`;
   let files = 0;
   for (const e of readTar(await gunzip(crate))) {

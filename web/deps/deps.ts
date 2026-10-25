@@ -2,7 +2,7 @@
 // files round by round, as the resolver asks for them), then download, verify and unpack every
 // registry crate of the result into the VFS under `<dir>/<name>-<version>/`.
 
-import { FileCache } from './cache';
+import { type ByteStore, FileCache } from './cache';
 import { SparseIndex } from './index';
 import { CRATES_IO_DL, type CrateStats, fetchCrate, unpackCrate } from './crates';
 import { Resolver, type ResolvedPackage } from './resolver';
@@ -19,7 +19,7 @@ export interface DepsOptions {
   dir?: string;
   /** Parallel requests (default 16); kept modest, per crates.io's crawler policy. */
   concurrency?: number;
-  cache?: FileCache;
+  cache?: ByteStore;
 }
 
 export interface DepsResult {
@@ -51,7 +51,7 @@ export async function resolveManifest(manifest: string, opts: DepsOptions): Prom
   }
 }
 
-export async function fetchDependencies(manifest: string, vfs: Vfs, opts: DepsOptions): Promise<DepsResult> {
+export async function fetchDependencies(manifest: string, vfs: Pick<Vfs, 'writeFile'>, opts: DepsOptions): Promise<DepsResult> {
   const cache = opts.cache ?? await FileCache.open();
   const r = await resolveManifest(manifest, { ...opts, cache });
   const t0 = performance.now();

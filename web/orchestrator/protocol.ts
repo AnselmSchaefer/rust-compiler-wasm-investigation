@@ -18,9 +18,13 @@ export type Ops = {
   /**
    * `cargo build` of the project in `project` (WP-17): dependencies from `index` (sparse index)
    * and `dl`, planned by the resolver module at `resolverUrl`; see web/build/cargo.ts.
+   * `cache` (WP-18): `l1` (default true) keeps built units in OPFS; `l2` is a read-only cache's base URL.
    */
   build: {
-    args: { project: string; resolverUrl: string; index: string; dl?: string; features?: string[]; defaultFeatures?: boolean; profile?: PlanInput['profile'] };
+    args: {
+      project: string; resolverUrl: string; index: string; dl?: string; features?: string[]; defaultFeatures?: boolean; profile?: PlanInput['profile'];
+      cache?: { l1?: boolean; l2?: string }; targetDir?: string;
+    };
     result: BuildResult;
   };
   /** Run a wasm32-wasip1 program from the VFS in the run sandbox (no stdin; see web/sandbox for more). */

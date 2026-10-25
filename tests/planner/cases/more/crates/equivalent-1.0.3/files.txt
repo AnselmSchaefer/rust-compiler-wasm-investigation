@@ -1,0 +1,10 @@
+.cargo_vcs_info.json
+.github/workflows/ci.yml
+.gitignore
+Cargo.lock
+Cargo.toml
+Cargo.toml.orig
+LICENSE-APACHE
+LICENSE-MIT
+README.md
+src/lib.rs

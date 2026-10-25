@@ -2,11 +2,16 @@
 import { Orchestrator } from './orchestrator';
 import { runSandboxed } from '../sandbox/sandbox';
 import { cargoBuild } from '../build/cargo';
+import { browserHost } from '../build/browser-host';
+import { UnitCache } from '../build/cache';
+import { FileCache } from '../deps/cache';
 import { Resolver } from '../deps/resolver';
 import type { Ops, Request, Response, RunOutput } from './protocol';
 
 let orch: Orchestrator | undefined, vfsUrl: string | undefined, sandboxUrl: string | undefined;
 const resolvers = new Map<string, Promise<WebAssembly.Module>>();
+/** The OPFS directory of the build cache's L1 (WP-18). */
+const BUILD_CACHE = 'build-cache';
 const need = () => { if (!orch) throw new Error('orchestrator: init first'); return orch; };
 
 const handlers: { [O in keyof Ops]: (a: Ops[O]['args']) => Promise<Ops[O]['result']> | Ops[O]['result'] } = {
@@ -26,9 +31,10 @@ const handlers: { [O in keyof Ops]: (a: Ops[O]['args']) => Promise<Ops[O]['resul
     if (!m) resolvers.set(a.resolverUrl, m = WebAssembly.compileStreaming(fetch(a.resolverUrl)));
     // A fresh instance per build: the planner keeps its last plan, and resolve state stays small.
     const resolver = await Resolver.instantiate(await m);
-    return cargoBuild(need(), {
+    const units = new UnitCache(a.cache?.l1 === false ? null : await FileCache.open(BUILD_CACHE), a.cache?.l2 ?? null);
+    return cargoBuild(browserHost(need(), { workerUrl: sandboxUrl!, vfsUrl: vfsUrl! }), {
       project: a.project, resolver, index: a.index, dl: a.dl, features: a.features, defaultFeatures: a.defaultFeatures,
-      profile: a.profile, sandbox: { workerUrl: sandboxUrl!, vfsUrl: vfsUrl! },
+      profile: a.profile, units, targetDir: a.targetDir,
     });
   },
   run: a => runProgram(a.path, a.args ?? []),

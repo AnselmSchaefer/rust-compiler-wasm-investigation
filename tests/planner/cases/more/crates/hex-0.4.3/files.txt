@@ -1,0 +1,16 @@
+.cargo_vcs_info.json
+.github/workflows/rust.yml
+.gitignore
+.gitlab-ci.yml
+.travis.yml
+Cargo.toml
+Cargo.toml.orig
+LICENSE-APACHE
+LICENSE-MIT
+README.md
+benches/hex.rs
+src/error.rs
+src/lib.rs
+src/serde.rs
+tests/serde.rs
+tests/version-number.rs

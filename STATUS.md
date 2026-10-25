@@ -3,11 +3,24 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** **WP-18** (ready, next). WP-17 done in session 19. WP-16 done (on the snapshot index; deployed index host = open [H]). WP-14 done (user trial passed 2026-10-24).
-- **Last session:** 2026-10-25 (session 19). `cargo build` works in Chromium: serde_json + itoa + memchr + serde_core + zmij (3 build scripts) resolve, download, plan, compile on 4 compile servers, link, and the program runs; so does a 24-package rand + regex case.
+- **Active WP:** **WP-19** (ready, next). WP-18 done in session 20. WP-17 done in session 19. WP-16 done (on the snapshot index; deployed index host = open [H]). WP-14 done (user trial passed 2026-10-24).
+- **Last session:** 2026-10-25 (session 20). The build cache works. Units are keyed by content, stored in L1 (OPFS), and served from a read-only L2 that `tools/prebuild` fills by running the same rustc.wasm under wasmtime. Browser and wasmtime outputs are bit-identical (51 units, 30 crates). A second build takes 83–219 ms; edit → run takes 278 ms in-session.
 - **Rule for rustc source:** rust-lang's agent policy (`build/rust/AGENTS.md`) applies. Claude does not write or edit rustc source, and does not draft rust-lang issues, PRs or Zulip posts. The user writes those, or applies existing **human-written** patches (bjorn3/oligamiq), which the user prefers whenever one exists. **danlapid 0005–0007 are LLM-generated** (Claude co-author trailers), so they don't qualify even if the user applies them; design reference only (`docs/patches.md`). Claude reviews, builds and explains. Everything outside `build/rust` is Claude's, including out-of-tree drivers using `rustc_driver` (`toolchain/rustc-multi`).
-- **Next step:** WP-18 (content-addressed cache). Read WP-18 in PLAN.md. Hook point: `web/build/cargo.ts` `compile()` / `runBuildScript()`. A unit's cache key = hash(RUSTC_ID, source hash of the package's files, its final args minus paths, env, dependency keys); the planner's `Unit.hash` already chains dependency hashes but doesn't include source contents. Outputs to store: `Unit.outputs` (rlib + rmeta, executables) and a run unit's OUT_DIR + stdout. `tools/prebuild` should drive the same rustc.wasm under wasmtime with the same plan (the planner runs natively: `resolver::plan::plan`). Build-script compiles (~3 s each, identical every time) are the first win.
+- **Next step:** WP-19 (proc-macro bridge, native prototype). Read WP-19 in PLAN.md. Start: compile `serde_derive` for wasm32-wasip1 as a cdylib exporting rustc's proc-macro declarations (`proc_macro::bridge::client::ProcMacro` slice, `__rustc_proc_macro_decls_*`). The bridge client comes from the sysroot's `proc_macro`. Then write a wasmtime host that acts as the bridge server. Check first whether the sysroot's wasm32-wasip1 `proc_macro` rlib is usable as is, and what the bridge ABI expects (`build/rust/library/proc_macro/src/bridge/`, read only). This is a design + prototype WP, and nothing in it edits rustc. WP-25 (projects/workspaces) is also ready; WP-19 is lower-numbered.
 - **Running background jobs:** none
+
+## Current session (2026-10-25, session 20): done
+- Goals (met): WP-18. (1) unit cache key (sha256 over RUSTC_ID, kind, planned args + env, package source id, dependency keys) in `web/build/cache.ts`, plus a bundle format for a unit's outputs. (2) L1 in OPFS and a read-only L2 client (HTTP, `<base><key>`), wired into `cargoBuild`: hit → restore, miss → run + store. (3) `cargoBuild` over a `BuildHost` interface so `tools/prebuild` (Node + wasmtime, the same release rustc.wasm/wasm-ld.wasm, same planner) reuses it and fills an L2 directory. (4) A third case so ≥ 20 crates are covered; determinism check browser vs wasmtime (keys and output sha256). (5) e2e: second build all hits, edit → run measured, L2-only build all hits; `scripts/verify/wp-18.sh`.
+
+- **Key** (`web/build/cache.ts`): sha256 of the JSON of [`wp18/1`, RUSTC_ID, kind, planned args, env sorted (without NUM_JOBS), source (`registry:<.crate sha256>` or `path:<hash of files>`), dependency keys]. Computed up front from the plan. Build-script output added by `finish` is covered by the run unit's key. Paths stay in the key because outputs embed them, so **the target dir is now `/target`, shared by all projects** (new `targetDir` option). Bundle format: `RCB1` + header JSON (path, size, sha256 per file, stdout) + data.
+- **`cargoBuild`** now runs over a `BuildHost` (`web/build/browser-host.ts` for the orchestrator + sandbox). Per unit, in order: already in the VFS from this session (`fresh`), L1 (OPFS `build-cache`), L2 (HTTP, per-file sha256 checked, copied into L1), else build and store in L1. A hit needs none of its dependencies (a fully cached build restores only the bin). A miss first materializes its whole dependency closure, because rustc reads transitive rmetas. Build op: `cache: { l1?, l2? }`, `targetDir`. `ByteStore` interface in `web/deps/cache.ts`.
+- **`tools/prebuild`** (`scripts/build-prebuild.mjs` → `build/prebuild/prebuild.mjs`): the same `cargoBuild` on a disk root laid out like the VFS. The release's rustc.wasm runs under wasmtime-threads, one process per unit, as in `Orchestrator.run` (scratch dir, link outside rustc with the release's wasm-ld.wasm). Build scripts run under wasmtime with only the package dir and OUT_DIR mounted. The index comes from the snapshot via `file:`, crates from static.crates.io (own User-Agent). Its L1 store is the L2 dir `build/l2/<RUSTC_ID>/`. Playwright's server mounts it at `/l2/`.
+- **New case** `tests/planner/cases/more` (16 crates: itertools, indexmap, semver, base64, bytes, typenum, …), recorded with `record.sh`. The planner golden test passes on all 3 cases.
+- **Determinism** (`tests/cache/compare.mjs`): all 51 units, covering 30 registry crates and 3 bins, have the same keys and bit-identical outputs in Chromium (compile servers) and under wasmtime (plain rustc processes).
+- **Measured** (`bench/cache.md`): cold 7.0 / 8.2 / 3.7 s. Second build after a reload, all L1: 120 / 219 / 83 ms. Edit → run: **278 ms** in session, 575 ms after a reload (closure from OPFS). Empty L1 + L2 with edited mains: 576–700 ms. Prebuild: 29 s for the 3 cases; 47 bundles = 110 MB raw, 17 MB brotli.
+- Also: `build.spec.ts` stays cold (`l1: false`, its own target dir per project). Unit `start` is now taken after the dependencies finish (the WP-17 semantics). Cold builds measured 6.9–7.5 s today vs 10.9 s recorded in session 19, with no change to the compile path; cause not investigated (`bench/cache.md`).
+- `scripts/verify/wp-18.sh` passes; WP-17 verify passes; full Chromium suite 15 passed. Design: `docs/cache.md`.
+- **Known gaps:** no L1 eviction or size limit; cached units' warnings aren't replayed; L2 integrity trusts the L2 host (per-file sha256 sits in the same bundle); bundles aren't compressed on the L2 side; proc-macro artifacts (WP-20) still need keys.
 
 ## Current session (2026-10-25, session 19): done
 - Goals (met): WP-17. (1) Golden: native `cargo build -vv --target wasm32-wasip1` of a serde_json demo on the snapshot index (`build/wp-17/native/`). (2) Planner in Rust (`crates/resolver/src/plan/`): cargo's v2 feature resolution per (package, host/target), units, rustc args + env; native golden test against the recorded invocations. (3) `rustc-multi`: per-request env (`OUT_DIR`, `CARGO_PKG_*`) and N compile servers in the orchestrator. (4) Executor `web/build/`: parallel scheduling; build scripts compiled to wasm32-wasip1 and run in the sandbox with `cargo:` directives parsed (a basic slice of WP-21, needed because zmij, serde_core and serde_json all have build scripts). (5) Browser e2e + `scripts/verify/wp-17.sh`.
@@ -129,15 +142,15 @@
 | 14 | Minimal UI (M1a) | done | 1 | `scripts/verify/wp-14.sh` passes; user trial passed 2026-10-24 |
 | 15 | Cargo resolver | done | 2 | `scripts/verify/wp-15.sh` passes. Own `crates/resolver` (cargo crate can't build for WASI): 50/50 golden lockfiles identical, native and wasm32-wasip1; `bench/resolver.md` |
 | 16 | Index and crate download | done | 1 | `scripts/verify/wp-16.sh` passes (snapshot index at /index/; index.crates.io has no CORS → [H] host decision). `docs/deps.md` |
-| 17 | Build planner | ready | 0 | depends on WP-15, WP-12 (both done) |
-| 18 | Content-addressed cache | blocked | 0 | |
-| 19 | Proc-macro bridge prototype | blocked | 0 | |
+| 17 | Build planner | done | 1 | `scripts/verify/wp-17.sh` passes. Planner golden-identical to `cargo build -vv` (3 cases); build scripts in the sandbox; `docs/planner.md` |
+| 18 | Content-addressed cache | done | 1 | `scripts/verify/wp-18.sh` passes. L1 OPFS + L2 HTTP, `tools/prebuild` (wasmtime); browser = wasmtime bit for bit (51 units); `docs/cache.md` |
+| 19 | Proc-macro bridge prototype | ready | 0 | depends on WP-06 (done) |
 | 20 | Proc macros inside rustc.wasm | blocked | 0 | |
 | 21 | Build scripts | blocked | 0 | |
 | 22 | Ecosystem matrix (M1) | blocked | 0 | |
 | 23 | rust-analyzer in Wasm | deferred | 0 | Appendix (human-only), 2026-10-24 |
 | 24 | Editor integration | deferred | 0 | Appendix (human-only) |
-| 25 | Projects and workspaces | blocked | 0 | re-scoped for agents 2026-10-24 |
+| 25 | Projects and workspaces | ready | 0 | re-scoped for agents 2026-10-24; depends on WP-17 + WP-16 (done) |
 | 26 | Tests, Clippy, rustfmt | blocked | 0 | |
 | 27 | Incremental compilation | blocked | 0 | check-on-idle moved to the Appendix |
 | 28 | First-visit performance | deferred | 0 | Appendix (human-only) |
@@ -149,6 +162,7 @@
 | 37 | Release-train rebase | blocked | 0 | recurring |
 
 ## Measurements
+- 2026-10-25 WP-18 (Chromium, 4 compile servers): second build after a reload, all L1: serde_json 120 ms, mix 219 ms, more 83 ms. Edit main.rs → run: 278 ms in session, 575 ms after a reload. Empty L1 + L2 (edited mains): 576–700 ms. Cold: 7.0 / 8.2 / 3.7 s. tools/prebuild (wasmtime, 4 jobs): 29 s for 3 cases, 47 bundles, 110 MB (17 MB brotli). Browser and wasmtime outputs are bit-identical for 51 units. `bench/cache.md`.
 - 2026-10-24 WP-16 (Chromium): serde+serde_json (12 pkgs): cold resolve 70 ms (5 rounds, 11 index files 1.5 MB from localhost) + download/unpack 667 ms (11 crates, 962 KB, static.crates.io); offline after reload 24 + 26 ms. Resolver wasm (wasip1) 2.6 MiB / 431 KiB br.
 - 2026-10-24 WP-15: golden 50/50 identical (native and wasm32-wasip1). Resolve time native / wasm: tokio 118 / 199 ms, sqlx 325 / 462 ms, nu (795 pkgs) 570 / 794 ms. Resolver wasm 2,584 KiB (423 KiB br). `bench/resolver.md`.
 - 2026-10-24 WP-14 (Chromium, cold context, localhost): editor interactive 187–200 ms (budget 2 s); toolchain ready 2.8 s; first Check 836–849 ms; first Run to the program's prompt 2.9 s (incl. lld + link group). main.js 857 KB minified.
@@ -168,6 +182,7 @@
 - Smoke: hello world runs on wasip1, wasip2, wasip3 (wasmtime 50) and wasip1-threads with a real thread (wasmtime 46.0.3).
 
 ## Session log
+- 2026-10-25 (session 20): **WP-18 done.** Content-addressed build cache (L1 OPFS, L2 HTTP), `cargoBuild` over a host interface, `tools/prebuild` on wasmtime with the same rustc.wasm; browser and wasmtime builds are bit-identical. Shared `/target`.
 - 2026-10-24 (session 16): WP-15 started. Spike: no (cargo needs curl/libgit2/ssh). Golden corpus of 50 lockfiles from native cargo against a pinned, committed index snapshot; replay is byte-identical. WP-14 still waits on the [H] user trial.
 - 2026-10-24 (session 15): WP-14 automated part done: the IDE with editor, terminal, Check/Run/Stop and inline diagnostics; editor interactive at ~200 ms cold. Waiting on the [H] user trial.
 - 2026-10-24 (session 14): **WP-13 done.** Run sandbox with interactive stdin pipe, streamed output, panics, kill/timeout; fixed an onWrite-inside-lock deadlock in WasiProcess.

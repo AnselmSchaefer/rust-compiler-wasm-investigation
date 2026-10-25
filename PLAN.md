@@ -297,6 +297,7 @@ These are taken as defaults so work can start. Changing one later only affects t
   - hashes match for 20 crates
   - a second build of the WP-17 graph is entirely cache hits
   - edit → run is measured
+  - *2026-10-25 (done, session 20):* 51 units of 3 cases (30 registry crates) have the same keys and bit-identical outputs in Chromium and under wasmtime. Second build after a reload: 83–219 ms, all L1. Edit → run: 278 ms in session, 575 ms after a reload. One shared target dir `/target`, because paths are embedded in outputs. See `docs/cache.md`, `bench/cache.md`.
 
 #### WP-19 Proc-macro bridge: design and native prototype
 - **Depends:** WP-06 · **Est.:** 2–3 sessions
