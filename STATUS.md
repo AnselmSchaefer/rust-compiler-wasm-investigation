@@ -169,7 +169,7 @@
 | 17 | Build planner | done | 1 | `scripts/verify/wp-17.sh` passes. Planner golden-identical to `cargo build -vv` (3 cases); build scripts in the sandbox; `docs/planner.md` |
 | 18 | Content-addressed cache | done | 1 | `scripts/verify/wp-18.sh` passes. L1 OPFS + L2 HTTP, `tools/prebuild` (wasmtime); browser = wasmtime bit for bit (51 units); `docs/cache.md` |
 | 19 | Proc-macro bridge prototype | done | 1 | `scripts/verify/wp-19.sh` passes. serde_derive in Wasm = native token for token; ~2.0–2.1× per call (~1.7× without the proxy hop); `docs/proc-macro.md` |
-| 20 | Proc macros inside rustc.wasm | in-progress (waits on user-written rustc changes) | 1 | raw-module host path proven; spec `docs/wp20-rustc-changes.md` |
+| 20 | Proc macros inside rustc.wasm | in-progress | 1 | rustc side done (bjorn3 #160981 + user's loader hook, verified); next: rustc-multi loader, JS host, planner units |
 | 21 | Build scripts | blocked | 0 | |
 | 22 | Ecosystem matrix (M1) | blocked | 0 | |
 | 23 | rust-analyzer in Wasm | deferred | 0 | Appendix (human-only), 2026-10-24 |
