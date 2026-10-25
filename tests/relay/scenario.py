@@ -124,7 +124,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--browser', default='headless', choices=['headless', 'headed'])
     ap.add_argument('--port', type=int, default=8791)
+    ap.add_argument('--screenshot', help='save how the IDE page looked at the end (PNG)')
     args = ap.parse_args()
+    if args.screenshot:
+        os.environ['RELAY_SCREENSHOT'] = str(Path(args.screenshot).resolve())
     (REPO / 'build/wp-38').mkdir(parents=True, exist_ok=True)
     steps, t_start = [], time.monotonic()
 

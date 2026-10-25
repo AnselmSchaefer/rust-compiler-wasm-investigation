@@ -6,6 +6,7 @@
 
 import type { OrchestratorClient } from '../orchestrator/client';
 import type { Ops } from '../orchestrator/protocol';
+import type { BuildResult } from '../build/cargo';
 import type { Diagnostic } from '../build/diagnostics';
 import TOOLS from '../../tools/relay/tools.json';
 
@@ -16,8 +17,21 @@ export interface ToolsOptions {
   /** The sparse index: the relay's same-origin proxy of index.crates.io. */
   index: string;
   /** Watch what happens: a file the tool read or wrote, program or test output. */
-  onFile?: (project: string, path: string, content: string) => void;
+  onFile?: (project: string, path: string, content: string, change: 'read' | 'write') => void;
   onOutput?: (title: string, text: string) => void;
+  /** Timings of each build a tool did (the page's stats bar). */
+  onBuild?: (s: BuildStats) => void;
+}
+
+/** One build's numbers: phases, units by where they came from, the project's own compiles. */
+export interface BuildStats {
+  tool: string; project: string; ok: boolean;
+  ms: BuildResult['ms'];
+  units: number; built: number; fresh: number; l1: number; l2: number;
+  /** rustc time of the units that ran for the project's own packages (the edited code). */
+  ownRustcMs: number;
+  /** Extra phases of the tool: running tests or the program, Clippy's pass. */
+  extra?: Record<string, number>;
 }
 
 const PROJECTS = '/projects';
@@ -45,6 +59,15 @@ export class AgentTools {
   }
 
   private dir(project: string) { return `${PROJECTS}/${project}`; }
+
+  private stats(tool: string, project: string, b: BuildResult, extra?: Record<string, number>) {
+    if (!this.o.onBuild) return;
+    const count = (c: string | undefined) => b.units.filter(u => u.cached === c).length;
+    // Path packages are the ones whose CARGO_MANIFEST_DIR is in the project.
+    const own = new Set(b.plan.units.filter(u => u.env.CARGO_MANIFEST_DIR?.startsWith(this.dir(project))).map(u => u.id));
+    const ownRustcMs = Math.round(b.units.filter(u => own.has(u.id) && u.rustcMs).reduce((t, u) => t + (u.rustcMs ?? 0), 0));
+    this.o.onBuild({ tool, project, ok: b.ok, ms: b.ms, units: b.units.length, built: count(undefined), fresh: count('fresh'), l1: count('l1'), l2: count('l2'), ownRustcMs, extra });
+  }
 
   private path(project: string, rel: unknown): string {
     if (typeof rel !== 'string' || !rel || rel.startsWith('/') || rel.split('/').some(s => s === '..' || s === '')) {
@@ -102,7 +125,7 @@ export class AgentTools {
     let bytes: Uint8Array;
     try { bytes = await this.orch.call('readFile', { path: p }); } catch { throw new ToolError(`no file \`${a.path}\` in \`${a.project}\``); }
     const content = new TextDecoder().decode(bytes);
-    this.o.onFile?.(a.project, a.path, content);
+    this.o.onFile?.(a.project, a.path, content, 'read');
     return { path: a.path, content };
   }
 
@@ -110,7 +133,7 @@ export class AgentTools {
     await this.need(a.project);
     if (typeof a.content !== 'string') throw new ToolError('`content` must be a string');
     await this.orch.call('writeFile', { path: this.path(a.project, a.path), data: a.content });
-    this.o.onFile?.(a.project, a.path, a.content);
+    this.o.onFile?.(a.project, a.path, a.content, 'write');
     return { path: a.path, bytes: new TextEncoder().encode(a.content).length };
   }
 
@@ -141,7 +164,7 @@ export class AgentTools {
     const manifest = `${dir ? `${dir}/` : ''}Cargo.toml`;
     if (r.ok) {
       const content = new TextDecoder().decode(await this.orch.call('readFile', { path: `${this.dir(project)}/${manifest}` }));
-      this.o.onFile?.(project, manifest, content);
+      this.o.onFile?.(project, manifest, content, 'write');
     }
     // The new lockfile itself is long and on disk; the changes say what happened.
     return r.ok ? { ok: true, manifest, changes: r.changes } : r;
@@ -152,12 +175,14 @@ export class AgentTools {
   async t_cargo_check(a: { project: string }) {
     await this.need(a.project);
     const r = await this.orch.call('check', this.buildArgs(a.project));
+    this.stats('cargo_check', a.project, r);
     return { ok: r.ok, ...this.diagnostics(a.project, r.diagnostics, r.ok ? '' : r.errors), ms: r.ms.total };
   }
 
   async t_cargo_build(a: { project: string }) {
     await this.need(a.project);
     const r = await this.orch.call('build', this.buildArgs(a.project));
+    this.stats('cargo_build', a.project, r);
     return {
       ok: r.ok, ...this.diagnostics(a.project, r.diagnostics, r.ok ? '' : r.errors), bins: Object.keys(r.bins),
       units: r.units.length, built: r.units.filter(u => !u.cached).length, ms: r.ms.total,
@@ -168,13 +193,14 @@ export class AgentTools {
     await this.need(a.project);
     const b = await this.orch.call('build', this.buildArgs(a.project));
     const diags = this.diagnostics(a.project, b.diagnostics, b.ok ? '' : b.errors);
-    if (!b.ok) return { ok: false, stage: 'build', ...diags };
+    if (!b.ok) { this.stats('cargo_run', a.project, b); return { ok: false, stage: 'build', ...diags }; }
     const names = Object.keys(b.bins);
     const bin = a.bin ?? (names.length === 1 ? names[0] : names.find(n => n === a.project));
     if (!bin || !b.bins[bin]) throw new ToolError(names.length ? `which bin? \`bin\` is one of: ${names.join(', ')}` : 'the project has no executable (src/main.rs or [[bin]])');
     const r = await this.orch.call('run', {
       path: b.bins[bin], args: a.args, stdin: a.stdin ?? '', timeoutMs: a.timeout_ms ?? 10_000, dir: this.dir(a.project),
     });
+    this.stats('cargo_run', a.project, b, { run: r.ms });
     this.o.onOutput?.(`cargo run (${bin})`, r.stdout + r.stderr);
     return {
       ok: r.code === 0, stage: 'run', bin, exit_code: r.code, timed_out: !!r.timedOut, stdout: cut(r.stdout), stderr: cut(r.stderr),
@@ -185,6 +211,7 @@ export class AgentTools {
   async t_cargo_test(a: { project: string; filter?: string; exact?: boolean; include_ignored?: boolean }) {
     await this.need(a.project);
     const r = await this.orch.call('test', { ...this.buildArgs(a.project), filter: a.filter, exact: a.exact, includeIgnored: a.include_ignored });
+    this.stats('cargo_test', a.project, r.build, { tests: r.ms.run });
     if (!r.build.ok) return { ok: false, stage: 'build', ...this.diagnostics(a.project, r.build.diagnostics, r.build.errors) };
     const tests = r.tests.map(t => ({
       suite: t.suite, name: t.name, status: t.status, ms: t.ms,
@@ -199,6 +226,7 @@ export class AgentTools {
   async t_cargo_clippy(a: { project: string }) {
     await this.need(a.project);
     const r = await this.orch.call('clippy', this.buildArgs(a.project));
+    this.stats('cargo_clippy', a.project, r.build, { clippy: r.ms.clippy });
     return { ok: r.ok, ...this.diagnostics(a.project, r.ok || r.build.ok ? r.diagnostics : r.build.diagnostics, r.build.ok ? '' : r.build.errors), ms: r.ms };
   }
 
@@ -216,7 +244,7 @@ export class AgentTools {
       if (r.exit !== 0 && !(a.check && r.out)) results.push({ path: f, error: this.rel(a.project, r.stderr || `rustfmt exit ${r.exit}`) });
       else if (a.check) results.push({ path: f, formatted: r.exit === 0, ...(r.exit !== 0 && { diff: cut(this.rel(a.project, r.out)) }) });
       else results.push({ path: f, changed: r.changed });
-      if (r.changed) this.o.onFile?.(a.project, f, new TextDecoder().decode(await this.orch.call('readFile', { path: `${dir}/${f}` })));
+      if (r.changed) this.o.onFile?.(a.project, f, new TextDecoder().decode(await this.orch.call('readFile', { path: `${dir}/${f}` })), 'write');
     }
     const ok = results.every(r => !r.error && (a.check ? r.formatted : true));
     return a.check

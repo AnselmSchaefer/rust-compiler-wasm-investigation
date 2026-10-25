@@ -10,7 +10,12 @@
     <span id="relay" class="badge">relay: connecting…</span>
     <span id="status">Loading the toolchain…</span>
   </header>
+  <div id="statsbar">
+    <span id="stats" class="stats" title="The last build, check, test, run or Clippy pass">no builds yet</span>
+    <span id="totals" class="stats"></span>
+  </div>
   <main class="agent">
+    <nav id="tree" aria-label="Projects and files"><div class="empty">No projects yet</div></nav>
     <section id="log" aria-label="Tool calls"></section>
     <section class="right">
       <div id="file-title" class="pane-title">No file yet</div>

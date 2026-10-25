@@ -35,8 +35,9 @@ This connects a Claude Code session to the relay (`tools/relay/relay.py`, WP-38)
    > Use only the rust-ide tools (the browser IDE), not the shell. Create a project `csv-demo` that parses CSV with the csv crate and serde, add tests, then run cargo_test, cargo_clippy and cargo_fmt, and cargo_run it.
 
    Or paste `tests/relay/agent-task.md` (the WP-38 task: a seeded compile error, a failing test, a Clippy lint, unformatted code). Allow the `rust-ide` tools when Claude asks, ideally "always".
-5. Watch the window:
-   - left: each tool call with its arguments and a one-line result;
+5. Watch the window (top: the last build's timings, phases and cached/built units, plus totals):
+   - left: the projects' files (marked: changed by the last few calls; click one to see it);
+   - middle: each tool call with its time, arguments and a one-line result;
    - top right: the file the agent read or wrote;
    - bottom right: test and program output.
 
