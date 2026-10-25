@@ -157,7 +157,8 @@ def main():
         t = time.monotonic()
         r = mcp.tool('cargo_check', project=PROJECT)
         e = [d for d in r['diagnostics'] if d['level'] == 'error']
-        step('cargo_check finds the seeded error', not r['ok'] and any(d['code'] == 'E0308' and d['file'] == 'src/lib.rs' for d in e),
+        # Exactly once: a failed lib's error used to come back again from every unit waiting on it.
+        step('cargo_check finds the seeded error, once', not r['ok'] and r['errors'] == 1 and len(e) == 1 and e[0]['code'] == 'E0308' and e[0]['file'] == 'src/lib.rs',
              f'{e[0]["code"]} at {e[0]["file"]}:{e[0]["line"]} ({time.monotonic() - t:.1f} s, cold)' if e else json.dumps(r)[:300])
         lib = mcp.tool('file_read', project=PROJECT, path='src/lib.rs')['content'].replace('y: "oops"', 'y: v[1]')
         mcp.tool('file_write', project=PROJECT, path='src/lib.rs', content=lib)
