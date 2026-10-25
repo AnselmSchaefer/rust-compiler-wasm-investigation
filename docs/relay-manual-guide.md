@@ -2,24 +2,42 @@
 
 This connects a Claude Code session to the relay (`tools/relay/relay.py`, WP-38), so that the agent builds, tests and runs Rust inside the browser IDE instead of with local `cargo`. Background and design: `docs/relay.md`.
 
-## Once: build and register
+## Once: build the app
 
-1. Build the app (it needs a toolchain release in `build/release`):
+The relay serves the IDE page from `build/www/app`, so build it once, and again after the app's code changes. It needs a toolchain release in `build/release`.
+```
+cd ~/Projects/rust-compiler-wasm-investigation
+pnpm build:app
+```
+
+## Once: a directory for trying it, with the MCP server
+
+Claude Code registers MCP servers per directory. A directory of its own for these sessions keeps things simple: the IDE is available exactly there, and no project's CLAUDE.md steers the agent. The directory stays empty; the projects live in the browser, not in it.
+
+1. **Create the directory:**
    ```
-   cd ~/Projects/rust-compiler-wasm-investigation
-   pnpm build:app
+   mkdir -p ~/Projects/rust-ide-try
+   cd ~/Projects/rust-ide-try
    ```
-2. Register the relay as an MCP server for a directory of your choice. Use an empty one, so that no project's CLAUDE.md steers the session. **Type it as one line:**
+2. **Register the relay as the MCP server `rust-ide`**, from inside that directory. Type it as **one line**, with `python3` and the full path to `relay.py` after `--`:
    ```
-   mkdir -p ~/Projects/rust-ide-try && cd ~/Projects/rust-ide-try
    claude mcp add rust-ide -- python3 /home/anselm/Projects/rust-compiler-wasm-investigation/tools/relay/relay.py --browser headed
    ```
-   That registers it for this directory only. Add `-s user` to have it in every directory.
-3. Check it:
+   - This writes the server into `~/.claude.json`, under this directory's entry ("local" scope), so it applies only when `claude` runs in `~/Projects/rust-ide-try`.
+   - `--browser headed` opens a visible Chromium window. `--browser headless` runs without a window; `--browser none` opens none, and the page's URL is then in `build/relay/url.txt`.
+   - Everywhere instead of one directory: add `-s user` before `rust-ide`.
+   - Alternative to the command: a file `~/Projects/rust-ide-try/.mcp.json` ("project" scope; Claude Code asks once whether to trust it):
+     ```json
+     { "mcpServers": { "rust-ide": { "command": "python3", "args": ["/home/anselm/Projects/rust-compiler-wasm-investigation/tools/relay/relay.py", "--browser", "headed"] } } }
+     ```
+3. **Check the registration**, still in that directory:
    ```
    claude mcp list
    ```
-   The line must read `rust-ide: python3 /home/anselm/…/tools/relay/relay.py --browser headed - ✔ Connected`. If it shows only `python3`, the command was split: `claude mcp remove rust-ide`, then step 2 again.
+   The line must read `rust-ide: python3 /home/anselm/…/tools/relay/relay.py --browser headed - ✔ Connected`. The check starts the relay briefly and stops it again; it may flash a window.
+   - **Only `python3`, without the path:** the command was split over two lines. Fix it with `claude mcp remove rust-ide`, then step 2 again.
+   - **✘ Failed to connect:** see "If it doesn't connect" below.
+4. **To undo it later:** `claude mcp remove rust-ide` (in that directory), and delete the directory if you like.
 
 ## Each time
 
@@ -49,6 +67,13 @@ cd ~/Projects/rust-compiler-wasm-investigation
 python3 -I tests/relay/check-agent.py --project wp38-agent --browser headed
 ```
 Use your project's name instead of `wp38-agent` for other tasks. Remove the registration with `claude mcp remove rust-ide` (in the registered directory).
+
+## If it doesn't connect
+
+- **`claude mcp list` shows `python3` without the path, or `/mcp` times out after 30 s:** the registration lost its arguments. `claude mcp remove rust-ide`, then add it again as one line.
+- **The window is empty, or the agent uses local `cargo`:** a relay started by hand is in the way. Close every terminal where you ran `relay.py` (or `pkill -f tools/relay/relay.py`), then `/mcp` → Reconnect, or `/exit` and `claude` again.
+- **The page says "relay: disconnected, retrying…" or the console shows a 403:** that window belongs to a relay that's gone (its token is no longer valid). Close the window; the current relay opens its own.
+- **Claude Code's own log of the server**, with the relay's error messages: `~/.cache/claude-cli-nodejs/-home-anselm-Projects-rust-ide-try/mcp-logs-rust-ide/` (the newest file).
 
 ## Good to know
 
