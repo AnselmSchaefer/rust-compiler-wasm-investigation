@@ -1,0 +1,66 @@
+{
+ "date": "2026-10-25",
+ "commit": "ad8a1df",
+ "browser": "chromium",
+ "steps": [
+  {
+   "step": "editor only (toolchain loading)",
+   "browserPssMiB": 226
+  },
+  {
+   "step": "toolchain ready",
+   "browserPssMiB": 797,
+   "peakPssMiB": 855,
+   "vfsMiB": 113,
+   "rustcMiB": 17
+  },
+  {
+   "step": "check hello",
+   "browserPssMiB": 906,
+   "peakPssMiB": 918,
+   "vfsMiB": 113,
+   "rustcMiB": 104
+  },
+  {
+   "step": "run hello (first link: lld + link sysroot)",
+   "browserPssMiB": 1136,
+   "peakPssMiB": 1132,
+   "vfsMiB": 138,
+   "rustcMiB": 141
+  },
+  {
+   "step": "program running (waiting for input)",
+   "browserPssMiB": 1087,
+   "vfsMiB": 141,
+   "rustcMiB": 141
+  },
+  {
+   "step": "check medium (560 lines)",
+   "browserPssMiB": 1084,
+   "peakPssMiB": 1120,
+   "vfsMiB": 141,
+   "rustcMiB": 141
+  },
+  {
+   "step": "run medium",
+   "browserPssMiB": 1151,
+   "peakPssMiB": 1167,
+   "vfsMiB": 143,
+   "rustcMiB": 162
+  },
+  {
+   "step": "after 20 edit + check cycles",
+   "browserPssMiB": 1099,
+   "peakPssMiB": 1171,
+   "vfsMiB": 143,
+   "rustcMiB": 162
+  },
+  {
+   "step": "after 5 edit + run cycles",
+   "browserPssMiB": 1179,
+   "peakPssMiB": 1232,
+   "vfsMiB": 146,
+   "rustcMiB": 162
+  }
+ ]
+}

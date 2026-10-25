@@ -45,17 +45,18 @@ export async function sourceId(pkg: { source: string; checksum: string | null },
 }
 
 export interface BundleFile { path: string; data: Uint8Array; sha256: string }
-export interface Bundle { files: BundleFile[]; stdout?: string }
+/** `diagnostics` (WP-38): rustc's JSON diagnostics of the compile, replayed on a hit, as cargo does. */
+export interface Bundle { files: BundleFile[]; stdout?: string; diagnostics?: unknown[] }
 
-// "RCB1", u32 LE header length, header JSON { files: [{path, size, sha256}], stdout? }, file data.
+// "RCB1", u32 LE header length, header JSON { files: [{path, size, sha256}], stdout?, diagnostics? }, file data.
 const MAGIC = [0x52, 0x43, 0x42, 0x31];
 
-export async function makeBundle(files: [string, Uint8Array][], stdout?: string): Promise<Bundle> {
-  return { files: await Promise.all(files.map(async ([path, data]) => ({ path, data, sha256: await sha256(data) }))), stdout };
+export async function makeBundle(files: [string, Uint8Array][], stdout?: string, diagnostics?: unknown[]): Promise<Bundle> {
+  return { files: await Promise.all(files.map(async ([path, data]) => ({ path, data, sha256: await sha256(data) }))), stdout, ...(diagnostics?.length && { diagnostics }) };
 }
 
 export function encodeBundle(b: Bundle): Uint8Array {
-  const header = enc.encode(JSON.stringify({ files: b.files.map(f => ({ path: f.path, size: f.data.length, sha256: f.sha256 })), stdout: b.stdout }));
+  const header = enc.encode(JSON.stringify({ files: b.files.map(f => ({ path: f.path, size: f.data.length, sha256: f.sha256 })), stdout: b.stdout, diagnostics: b.diagnostics }));
   const out = new Uint8Array(8 + header.length + b.files.reduce((a, f) => a + f.data.length, 0));
   out.set(MAGIC);
   new DataView(out.buffer).setUint32(4, header.length, true);
@@ -68,11 +69,11 @@ export function encodeBundle(b: Bundle): Uint8Array {
 export function decodeBundle(bytes: Uint8Array): Bundle {
   if (bytes.length < 8 || MAGIC.some((m, i) => bytes[i] !== m)) throw new Error('not a cache bundle');
   const len = new DataView(bytes.buffer, bytes.byteOffset).getUint32(4, true);
-  const h = JSON.parse(dec.decode(bytes.subarray(8, 8 + len))) as { files: { path: string; size: number; sha256: string }[]; stdout?: string };
+  const h = JSON.parse(dec.decode(bytes.subarray(8, 8 + len))) as { files: { path: string; size: number; sha256: string }[]; stdout?: string; diagnostics?: unknown[] };
   let o = 8 + len;
   const files = h.files.map(f => { const data = bytes.subarray(o, o += f.size); return { path: f.path, data, sha256: f.sha256 }; });
   if (o !== bytes.length) throw new Error('cache bundle has the wrong size');
-  return { files, stdout: h.stdout };
+  return { files, stdout: h.stdout, ...(h.diagnostics && { diagnostics: h.diagnostics }) };
 }
 
 /** Where a key's bundle lives, in L1 and below the L2 base URL. */

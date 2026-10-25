@@ -16,6 +16,9 @@
 
 import type { Resolver } from '../deps/resolver';
 import { type BuildHost, type BuildOptions, type BuildResult, cargoBuild } from './cargo';
+import { type Diagnostic, parseDiagnostics } from './diagnostics';
+
+export type { Diagnostic };
 
 export type TestStatus = 'ok' | 'failed' | 'ignored';
 
@@ -143,16 +146,6 @@ async function pool<T, R>(items: T[], n: number, f: (t: T) => Promise<R>): Promi
 
 // --- clippy
 
-export interface Diagnostic {
-  level: string;
-  message: string;
-  /** `clippy::needless_return`, `E0308`, ... */
-  code: string | null;
-  /** The primary span. */
-  file?: string; line?: number; column?: number;
-  rendered: string;
-}
-
 export interface ClippyRun {
   build: BuildResult;
   ok: boolean;
@@ -193,21 +186,6 @@ function checkArgs(args: string[], outDir: string): string[] {
     else if (a === '--out-dir') { out.push(a, outDir); i++; }
     else if (a === '-C' && args[i + 1]?.startsWith('incremental=')) i++;
     else out.push(a);
-  }
-  return out;
-}
-
-export function parseDiagnostics(stderr: string): Diagnostic[] {
-  const out: Diagnostic[] = [];
-  for (const l of stderr.split('\n')) {
-    if (!l.startsWith('{')) continue;
-    let d: any;
-    try { d = JSON.parse(l); } catch { continue; }
-    if (d.$message_type !== 'diagnostic' || !d.rendered) continue;
-    // rustc's own summary ("2 warnings emitted") has no code and no spans.
-    if (!d.spans?.length && !d.code && /^(aborting due to|\d+ warnings? emitted)/.test(d.message)) continue;
-    const span = d.spans?.find((s: any) => s.is_primary) ?? d.spans?.[0];
-    out.push({ level: d.level, message: d.message, code: d.code?.code ?? null, file: span?.file_name, line: span?.line_start, column: span?.column_start, rendered: d.rendered });
   }
   return out;
 }

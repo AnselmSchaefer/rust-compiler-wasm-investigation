@@ -13,7 +13,7 @@ export type ProjectSource =
   | { files: Record<string, string | Uint8Array> }
   | { zip: Uint8Array }
   | { github: string; subdir?: string };
-export interface RunOutput { code: number; stdout: string; stderr: string; ms: number }
+export interface RunOutput { code: number; stdout: string; stderr: string; ms: number; timedOut?: boolean; trap?: string }
 
 /** Each request names its operation; the answer type is in `Ops`. */
 export type Ops = {
@@ -23,6 +23,10 @@ export type Ops = {
   writeFile: { args: { path: string; data: string | Uint8Array }; result: void };
   readFile: { args: { path: string }; result: Uint8Array };
   ls: { args: { path: string }; result: string[] };
+  /** Every file below `dir`, relative, without target/ and hidden directories (WP-38). */
+  listFiles: { args: { dir: string }; result: string[] };
+  /** Delete a file or a directory tree (WP-38). */
+  remove: { args: { path: string }; result: void };
   rustc: { args: { args: string[]; env?: Record<string, string> }; result: RustcResult };
   /**
    * `cargo build` of the project in `project` (WP-17): dependencies from `index` (sparse index)
@@ -60,7 +64,8 @@ export type Ops = {
   /** Edit a Cargo.toml (`dir` relative to the project) and resolve: lockfile changes, or the error. */
   manifestEdit: { args: { project: string; dir?: string; edits: ManifestEdit[]; resolverUrl: string; index: string }; result: EditResult };
   /** Run a wasm32-wasip1 program from the VFS in the run sandbox (no stdin; see web/sandbox for more). */
-  run: { args: { path: string; args?: string[] }; result: RunOutput };
+  /** Run a program in the sandbox; `dir`: a directory whose files it can read (WP-38). */
+  run: { args: { path: string; args?: string[]; stdin?: string; timeoutMs?: number; dir?: string }; result: RunOutput };
   /** Sizes of the big memories: the VFS and the compile server's rustc instance (both only grow). */
   stats: { args: Record<string, never>; result: { vfsBytes: number; rustcBytes: number; jobs: number; servers: number } };
   close: { args: Record<string, never>; result: { code: number } };

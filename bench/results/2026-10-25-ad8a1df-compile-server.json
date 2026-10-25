@@ -1,0 +1,122 @@
+{
+ "date": "2026-10-25",
+ "commit": "ad8a1df",
+ "browser": "chromium",
+ "cold": [
+  216,
+  209,
+  176,
+  248,
+  249
+ ],
+ "coldMedian": 216,
+ "warm": [
+  60.1,
+  135.7,
+  89,
+  90.3
+ ],
+ "warmMedian": 90.3,
+ "answers": [
+  {
+   "name": "check-hello",
+   "want": 0,
+   "exit": 0,
+   "ms": 181.2,
+   "hostMs": 234,
+   "memMiB": 102,
+   "stderr": ""
+  },
+  {
+   "name": "check-hello",
+   "want": 0,
+   "exit": 0,
+   "ms": 74,
+   "hostMs": 76.1,
+   "memMiB": 105,
+   "stderr": ""
+  },
+  {
+   "name": "bad",
+   "want": 1,
+   "exit": 1,
+   "ms": 196.7,
+   "hostMs": 199.2,
+   "memMiB": 105,
+   "stderr": "error[E0308]: mismatched types\n --> /work/bad.rs:1:26\n  |\n1 | fn main() { let x: u32 = \"no\"; }\n  |                    ---   ^^^^ expected `u32`, found `&str`\n  |                    |\n  |                    expected due to this\n\nerror: aborting due to 1 previous error\n\nFor more information about this"
+  },
+  {
+   "name": "check-hello",
+   "want": 0,
+   "exit": 0,
+   "ms": 58.8,
+   "hostMs": 60.1,
+   "memMiB": 105,
+   "stderr": ""
+  },
+  {
+   "name": "check-medium",
+   "want": 0,
+   "exit": 0,
+   "ms": 2385.5,
+   "hostMs": 2387,
+   "memMiB": 111,
+   "stderr": "warning: enum `Token` is never used\n  --> /work/medium.rs:11:6\n   |\n11 | enum Token {\n   |      ^^^^^\n   |\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: struct `Lexer` is never constructed\n  --> /work/medium.rs:23:8\n   |\n23 | struct Lexer<'a> {\n   |        ^^^^^"
+  },
+  {
+   "name": "obj-hello",
+   "want": 0,
+   "exit": 0,
+   "ms": 1584.7,
+   "hostMs": 1588.8,
+   "memMiB": 141,
+   "stderr": ""
+  },
+  {
+   "name": "check-hello",
+   "want": 0,
+   "exit": 0,
+   "ms": 133.2,
+   "hostMs": 135.7,
+   "memMiB": 141,
+   "stderr": ""
+  },
+  {
+   "name": "check-hello",
+   "want": 0,
+   "exit": 0,
+   "ms": 87.6,
+   "hostMs": 89,
+   "memMiB": 141,
+   "stderr": ""
+  },
+  {
+   "name": "version",
+   "want": 0,
+   "exit": 0,
+   "ms": 1,
+   "hostMs": 2.5,
+   "memMiB": 141,
+   "stderr": ""
+  },
+  {
+   "name": "check-hello",
+   "want": 0,
+   "exit": 0,
+   "ms": 89.6,
+   "hostMs": 90.3,
+   "memMiB": 141,
+   "stderr": ""
+  }
+ ],
+ "quitCode": 0,
+ "peakMiB": 141,
+ "work": [
+  "bad.rs",
+  "h.o",
+  "h.rmeta",
+  "hello.rs",
+  "m.rmeta",
+  "medium.rs"
+ ]
+}

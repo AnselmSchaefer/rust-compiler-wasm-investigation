@@ -11,6 +11,8 @@ import { PROJECTS, deleteProject, editManifest, exportZip, importZip, listProjec
 import { importGitHub } from '../project/github';
 import { Resolver } from '../deps/resolver';
 import type { Ops, Request, Response, RunOutput } from './protocol';
+import { Kind, type Vfs } from '../vfs/vfs';
+import { unifiedDiff } from '../project/diff';
 
 let orch: Orchestrator | undefined, vfsUrl: string | undefined, sandboxUrl: string | undefined;
 let persister: Persister | undefined;
@@ -36,6 +38,8 @@ const handlers: { [O in keyof Ops]: (a: Ops[O]['args']) => Promise<Ops[O]['resul
   writeFile: a => need().vfs.writeFile(a.path, a.data),
   readFile: a => need().vfs.readFile(a.path),
   ls: a => need().vfs.readdir(a.path).map(e => e.name),
+  listFiles: a => packageTree(need().vfs, a.dir),
+  remove: a => { const vfs = need().vfs; if (vfs.exists(a.path)) vfs.removeAll(a.path); },
   rustc: a => need().rustcJob(a.args, a.env),
   async build(a) {
     return cargoBuild(host(), await buildOptions(a));
@@ -51,11 +55,14 @@ const handlers: { [O in keyof Ops]: (a: Ops[O]['args']) => Promise<Ops[O]['resul
   },
   async fmt(a) {
     const vfs = need().vfs, src = vfs.readText(a.path), dir = a.path.slice(0, a.path.lastIndexOf('/')) || '/';
-    const args = [...(a.edition ? ['--edition', a.edition] : []), ...(a.check ? ['--check'] : [])];
-    const r = await need().rustfmt(src, args, dir);
-    const changed = !a.check && r.exit === 0 && r.out !== src;
-    if (changed) vfs.writeFile(a.path, r.out);
-    return { exit: r.exit, changed, out: r.out, stderr: r.stderr, ms: r.ms };
+    // Always the formatted text: rustfmt's own --check prints its diff to the process's stdout,
+    // which the compile server shares with its answers. So check = compare, with our own diff.
+    const r = await need().rustfmt(src, a.edition ? ['--edition', a.edition] : [], dir);
+    if (r.exit !== 0) return { exit: r.exit, changed: false, out: '', stderr: r.stderr, ms: r.ms };
+    const differs = r.out !== src;
+    if (a.check) return { exit: differs ? 1 : 0, changed: false, out: differs ? unifiedDiff(a.path, src, r.out) : '', stderr: r.stderr, ms: r.ms };
+    if (differs) vfs.writeFile(a.path, r.out);
+    return { exit: 0, changed: differs, out: r.out, stderr: r.stderr, ms: r.ms };
   },
   projectList: () => listProjects(need().vfs),
   async projectImport(a) {
@@ -79,7 +86,7 @@ const handlers: { [O in keyof Ops]: (a: Ops[O]['args']) => Promise<Ops[O]['resul
   async manifestEdit(a) {
     return editManifest(need().vfs, await resolverFor(a.resolverUrl), a.project, a.dir ?? '', a.edits, { index: a.index });
   },
-  run: a => runProgram(a.path, a.args ?? []),
+  run: a => runProgram(a),
   stats: () => need().stats(),
   close: async () => ({ code: (await need().close()).code }),
 };
@@ -112,9 +119,22 @@ onmessage = async (e: MessageEvent<Request>) => {
 };
 
 /** A wasm32-wasip1 program from the VFS, in the run sandbox (a worker of its own). */
-async function runProgram(path: string, args: string[]): Promise<RunOutput> {
+async function runProgram(a: Ops['run']['args']): Promise<RunOutput> {
+  const vfs = need().vfs, files: Record<string, Uint8Array> = {};
+  if (a.dir) for (const f of packageTree(vfs, a.dir)) files[`${a.dir}/${f}`] = vfs.readFile(`${a.dir}/${f}`);
   const r = await runSandboxed({
-    workerUrl: sandboxUrl!, vfsUrl: vfsUrl!, program: need().vfs.readFile(path), args: [path, ...args],
+    workerUrl: sandboxUrl!, vfsUrl: vfsUrl!, program: vfs.readFile(a.path), args: [a.path, ...(a.args ?? [])],
+    stdin: a.stdin, timeoutMs: a.timeoutMs, files,
   }).result;
-  return { code: r.code ?? -1, stdout: r.stdout, stderr: r.stderr, ms: r.ms };
+  return { code: r.code ?? -1, stdout: r.stdout, stderr: r.stderr, ms: r.ms, timedOut: r.timedOut || undefined, trap: r.trap };
+}
+
+/** Files below `dir` (relative), as a project shows them: no target/, no hidden directories. */
+function packageTree(vfs: Vfs, dir: string, rel = ''): string[] {
+  if (!vfs.exists(dir)) return [];
+  return vfs.readdir(rel ? `${dir}/${rel}` : dir).flatMap(e => {
+    const r = rel ? `${rel}/${e.name}` : e.name;
+    if (e.kind === Kind.Dir) return e.name === 'target' || e.name.startsWith('.') ? [] : packageTree(vfs, dir, r);
+    return e.kind === Kind.File ? [r] : [];
+  }).sort();
 }

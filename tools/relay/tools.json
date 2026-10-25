@@ -1,0 +1,102 @@
+{
+  "about": "WP-38: the tools the relay's MCP server offers. The relay lists them (tools/list) and forwards calls to the IDE page, which runs them (web/agent/tools.ts). Projects live in the browser, persisted in OPFS; paths are relative to the project.",
+  "tools": [
+    {
+      "name": "project_create",
+      "description": "Create a Cargo project in the browser IDE. Without files it is `cargo new`: Cargo.toml (edition 2021) and src/main.rs. With files, exactly those (relative path -> content). Fails if the project exists, unless overwrite is true.",
+      "inputSchema": { "type": "object", "properties": {
+        "project": { "type": "string", "description": "Project name: letters, digits, - and _." },
+        "files": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Relative path -> file content." },
+        "overwrite": { "type": "boolean" }
+      }, "required": ["project"] }
+    },
+    {
+      "name": "project_list",
+      "description": "List the projects in the browser IDE.",
+      "inputSchema": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "project_delete",
+      "description": "Delete a project and its files.",
+      "inputSchema": { "type": "object", "properties": { "project": { "type": "string" } }, "required": ["project"] }
+    },
+    {
+      "name": "file_list",
+      "description": "List a project's files (relative paths), without target/ and hidden directories.",
+      "inputSchema": { "type": "object", "properties": { "project": { "type": "string" } }, "required": ["project"] }
+    },
+    {
+      "name": "file_read",
+      "description": "Read a file of a project.",
+      "inputSchema": { "type": "object", "properties": { "project": { "type": "string" }, "path": { "type": "string" } }, "required": ["project", "path"] }
+    },
+    {
+      "name": "file_write",
+      "description": "Write (create or replace) a file of a project; directories are created as needed.",
+      "inputSchema": { "type": "object", "properties": { "project": { "type": "string" }, "path": { "type": "string" }, "content": { "type": "string" } }, "required": ["project", "path", "content"] }
+    },
+    {
+      "name": "file_delete",
+      "description": "Delete a file of a project.",
+      "inputSchema": { "type": "object", "properties": { "project": { "type": "string" }, "path": { "type": "string" } }, "required": ["project", "path"] }
+    },
+    {
+      "name": "dependency_add",
+      "description": "Add (or change) a dependency in a Cargo.toml, like `cargo add`, and resolve against crates.io. Returns the lockfile changes, or the resolver's error with nothing changed.",
+      "inputSchema": { "type": "object", "properties": {
+        "project": { "type": "string" },
+        "name": { "type": "string", "description": "Crate name on crates.io." },
+        "version": { "type": "string", "description": "Version requirement, e.g. \"1\" or \"1.0.200\"; default: the newest." },
+        "features": { "type": "array", "items": { "type": "string" } },
+        "dev": { "type": "boolean", "description": "A dev-dependency." },
+        "dir": { "type": "string", "description": "The package's directory in a workspace (default: the project root)." }
+      }, "required": ["project", "name"] }
+    },
+    {
+      "name": "dependency_remove",
+      "description": "Remove a dependency from a Cargo.toml and resolve again.",
+      "inputSchema": { "type": "object", "properties": { "project": { "type": "string" }, "name": { "type": "string" }, "dev": { "type": "boolean" }, "dir": { "type": "string" } }, "required": ["project", "name"] }
+    },
+    {
+      "name": "cargo_check",
+      "description": "`cargo check`: type-check the project (dependencies are fetched from crates.io and cached). Returns ok and rustc's diagnostics (level, message, code, file, line, rendered).",
+      "inputSchema": { "type": "object", "properties": { "project": { "type": "string" } }, "required": ["project"] }
+    },
+    {
+      "name": "cargo_build",
+      "description": "`cargo build` (dev profile, target wasm32-wasip1). Returns ok, diagnostics, the executables and per-unit timings.",
+      "inputSchema": { "type": "object", "properties": { "project": { "type": "string" } }, "required": ["project"] }
+    },
+    {
+      "name": "cargo_run",
+      "description": "`cargo run`: build, then run the program in the sandbox (WASI, no network, only the project's files readable). Returns the build diagnostics, then exit code, stdout and stderr.",
+      "inputSchema": { "type": "object", "properties": {
+        "project": { "type": "string" },
+        "bin": { "type": "string", "description": "Which executable, if there are several." },
+        "args": { "type": "array", "items": { "type": "string" } },
+        "stdin": { "type": "string" },
+        "timeout_ms": { "type": "integer", "description": "Default 10000." }
+      }, "required": ["project"] }
+    },
+    {
+      "name": "cargo_test",
+      "description": "`cargo test`: build the test harnesses and run every test in its own process. Returns per-test results (suite, name, status ok/failed/ignored, ms, stdout, panic message) and counts. `filter` selects tests by substring (or the exact name with `exact`).",
+      "inputSchema": { "type": "object", "properties": {
+        "project": { "type": "string" },
+        "filter": { "type": "string" },
+        "exact": { "type": "boolean" },
+        "include_ignored": { "type": "boolean" }
+      }, "required": ["project"] }
+    },
+    {
+      "name": "cargo_clippy",
+      "description": "`cargo clippy`: Clippy's lints on the project's own packages. Returns ok and the diagnostics (codes like clippy::needless_return).",
+      "inputSchema": { "type": "object", "properties": { "project": { "type": "string" } }, "required": ["project"] }
+    },
+    {
+      "name": "cargo_fmt",
+      "description": "`cargo fmt`: rustfmt on every .rs file of the project (rustfmt.toml respected). With check, nothing changes: returns which files aren't formatted, with diffs.",
+      "inputSchema": { "type": "object", "properties": { "project": { "type": "string" }, "check": { "type": "boolean" } }, "required": ["project"] }
+    }
+  ]
+}

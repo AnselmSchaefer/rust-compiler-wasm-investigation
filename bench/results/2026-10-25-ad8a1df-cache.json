@@ -1,0 +1,772 @@
+{
+  "release": "1.99.1-6c798e2613f0",
+  "workers": 4,
+  "steps": {
+    "cold/serde_json": {
+      "units": 12,
+      "skipped": 0,
+      "built": 12,
+      "l1": 0,
+      "l2": 0,
+      "fresh": 0,
+      "ms": {
+        "deps": 1275,
+        "plan": 39,
+        "build": 9995,
+        "store": 31,
+        "total": 11341,
+        "buildAndRun": 11414
+      },
+      "cache": {
+        "l1": 0,
+        "l2": 0,
+        "miss": 13,
+        "stored": 13,
+        "bytesIn": 0,
+        "bytesOut": 24053627
+      }
+    },
+    "cold/mix": {
+      "units": 22,
+      "skipped": 0,
+      "built": 18,
+      "l1": 0,
+      "l2": 0,
+      "fresh": 4,
+      "ms": {
+        "deps": 1662,
+        "plan": 27,
+        "build": 8365,
+        "store": 23,
+        "total": 10077,
+        "buildAndRun": 10139
+      },
+      "cache": {
+        "l1": 0,
+        "l2": 0,
+        "miss": 18,
+        "stored": 18,
+        "bytesIn": 0,
+        "bytesOut": 41074167
+      }
+    },
+    "cold/more": {
+      "units": 17,
+      "skipped": 0,
+      "built": 17,
+      "l1": 0,
+      "l2": 0,
+      "fresh": 0,
+      "ms": {
+        "deps": 507,
+        "plan": 8,
+        "build": 4291,
+        "store": 12,
+        "total": 4818,
+        "buildAndRun": 4856
+      },
+      "cache": {
+        "l1": 0,
+        "l2": 0,
+        "miss": 17,
+        "stored": 17,
+        "bytesIn": 0,
+        "bytesOut": 25111899
+      }
+    },
+    "second/serde_json": {
+      "units": 1,
+      "skipped": 11,
+      "built": 0,
+      "l1": 1,
+      "l2": 0,
+      "fresh": 0,
+      "ms": {
+        "deps": 112,
+        "plan": 6,
+        "build": 13,
+        "store": 0,
+        "total": 131,
+        "buildAndRun": 199
+      },
+      "cache": {
+        "l1": 1,
+        "l2": 0,
+        "miss": 0,
+        "stored": 0,
+        "bytesIn": 2526656,
+        "bytesOut": 0
+      }
+    },
+    "second/mix": {
+      "units": 1,
+      "skipped": 21,
+      "built": 0,
+      "l1": 1,
+      "l2": 0,
+      "fresh": 0,
+      "ms": {
+        "deps": 209,
+        "plan": 15,
+        "build": 23,
+        "store": 0,
+        "total": 247,
+        "buildAndRun": 319
+      },
+      "cache": {
+        "l1": 1,
+        "l2": 0,
+        "miss": 0,
+        "stored": 0,
+        "bytesIn": 4232635,
+        "bytesOut": 0
+      }
+    },
+    "second/more": {
+      "units": 1,
+      "skipped": 16,
+      "built": 0,
+      "l1": 1,
+      "l2": 0,
+      "fresh": 0,
+      "ms": {
+        "deps": 78,
+        "plan": 7,
+        "build": 13,
+        "store": 0,
+        "total": 98,
+        "buildAndRun": 134
+      },
+      "cache": {
+        "l1": 1,
+        "l2": 0,
+        "miss": 0,
+        "stored": 0,
+        "bytesIn": 2532235,
+        "bytesOut": 0
+      }
+    },
+    "edit-after-reload/serde_json": {
+      "units": 12,
+      "skipped": 0,
+      "built": 1,
+      "l1": 11,
+      "l2": 0,
+      "fresh": 0,
+      "ms": {
+        "deps": 165,
+        "plan": 22,
+        "build": 1449,
+        "store": 13,
+        "total": 1649,
+        "buildAndRun": 1701
+      },
+      "cache": {
+        "l1": 12,
+        "l2": 0,
+        "miss": 1,
+        "stored": 1,
+        "bytesIn": 21526971,
+        "bytesOut": 2526656
+      }
+    },
+    "edit-in-session/serde_json": {
+      "units": 12,
+      "skipped": 0,
+      "built": 1,
+      "l1": 0,
+      "l2": 0,
+      "fresh": 11,
+      "ms": {
+        "deps": 109,
+        "plan": 6,
+        "build": 396,
+        "store": 15,
+        "total": 527,
+        "buildAndRun": 553
+      },
+      "cache": {
+        "l1": 0,
+        "l2": 0,
+        "miss": 1,
+        "stored": 1,
+        "bytesIn": 0,
+        "bytesOut": 2526656
+      }
+    },
+    "l2-edited/serde_json": {
+      "units": 12,
+      "skipped": 0,
+      "built": 1,
+      "l1": 0,
+      "l2": 11,
+      "fresh": 0,
+      "ms": {
+        "deps": 137,
+        "plan": 8,
+        "build": 1714,
+        "store": 17,
+        "total": 1876,
+        "buildAndRun": 1924
+      },
+      "cache": {
+        "l1": 0,
+        "l2": 11,
+        "miss": 2,
+        "stored": 2,
+        "bytesIn": 21086047,
+        "bytesOut": 2967580
+      }
+    },
+    "l2-edited/mix": {
+      "units": 22,
+      "skipped": 0,
+      "built": 1,
+      "l1": 0,
+      "l2": 17,
+      "fresh": 4,
+      "ms": {
+        "deps": 221,
+        "plan": 24,
+        "build": 629,
+        "store": 20,
+        "total": 895,
+        "buildAndRun": 971
+      },
+      "cache": {
+        "l1": 0,
+        "l2": 17,
+        "miss": 1,
+        "stored": 1,
+        "bytesIn": 36841532,
+        "bytesOut": 4232635
+      }
+    },
+    "l2-edited/more": {
+      "units": 17,
+      "skipped": 0,
+      "built": 1,
+      "l1": 0,
+      "l2": 16,
+      "fresh": 0,
+      "ms": {
+        "deps": 79,
+        "plan": 10,
+        "build": 724,
+        "store": 18,
+        "total": 831,
+        "buildAndRun": 862
+      },
+      "cache": {
+        "l1": 0,
+        "l2": 16,
+        "miss": 1,
+        "stored": 1,
+        "bytesIn": 22579664,
+        "bytesOut": 2532235
+      }
+    }
+  },
+  "units": {
+    "serde_json": [
+      {
+        "name": "itoa",
+        "version": "1.0.18",
+        "kind": "lib",
+        "key": "20eeefab6c5825b3acd423cb9ec24619fb4e5a3ee190a863e76ec527843d59d0",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libitoa-b317e1907f7189a1.rlib": "521488f2d53e0d0ffd288a3e7e5c9ff99e757fb0266d5d093e05d2da3ccd29b4",
+          "/target/wasm32-wasip1/debug/deps/libitoa-b317e1907f7189a1.rmeta": "995fbae8b5497f005f6cb12b89462cc6223ff8d1bf305d7c744440e3623dd223"
+        }
+      },
+      {
+        "name": "zmij",
+        "version": "1.0.23",
+        "kind": "custom-build",
+        "key": "638bc77876581ac6f9e3750895c81d5edc26986c6665408e41292b894b434875",
+        "files": {
+          "/target/debug/build/zmij-19c6f7cd4752a1ec/build_script_build-19c6f7cd4752a1ec.wasm": "6c9f118336314698aa2d80db0c9fd22e3ec83be70ac5c0010427a8b5ee928cc8"
+        }
+      },
+      {
+        "name": "serde_core",
+        "version": "1.0.229",
+        "kind": "custom-build",
+        "key": "eaaf2987a5a5ebbae5bf276252a95bbb78fb6d021028e7aaf517899f9005e8c9",
+        "files": {
+          "/target/debug/build/serde_core-5998bb183b77897a/build_script_build-5998bb183b77897a.wasm": "0b565661c825b81c509a7223c111c707dcf12af35fc9393c8a24b44bf801eac2"
+        }
+      },
+      {
+        "name": "serde_json",
+        "version": "1.0.154",
+        "kind": "custom-build",
+        "key": "6b09bf4125a58a71cb1dfbd1e37cb5f09977eec4021c110c3e258c40f48761e8",
+        "files": {
+          "/target/debug/build/serde_json-fef6f55763d407af/build_script_build-fef6f55763d407af.wasm": "fbb33a1182d8f03c38ae68e0b9997e6379454fc0cf6c7bbdabdff2bb9d204fd7"
+        }
+      },
+      {
+        "name": "memchr",
+        "version": "2.8.3",
+        "kind": "lib",
+        "key": "37cdeacffc7306224edf8abbf8013c1f1b4a423dbb1430ecb447d8bfc7b1773e",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libmemchr-9ce2f0188e5a0c32.rlib": "8036ab6f7ce48c75fb9a24f2e4f20affa85eac465796ec73f0dcc8d686eff278",
+          "/target/wasm32-wasip1/debug/deps/libmemchr-9ce2f0188e5a0c32.rmeta": "7d8e6e541d8f8e0bb08904b499312939ba13a62a98e59254b2550619bc9319b5"
+        }
+      },
+      {
+        "name": "zmij",
+        "version": "1.0.23",
+        "kind": "run-custom-build",
+        "key": "e5939351ee97c72f7c16d16b8e9b1d39802d0b0cfa24ad10b26901b7708ee1cf",
+        "files": {},
+        "stdout": "cargo:rerun-if-changed=build.rs\ncargo:rustc-check-cfg=cfg(exhaustive)\ncargo:rustc-check-cfg=cfg(opt_level, values(\"s\"))\ncargo:rustc-check-cfg=cfg(zmij_no_select_unpredictable)\n"
+      },
+      {
+        "name": "serde_core",
+        "version": "1.0.229",
+        "kind": "run-custom-build",
+        "key": "7af610e8244e150281a997cf8671f6be9c607d65ac8242e4ff4d2846dc0c4ce9",
+        "files": {
+          "/target/wasm32-wasip1/debug/build/serde_core-49811cd06de4bb6f/out/private.rs": "899563ce84b59b13cd7036e25f7897c1e730906f62a43aff14472d11c4229f34"
+        },
+        "stdout": "cargo:rerun-if-changed=build.rs\ncargo:rustc-check-cfg=cfg(if_docsrs_then_no_serde_core)\ncargo:rustc-check-cfg=cfg(no_core_cstr)\ncargo:rustc-check-cfg=cfg(no_core_error)\ncargo:rustc-check-cfg=cfg(no_core_net)\ncargo:rustc-check-cfg=cfg(no_core_num_saturating)\ncargo:rustc-check-cfg=cfg(no_diagnostic_namespace)\ncargo:rustc-check-cfg=cfg(no_serde_derive)\ncargo:rustc-check-cfg=cfg(no_std_atomic)\ncargo:rustc-check-cfg=cfg(no_std_atomic64)\ncargo:rustc-check-cfg=cfg(no_target_has_atomic)\n"
+      },
+      {
+        "name": "serde_json",
+        "version": "1.0.154",
+        "kind": "run-custom-build",
+        "key": "305f426b382696bc08c83daa554d874d4cbdbff704580a2106095e86ac867bfc",
+        "files": {},
+        "stdout": "cargo:rerun-if-changed=build.rs\ncargo:rustc-check-cfg=cfg(fast_arithmetic, values(\"32\", \"64\"))\ncargo:rustc-cfg=fast_arithmetic=\"64\"\n"
+      },
+      {
+        "name": "zmij",
+        "version": "1.0.23",
+        "kind": "lib",
+        "key": "a92f310ec28d16664c9ab202d1b5d1a111390b4de0488a8d28284d452f99e252",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libzmij-fac0b120f40a33fb.rlib": "17cfed0a2dd083d7a6d883b58670e94428f0f4374953c708985a6f0dfc0603b9",
+          "/target/wasm32-wasip1/debug/deps/libzmij-fac0b120f40a33fb.rmeta": "94009a03a0d712ae97e7d1250a4b13742b103b8adb734c46ea392ed626311e96"
+        }
+      },
+      {
+        "name": "serde_core",
+        "version": "1.0.229",
+        "kind": "lib",
+        "key": "314abcff49a0d03b9c0f2262da227814f5bdaec6d340f29010f49cad12c31e94",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libserde_core-f09694e08510bbcf.rlib": "9fadab9e2ffa454032ae00a0280d94efe09ab7d9c4f8c6251ddaa43f7bc5d4e9",
+          "/target/wasm32-wasip1/debug/deps/libserde_core-f09694e08510bbcf.rmeta": "19642ea28aa9ee6d3212cd99a6a308465f269d3e0ecaa556c7786873801f31b5"
+        }
+      },
+      {
+        "name": "serde_json",
+        "version": "1.0.154",
+        "kind": "lib",
+        "key": "bda887e64451747a665d43461d42ccd212336ff1682d8fb46ed9deb523b7a911",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libserde_json-0682510288222575.rlib": "ef2d2c76e8f97ee365b09b4f16a87d7ab5c845052e1e56e82cd05bb92891342e",
+          "/target/wasm32-wasip1/debug/deps/libserde_json-0682510288222575.rmeta": "34f0b705d3b08c1103f2f08313034c679ca7dee01b9955fb0ab49ae1e71541b7"
+        }
+      },
+      {
+        "name": "demo",
+        "version": "0.1.0",
+        "kind": "bin",
+        "key": "31bd6b8a03130be306839adef7ecee48203a0ebe6033258674820d9e46b8bfa1",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/demo-432d2d24ad07346f.wasm": "b1cd21802eade95c1059bff6cb24f57a567fb2cd5d8aa0f776fa4bb17200bb16"
+        }
+      }
+    ],
+    "mix": [
+      {
+        "name": "itoa",
+        "version": "1.0.18",
+        "kind": "lib",
+        "key": "20eeefab6c5825b3acd423cb9ec24619fb4e5a3ee190a863e76ec527843d59d0",
+        "cached": "fresh",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libitoa-b317e1907f7189a1.rlib": "521488f2d53e0d0ffd288a3e7e5c9ff99e757fb0266d5d093e05d2da3ccd29b4",
+          "/target/wasm32-wasip1/debug/deps/libitoa-b317e1907f7189a1.rmeta": "995fbae8b5497f005f6cb12b89462cc6223ff8d1bf305d7c744440e3623dd223"
+        }
+      },
+      {
+        "name": "zmij",
+        "version": "1.0.23",
+        "kind": "lib",
+        "key": "a92f310ec28d16664c9ab202d1b5d1a111390b4de0488a8d28284d452f99e252",
+        "cached": "fresh",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libzmij-fac0b120f40a33fb.rlib": "17cfed0a2dd083d7a6d883b58670e94428f0f4374953c708985a6f0dfc0603b9",
+          "/target/wasm32-wasip1/debug/deps/libzmij-fac0b120f40a33fb.rmeta": "94009a03a0d712ae97e7d1250a4b13742b103b8adb734c46ea392ed626311e96"
+        }
+      },
+      {
+        "name": "zmij",
+        "version": "1.0.23",
+        "kind": "run-custom-build",
+        "key": "e5939351ee97c72f7c16d16b8e9b1d39802d0b0cfa24ad10b26901b7708ee1cf",
+        "cached": "fresh",
+        "files": {},
+        "stdout": "cargo:rerun-if-changed=build.rs\ncargo:rustc-check-cfg=cfg(exhaustive)\ncargo:rustc-check-cfg=cfg(opt_level, values(\"s\"))\ncargo:rustc-check-cfg=cfg(zmij_no_select_unpredictable)\n"
+      },
+      {
+        "name": "zmij",
+        "version": "1.0.23",
+        "kind": "custom-build",
+        "key": "638bc77876581ac6f9e3750895c81d5edc26986c6665408e41292b894b434875",
+        "cached": "fresh",
+        "files": {
+          "/target/debug/build/zmij-19c6f7cd4752a1ec/build_script_build-19c6f7cd4752a1ec.wasm": "6c9f118336314698aa2d80db0c9fd22e3ec83be70ac5c0010427a8b5ee928cc8"
+        }
+      },
+      {
+        "name": "memchr",
+        "version": "2.8.3",
+        "kind": "lib",
+        "key": "90d789382849a7c53aaf943b93a0e10b1ff9abe3822b92ae96bc4e44e458a5c0",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libmemchr-1f1197901976eb34.rlib": "cbfe61ca5b637911abfe5d46ecf021942cd3f32f439da9f30b95bd5225dd91e4",
+          "/target/wasm32-wasip1/debug/deps/libmemchr-1f1197901976eb34.rmeta": "9533295b0275ba2cac432223ade4996e6f057fdb23fa75c94d7eef96774adc15"
+        }
+      },
+      {
+        "name": "serde_core",
+        "version": "1.0.229",
+        "kind": "custom-build",
+        "key": "91553fdfeb626183f3e0cb5dff99519515472a43fadf74389895cb1050f2f8af",
+        "files": {
+          "/target/debug/build/serde_core-184920d70edbccce/build_script_build-184920d70edbccce.wasm": "0cbcbdee9c46991e38899eaad456d9b05e869dbf4212da51d13e608daaca07a3"
+        }
+      },
+      {
+        "name": "rand_core",
+        "version": "0.10.1",
+        "kind": "lib",
+        "key": "76ba81f901ce468504fe93722c40e6e22807105278b1b1ceadb575a045d5baa0",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/librand_core-1bc89eb6c5bc801d.rlib": "b64b4d0c97ca888cd39c384be5e759d328464023fe8f6fb6a2cceaa3198c9b50",
+          "/target/wasm32-wasip1/debug/deps/librand_core-1bc89eb6c5bc801d.rmeta": "afa170a3f9e3d0871ff0a76cc55902140fcdb7fe38af3b9c04a22d7bc382eb19"
+        }
+      },
+      {
+        "name": "serde_json",
+        "version": "1.0.154",
+        "kind": "custom-build",
+        "key": "aee5b9f37b4ca74ab1002b8fe8fc72974f8d6c03acd54a882db9dd9ee6e88ae2",
+        "files": {
+          "/target/debug/build/serde_json-1eecba8146eec416/build_script_build-1eecba8146eec416.wasm": "638258e4a00e49689646fde246f584ee6906adaaa8223521722c9eda3a4853b8"
+        }
+      },
+      {
+        "name": "cfg-if",
+        "version": "1.0.5",
+        "kind": "lib",
+        "key": "e69aa1b95d68b6a40cdb05be07e68669a831cad070fc8293e2b18b6ec33eda1d",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libcfg_if-dad829fb5263d80d.rlib": "243c99ab3fe816b41aef7f87ea314e4ebc7589a2ab1f50343ad89f367df85316",
+          "/target/wasm32-wasip1/debug/deps/libcfg_if-dad829fb5263d80d.rmeta": "de85d7fe4806ad901ef3800dbeff8b6761f1eb6045378b2285b7c67f5f19b61a"
+        }
+      },
+      {
+        "name": "getrandom",
+        "version": "0.4.3",
+        "kind": "custom-build",
+        "key": "699009abd560e7cffd93ffe561d8f3902ca55b27485054c21704ab64675f93b6",
+        "files": {
+          "/target/debug/build/getrandom-eb001871bd31cf22/build_script_build-eb001871bd31cf22.wasm": "768cb00d5b42b11d4b19831d9d727fe82922033b81e45470ec8faea3aa2d798b"
+        }
+      },
+      {
+        "name": "regex-syntax",
+        "version": "0.8.11",
+        "kind": "lib",
+        "key": "1a93a372e2c80afdab29e8af5ec7efbcb1b63bfaf59e4b372952cd16fe981153",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libregex_syntax-b97928bcf8fe5c2b.rlib": "eee80f9c749bc471a55b3a4ef2d48bd744bcac23f9148680a7ce320a580b0057",
+          "/target/wasm32-wasip1/debug/deps/libregex_syntax-b97928bcf8fe5c2b.rmeta": "f09f5c6cadc445ca7a99a831651b24d167e864808f3f2accae5cedf75c3e31f4"
+        }
+      },
+      {
+        "name": "serde_json",
+        "version": "1.0.154",
+        "kind": "run-custom-build",
+        "key": "3be810d99be680c895127fe589069f199f2a5c12f172cbec5d53ade14e38ce87",
+        "files": {},
+        "stdout": "cargo:rerun-if-changed=build.rs\ncargo:rustc-check-cfg=cfg(fast_arithmetic, values(\"32\", \"64\"))\ncargo:rustc-cfg=fast_arithmetic=\"64\"\n"
+      },
+      {
+        "name": "chacha20",
+        "version": "0.10.2",
+        "kind": "lib",
+        "key": "c7128cd5032e8f7498b8e6428a0f5184850d9538c73610f162ff95c204f3e05a",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libchacha20-42083e38f2f3974f.rlib": "2a5a15dc390413133cca07de0f53df64f56c30c242d502159eb63ca407aa9e69",
+          "/target/wasm32-wasip1/debug/deps/libchacha20-42083e38f2f3974f.rmeta": "d5e5118e2d198b58272671567dbbb701718a1bcf514a8cddf80917a94a5a008f"
+        }
+      },
+      {
+        "name": "serde_core",
+        "version": "1.0.229",
+        "kind": "run-custom-build",
+        "key": "eceb22fb3fb6d7a74ac7202e4a148992fc92040138b5a5979aea5685ab5ddc7d",
+        "files": {
+          "/target/wasm32-wasip1/debug/build/serde_core-b0d16f1592aa8347/out/private.rs": "899563ce84b59b13cd7036e25f7897c1e730906f62a43aff14472d11c4229f34"
+        },
+        "stdout": "cargo:rerun-if-changed=build.rs\ncargo:rustc-check-cfg=cfg(if_docsrs_then_no_serde_core)\ncargo:rustc-check-cfg=cfg(no_core_cstr)\ncargo:rustc-check-cfg=cfg(no_core_error)\ncargo:rustc-check-cfg=cfg(no_core_net)\ncargo:rustc-check-cfg=cfg(no_core_num_saturating)\ncargo:rustc-check-cfg=cfg(no_diagnostic_namespace)\ncargo:rustc-check-cfg=cfg(no_serde_derive)\ncargo:rustc-check-cfg=cfg(no_std_atomic)\ncargo:rustc-check-cfg=cfg(no_std_atomic64)\ncargo:rustc-check-cfg=cfg(no_target_has_atomic)\n"
+      },
+      {
+        "name": "getrandom",
+        "version": "0.4.3",
+        "kind": "run-custom-build",
+        "key": "89c787c419b0bb830d4c55ad7c99b7e8148fa5b40279c6a0924a38be3b98dd1a",
+        "files": {},
+        "stdout": "cargo:rerun-if-changed=build.rs\n"
+      },
+      {
+        "name": "serde_core",
+        "version": "1.0.229",
+        "kind": "lib",
+        "key": "ffa104153e180c91f911cf73ba25b7d0cc2044b0ca4d9190755e4b1b3533dd22",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libserde_core-5f8ac633213e1d5a.rlib": "c9af7ab98509650d32007843fe1f374d313201e5e78ec4fae593eeb2c0b8fe14",
+          "/target/wasm32-wasip1/debug/deps/libserde_core-5f8ac633213e1d5a.rmeta": "d55c9e0b94e6e069595e4fcd94e0e243204883e31391e586501f9e23b0cf434f"
+        }
+      },
+      {
+        "name": "getrandom",
+        "version": "0.4.3",
+        "kind": "lib",
+        "key": "7169db5edea0d78204a9f9be3c1bf14992d37f1b03f0b23768671eabbbef998b",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libgetrandom-d5d91f016306dee9.rlib": "a10c570ba9362342c8977984e277996e7820b84bff7f6b283dc6c4b0364a2138",
+          "/target/wasm32-wasip1/debug/deps/libgetrandom-d5d91f016306dee9.rmeta": "eb995121db1c4f1a4830ef4bcff969f835daea27c4ce03d7466459cdca2ff61e"
+        }
+      },
+      {
+        "name": "rand",
+        "version": "0.10.3",
+        "kind": "lib",
+        "key": "e6b895aaaee4114e47c82a2c0f4e61f1c3a62009936d85de9698736574c5644f",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/librand-c84bc0d28f90a564.rlib": "2072bdd91d78c52b5803efec8a376133c19a1901443cfb102827e027ddf4fb87",
+          "/target/wasm32-wasip1/debug/deps/librand-c84bc0d28f90a564.rmeta": "42e8775f45fcc83bd134b941c3ce86885bb2777d18e526cee909e7eb6732b09d"
+        }
+      },
+      {
+        "name": "regex-automata",
+        "version": "0.4.18",
+        "kind": "lib",
+        "key": "591cba10f708c0a8d7de29f2af119995ae87714f3002b3a27bd7e1f1219791dc",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libregex_automata-59e87276ac40cb77.rlib": "792dc39f745ead93c30a865679dc299a0cad3a3684e3041a2dcdfe0de3fcaf10",
+          "/target/wasm32-wasip1/debug/deps/libregex_automata-59e87276ac40cb77.rmeta": "20fc34db921d813dbe1be228dd56650a04718085042c41e31cb2017d76281012"
+        }
+      },
+      {
+        "name": "serde_json",
+        "version": "1.0.154",
+        "kind": "lib",
+        "key": "ff0eba592a0c19742592bef92e2f349a17ea84d0d95374e95fb6567b4c7e73ed",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libserde_json-5b0255a41539e294.rlib": "e54f83f05add55d05fefe809fc172d7d865ce4b958f2a6735511c37cf6d4d5ea",
+          "/target/wasm32-wasip1/debug/deps/libserde_json-5b0255a41539e294.rmeta": "bfad05d5fdf2cdf65c850c2b871be529296db18956b07fa06c0997f8e0ae49bf"
+        }
+      },
+      {
+        "name": "regex",
+        "version": "1.13.1",
+        "kind": "lib",
+        "key": "47325a162da6261d9c5a35f7d8481d78f71ad50a49b85a20062191d432a2ba57",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libregex-41026ceff24cc984.rlib": "1086e2825f9e6f63162923731cbdab45e67a7aed6a53a86c97ee7582d09ae8fb",
+          "/target/wasm32-wasip1/debug/deps/libregex-41026ceff24cc984.rmeta": "2aec73bf5ef6beaddf3f7f00084bc593174cfb31107c8fecb6abfbea1c881c87"
+        }
+      },
+      {
+        "name": "mix",
+        "version": "0.1.0",
+        "kind": "bin",
+        "key": "abadc95bb66236805199905f79bbc2537ed3f7988ac1bf204e54f6649e746928",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/mix-2c983e1044637661.wasm": "597b9a4bce34573c3ff4b30ecb087c9f4c6dc395cf77b8f6a6d40b93a555ef32"
+        }
+      }
+    ],
+    "more": [
+      {
+        "name": "arrayvec",
+        "version": "0.7.8",
+        "kind": "lib",
+        "key": "86b08fbcb4f7d0a81022972ff4d34a76583d97c19eaeb0adc2792570a0eaff72",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libarrayvec-fca3118d7bd8b70c.rlib": "9950f95f425daaf38f2eed78c57bb0acfbb6fcfe4b36ff1d6b5fc162afdf52bd",
+          "/target/wasm32-wasip1/debug/deps/libarrayvec-fca3118d7bd8b70c.rmeta": "0b2370c3c200c8e331880f20232cae6fe3e798374ad1f09d312dde394c52dec4"
+        }
+      },
+      {
+        "name": "base64",
+        "version": "0.22.1",
+        "kind": "lib",
+        "key": "0efe9593d11ee179bc80581e011e54e725f615ff423ebd2689ff68fb97b4d714",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libbase64-76833b87f0b51969.rlib": "e6f2e263c66b3c6fc69f2bff1599548469c1c1f851d4cb89910ca811ad1ddf44",
+          "/target/wasm32-wasip1/debug/deps/libbase64-76833b87f0b51969.rmeta": "cd8d030e1b0b62195c53a35a4ee1139727b7720e03592e86a006e72492808a35"
+        }
+      },
+      {
+        "name": "fnv",
+        "version": "1.0.7",
+        "kind": "lib",
+        "key": "881528475a6041d8274c45e97b2625144c666e6485f77f63fa2557c42e9fbddd",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libfnv-d2773688e849bb43.rlib": "478996b1be9ac60e57345e1f08d354d27596c04f8ea16e006e269c561b67b10a",
+          "/target/wasm32-wasip1/debug/deps/libfnv-d2773688e849bb43.rmeta": "6462e136f0457b29a598a5d5375f70bc138a7ea91d6ed52a20158cf6bcd06bb9"
+        }
+      },
+      {
+        "name": "equivalent",
+        "version": "1.0.3",
+        "kind": "lib",
+        "key": "af92c4146c53da028b3003b77bf2470fbcaee1d00f7eb7027d9fcca0d5dab41b",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libequivalent-5cf84e7b8ec2e069.rlib": "0336ffc34d16623cc42a8349c63875b1b810fa13b8d7b24f076d3b18b9770e03",
+          "/target/wasm32-wasip1/debug/deps/libequivalent-5cf84e7b8ec2e069.rmeta": "0b7143d9cdad71bb202adf488403121782efae0895576741f44069ff89708abf"
+        }
+      },
+      {
+        "name": "hex",
+        "version": "0.4.3",
+        "kind": "lib",
+        "key": "7708cdb16392cdb3652d7062ef55d2ddc9bd02c71471da24021e2452d1427ca6",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libhex-9d65f3a4d550e5ed.rlib": "131f919bde7eb1b926fe5c05918eedc989b56ee75e02172260e2739f12e66443",
+          "/target/wasm32-wasip1/debug/deps/libhex-9d65f3a4d550e5ed.rmeta": "b5a89113d40f39d79f6c102912e2effcf0aa3e58364c600db12a0dac5486a4bc"
+        }
+      },
+      {
+        "name": "either",
+        "version": "1.19.0",
+        "kind": "lib",
+        "key": "7fdfd6f1a8a4a141bd0eafd70da2eaa510c947a9c1b7b258307d06c1995274d6",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libeither-ae4cd145716cc3e4.rlib": "b3ff4cbd9b8f8d8d2c54a755e4f34a6ed4b4f4e94a562c96a71a68b624097945",
+          "/target/wasm32-wasip1/debug/deps/libeither-ae4cd145716cc3e4.rmeta": "684a3100ef95691d4d52359bda5df5c9e8eb3109a8dbde50e507e9d12fb2ea54"
+        }
+      },
+      {
+        "name": "bytes",
+        "version": "1.12.1",
+        "kind": "lib",
+        "key": "68f91a041b03e8a324dda8ee13a6409fbe1bf74996d6a7dd3cd0fe52b5c8701c",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libbytes-d992eeb2696b98ea.rlib": "0026190f76a3e5a78533b3fb353c293e4e96eab0edf20966a2c183d3fc171df1",
+          "/target/wasm32-wasip1/debug/deps/libbytes-d992eeb2696b98ea.rmeta": "4c739574686c09d2504f4b3c8202e33fdbcd723aa512213b1a67eaf096363198"
+        }
+      },
+      {
+        "name": "hashbrown",
+        "version": "0.17.1",
+        "kind": "lib",
+        "key": "bb5f8f5e63d8a1f457bd6c4754acf3115a30ac07e6dbaac1008434a4207cc502",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libhashbrown-c00130a3ecc6c602.rlib": "3eae8363493e2f6e7255bc3720f79582e6c3c1ccfedf68a2e2388ff6b8957308",
+          "/target/wasm32-wasip1/debug/deps/libhashbrown-c00130a3ecc6c602.rmeta": "94d912816d8598dcac02513a5d113cc6624226781221988539cdf68d22b2d3c9"
+        }
+      },
+      {
+        "name": "once_cell",
+        "version": "1.21.4",
+        "kind": "lib",
+        "key": "82b1b7e5f6ec987ff3d544cbe9221c3092a2056c5dfec4f937bccb382ef38666",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libonce_cell-39de681cf6982f57.rlib": "c7ae3fdefd0b451a1757f6cf49c354809e3cb47eb3567ee938acb54a6d325cb9",
+          "/target/wasm32-wasip1/debug/deps/libonce_cell-39de681cf6982f57.rmeta": "4a10f05c40c81878ef4279f9a9f7d9f2d8522052c7fecca9a83270bbe09b336c"
+        }
+      },
+      {
+        "name": "smallvec",
+        "version": "1.16.4",
+        "kind": "lib",
+        "key": "61653925f7409d4b6c514124a6caea0909c1b3d5169842ba243218b589fff7c0",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libsmallvec-0fe735b338ac2d9b.rlib": "9d62519e6423c9e38e3d3ee708496b3e7ba9ef3ac0449c5a413a5693a4745e6b",
+          "/target/wasm32-wasip1/debug/deps/libsmallvec-0fe735b338ac2d9b.rmeta": "29a6e57919eabcb92df1505c542b72b9588c67217e38c765988555b38764d249"
+        }
+      },
+      {
+        "name": "semver",
+        "version": "1.0.28",
+        "kind": "lib",
+        "key": "03da4ea3977e49220cf1413bbed2314153b5e7afb4db605da7fb9bbed162dc4b",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libsemver-6fe856acc4b29196.rlib": "2945a8db0402a2cb532749086a37261a59fe8f3a1c2982d7ba11b36690450022",
+          "/target/wasm32-wasip1/debug/deps/libsemver-6fe856acc4b29196.rmeta": "f9719ce2fc2b11cc2e061fc88f88a0ae870ead3e6b19442922a61e96d85765ac"
+        }
+      },
+      {
+        "name": "byteorder",
+        "version": "1.5.0",
+        "kind": "lib",
+        "key": "91a600dd697ab6a22e664fbb877895425d851b0e441f0642d543fb8c20285c04",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libbyteorder-8436cf4318c56afd.rlib": "11ab636ef15ba071821befd9255d1abe317451693887fa2588cc2cdeb796fcfe",
+          "/target/wasm32-wasip1/debug/deps/libbyteorder-8436cf4318c56afd.rmeta": "d36151ae1ce412d13302462db693e1bf1816a80f41bc8303fe1c04de1440def2"
+        }
+      },
+      {
+        "name": "log",
+        "version": "0.4.34",
+        "kind": "lib",
+        "key": "eaf4efd378d7a561c3f1066a2780e8a728e7789ede3efd1edd601581085e21ba",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/liblog-765e70023e54d6fa.rlib": "0ebbda6ead29573095290ca09bf63a074b2a8e7cc4c33219ae440975c332da34",
+          "/target/wasm32-wasip1/debug/deps/liblog-765e70023e54d6fa.rmeta": "72929f89b914f201caafe7e964f07c174c684b0d8e5419fbecf14d4876b81831"
+        }
+      },
+      {
+        "name": "typenum",
+        "version": "1.20.1",
+        "kind": "lib",
+        "key": "304aeee321d905662f83a4899873e1c4e05b0fde800507551596a27f2f3c604d",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libtypenum-6d15e0c52f7cb0f7.rlib": "ee452f600c91a4d8d3e012dd71e86b0cc5250a6f7d02dd0cc0c6aca6c66c164b",
+          "/target/wasm32-wasip1/debug/deps/libtypenum-6d15e0c52f7cb0f7.rmeta": "d8ec071d512c81bb779f5527aa991658ede5d910d6a21f2f4374fde1a8bd5630"
+        }
+      },
+      {
+        "name": "itertools",
+        "version": "0.14.0",
+        "kind": "lib",
+        "key": "193f5d12dddbcc9f00670b31debe999dbb015e97be8336f381978182ad7f6305",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libitertools-ca539e4a9a58e8c0.rlib": "c0ec52ea25a1aef84b6b1a84ffa18fd92cb0a2db35609db7ce3091abc40734ab",
+          "/target/wasm32-wasip1/debug/deps/libitertools-ca539e4a9a58e8c0.rmeta": "f98496bc3820c4761c7eaaac1055b4b04d569f3e4dffc4466c8f8df5ccb9fe13"
+        }
+      },
+      {
+        "name": "indexmap",
+        "version": "2.14.2",
+        "kind": "lib",
+        "key": "85cc1fd18cd7f3cbe7a98220f663c06184e66548afa2f13f8a06e0f37b65e270",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/libindexmap-e859f4080d47cc1b.rlib": "10b517cdd05b8d1b9d6323dbcaf6edc80771e322829c9f04773fd17444c867fb",
+          "/target/wasm32-wasip1/debug/deps/libindexmap-e859f4080d47cc1b.rmeta": "f6481e8049a4727272eef001ff8f55ed7024ce1bf1aa821c0d4dbd1d75b816c5"
+        }
+      },
+      {
+        "name": "more",
+        "version": "0.1.0",
+        "kind": "bin",
+        "key": "9551840222b857c67feddc0801062de87e68bbfdaaa9ea68aa76f10473880d78",
+        "files": {
+          "/target/wasm32-wasip1/debug/deps/more-74b32b57e72c13ce.wasm": "b557331c5e825e10758dceabda6fb6a7f7e01daa7d2bd434902279cb290920b7"
+        }
+      }
+    ]
+  }
+}

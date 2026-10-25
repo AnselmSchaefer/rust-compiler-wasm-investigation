@@ -26,6 +26,7 @@ import { type Bundle, type CacheLevel, makeBundle, sha256, sourceId, type UnitCa
 import BS_STD from './bs-std/lib.rs';
 import { findOverride, type Override } from './overrides';
 import { decodeSpawn, encodeSpawnResult, runSpawn } from './spawn';
+import { type Diagnostic, parseDiagnostics } from './diagnostics';
 
 /** The files a build touches: the orchestrator's VFS, or a directory on disk (tools/prebuild). */
 export type BuildFs = Pick<Vfs, 'exists' | 'readFile' | 'readText' | 'writeFile' | 'readdir' | 'mkdirAll' | 'removeAll'>;
@@ -92,6 +93,8 @@ export interface UnitReport {
   files: Record<string, string>;
   /** Build-script runs: what the script printed (its `cargo:` lines). */
   stdout?: string;
+  /** rustc's diagnostics of the unit's compile (WP-38), replayed from the cache on a hit. */
+  diagnostics?: Diagnostic[];
   warnings: string[];
 }
 
@@ -101,6 +104,8 @@ export interface BuildResult {
   bins: Record<string, string>;
   /** Diagnostics of the failed unit(s). */
   errors: string;
+  /** rustc's diagnostics as data (WP-38): the path packages' units that ran, and failed units. */
+  diagnostics: Diagnostic[];
   units: UnitReport[];
   /** Planned units that weren't needed: everything that depends on them was a cache hit. */
   skipped: number;
@@ -115,10 +120,12 @@ export interface BuildResult {
 
 const TARGET = 'wasm32-wasip1';
 
-class UnitError extends Error {}
+class UnitError extends Error {
+  constructor(message: string, readonly diagnostics: Diagnostic[] = []) { super(message); }
+}
 
 /** Per VFS: unit key → its outputs, already in place from an earlier build in this session. */
-const inPlace = new WeakMap<object, Map<string, { files: Record<string, string>; stdout?: string }>>();
+const inPlace = new WeakMap<object, Map<string, { files: Record<string, string>; stdout?: string; diagnostics?: Diagnostic[] }>>();
 
 export async function cargoBuild(host: BuildHost, opts: BuildOptions): Promise<BuildResult> {
   const t0 = performance.now();
@@ -165,6 +172,7 @@ export async function cargoBuild(host: BuildHost, opts: BuildOptions): Promise<B
   const units: UnitReport[] = [];
   const outputs: Record<number, string> = {};
   const errors: string[] = [];
+  const failedDiagnostics: Diagnostic[] = [];
   const stores: Promise<void>[] = [];
   const done = new Map<number, Promise<void>>();
   const unit = (u: PlanUnit): Promise<void> => {
@@ -173,7 +181,7 @@ export async function cargoBuild(host: BuildHost, opts: BuildOptions): Promise<B
       p = (async () => {
         const key = await keyOf(u);
         let start = performance.now() - t0;
-        const report = (r: { cached?: UnitReport['cached']; rustcMs?: number; files: Record<string, string>; stdout?: string; warnings: string[] }) => {
+        const report = (r: { cached?: UnitReport['cached']; rustcMs?: number; files: Record<string, string>; stdout?: string; warnings: string[]; diagnostics?: Diagnostic[] }) => {
           const rep = { id: u.id, name: u.name, version: u.version, kind: u.kind, key, start: Math.round(start), end: Math.round(performance.now() - t0), ...r };
           units.push(rep);
           opts.onUnit?.(rep);
@@ -181,14 +189,15 @@ export async function cargoBuild(host: BuildHost, opts: BuildOptions): Promise<B
         const here = fresh.get(key);
         if (here && Object.keys(here.files).every(f => vfs.exists(f))) {
           if (here.stdout !== undefined) outputs[u.id] = here.stdout;
-          return report({ cached: 'fresh', files: here.files, stdout: here.stdout, warnings: [] });
+          return report({ cached: 'fresh', files: here.files, stdout: here.stdout, warnings: [], diagnostics: here.diagnostics });
         }
         const hit = await opts.units?.get(key);
         if (hit) {
           restore(vfs, u, hit.bundle, outputs);
           const files = hashes(hit.bundle);
-          fresh.set(key, { files, stdout: hit.bundle.stdout });
-          return report({ cached: hit.from, files, stdout: hit.bundle.stdout, warnings: [] });
+          const diagnostics = hit.bundle.diagnostics as Diagnostic[] | undefined;
+          fresh.set(key, { files, stdout: hit.bundle.stdout, diagnostics });
+          return report({ cached: hit.from, files, stdout: hit.bundle.stdout, warnings: [], diagnostics });
         }
         // rustc reads the dependencies' dependencies too (-L dependency=), so a miss needs the
         // whole closure in place; a hit above didn't put its own dependencies there.
@@ -199,11 +208,11 @@ export async function cargoBuild(host: BuildHost, opts: BuildOptions): Promise<B
         const r = o ? await overrideBuildScript(host, u, o, outputs)
           : u.kind === 'run-custom-build' ? await runBuildScript(host, opts.resolver, u, outputs) : await compile(host, opts.resolver, u, outputs);
         const files = hashes(r.bundle);
-        fresh.set(key, { files, stdout: r.bundle.stdout });
+        fresh.set(key, { files, stdout: r.bundle.stdout, diagnostics: r.diagnostics });
         if (opts.units) stores.push(opts.units.put(key, r.bundle));
-        report({ rustcMs: r.rustcMs, files, stdout: r.bundle.stdout, warnings: r.warnings });
+        report({ rustcMs: r.rustcMs, files, stdout: r.bundle.stdout, warnings: r.warnings, diagnostics: r.diagnostics });
       })().catch(e => {
-        if (e instanceof UnitError) errors.push(e.message);
+        if (e instanceof UnitError) { errors.push(e.message); failedDiagnostics.push(...e.diagnostics); }
         throw e;
       });
       done.set(u.id, p);
@@ -230,7 +239,8 @@ export async function cargoBuild(host: BuildHost, opts: BuildOptions): Promise<B
   await Promise.all(stores);
   const t4 = performance.now();
   return {
-    ok: !failed, bins, errors: [...new Set(errors)].join('\n'), units: units.sort((a, b) => a.start - b.start), skipped: plan.units.length - units.length,
+    ok: !failed, bins, errors: [...new Set(errors)].join('\n'),
+    diagnostics: [...units.flatMap(u => u.diagnostics ?? []), ...failedDiagnostics], units: units.sort((a, b) => a.start - b.start), skipped: plan.units.length - units.length,
     packages: deps.packages.length, workers: host.workers, cache: opts.units?.stats ?? null,
     ms: { deps: Math.round(t1 - t0), plan: Math.round(t2 - t1), build: Math.round(t3 - t2), store: Math.round(t4 - t3), total: Math.round(t4 - t0) },
     plan, scriptOutputs: outputs,
@@ -368,9 +378,11 @@ async function compile(host: BuildHost, resolver: Resolver, u: PlanUnit, outputs
   const at = f.args.indexOf('--out-dir');
   host.vfs.mkdirAll(f.args[at + 1]);
   const r = await host.rustc(f.args, f.env);
-  if (r.code !== 0) throw new UnitError(`error: could not compile \`${u.name}\` (${u.kind}) due to errors\n${rendered(r.stderr)}`);
-  const bundle = await makeBundle(u.outputs.map(p => [p, host.vfs.readFile(p)]));
-  return { rustcMs: r.ms.rustc, warnings: f.warnings, bundle };
+  const diagnostics = parseDiagnostics(r.stderr);
+  if (r.code !== 0) throw new UnitError(`error: could not compile \`${u.name}\` (${u.kind}) due to errors\n${rendered(r.stderr)}`, diagnostics);
+  const bundle = await makeBundle(u.outputs.map(p => [p, host.vfs.readFile(p)]), undefined, diagnostics);
+  // Registry crates build with --cap-lints allow, so in practice these are the path packages'.
+  return { rustcMs: r.ms.rustc, warnings: f.warnings, bundle, diagnostics };
 }
 
 /** rustc's JSON diagnostics → their rendered text (other lines as they are). */
@@ -399,14 +411,14 @@ async function runBuildScript(host: BuildHost, resolver: Resolver, u: PlanUnit, 
   const bundle = await makeBundle(files, r.stdout);
   if (host.vfs.exists(outDir)) host.vfs.removeAll(outDir);
   restore(host.vfs, u, bundle, outputs);
-  return { warnings: [] as string[], bundle, rustcMs: undefined };
+  return { warnings: [] as string[], bundle, rustcMs: undefined, diagnostics: undefined };
 }
 
 /** A build script on the override list: its listed output instead of a run. */
 async function overrideBuildScript(host: BuildHost, u: PlanUnit, o: Override, outputs: Record<number, string>) {
   const bundle = await makeBundle(Object.entries(o.files ?? {}).map(([p, d]) => [`${u.out_dir}/${p}`, new TextEncoder().encode(d)]), o.stdout.replaceAll('$OUT_DIR', u.out_dir!));
   restore(host.vfs, u, bundle, outputs);
-  return { warnings: [] as string[], bundle, rustcMs: undefined };
+  return { warnings: [] as string[], bundle, rustcMs: undefined, diagnostics: undefined };
 }
 
 export type { Plan };

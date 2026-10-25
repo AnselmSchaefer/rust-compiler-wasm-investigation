@@ -3,11 +3,18 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** WP-27a **done** (session 22; WP-27 split). Next: **WP-38** (agent tool API + local relay → M2), then WP-40 (hands-on demo). WP-27b (incremental) deferred (optional).
+- **Active WP:** **WP-38** in progress (session 22): relay, tools and page done; scripted MCP scenario passes headless and headed. Left: the real Claude Code run **[H]** (uses the user's plan). Then WP-40 (hands-on demo).
 - **Last session:** 2026-10-25 (session 22). WP-21 done: build scripts with autocfg, rustc probes, libc, proc-macro2, anyhow and `links` metadata build in the browser and print what they print natively. Release **1.99.1-7520bf319596**.
 - **Rule for rustc source:** rust-lang's agent policy (`build/rust/AGENTS.md`) applies. Claude does not write or edit rustc source, and does not draft rust-lang issues, PRs or Zulip posts. The user writes those, or applies existing **human-written** patches (bjorn3/oligamiq), which the user prefers whenever one exists. **danlapid 0005–0007 are LLM-generated** (Claude co-author trailers), so they don't qualify even if the user applies them; design reference only (`docs/patches.md`). Claude reviews, builds and explains. Everything outside `build/rust` is Claude's, including out-of-tree drivers using `rustc_driver` (`toolchain/rustc-multi`).
-- **Next step:** WP-38: page-side tool layer over the orchestrator ops (files, resolve, check, build, run, test, clippy, fmt; JSON results), Python relay `tools/relay/` (MCP on stdio, WebSocket to the page, serves the app with COOP/COEP, proxies `/index/` to index.crates.io, 127.0.0.1 + per-run token + Origin check), headed/headless Chromium via Playwright. Open follow-ups: doc tests, Wasm proc macros in prebuild/L2, top-500 matrix.
+- **Next step:** with the user's go-ahead, `WP38_AGENT=1 bash scripts/verify/wp-38.sh` (or `tests/relay/agent-run.sh headed` then `headless`): Claude Code with only the relay's MCP tools does `tests/relay/agent-task.md`, checked by `tests/relay/check-agent.py`. Then mark WP-38 done (M2) and start WP-40.
 - **Running background jobs:** none
+
+## Current session (2026-10-25, session 22, cont. 4): WP-38 in progress
+- **Relay** `tools/relay/relay.py` (Python stdlib): MCP on stdio (initialize, tools/list, tools/call, ping), HTTP on 127.0.0.1 serving build/www/app + build/release (.br) with COOP/COEP, `/index/` proxied to index.crates.io, WebSocket `/relay` (token + Origin checked, newest page wins, in-flight calls fail on disconnect), Chromium via `tools/relay/browser.mjs` (Playwright, persistent profile build/relay/profile, headed/headless, background throttling off).
+- **Tools** `tools/relay/tools.json` (15 tools, the one list for relay and page) → `web/agent/tools.ts` (`AgentTools`: per-project queue, relative paths, diagnostics as data without ANSI, outputs cut at 64 KB) → page `app/agent.html`/`agent.ts` (call log, editor shows touched file, terminal shows output, reconnects). Orchestrator ops: `listFiles`, `remove`, `run` with stdin/timeout/project files; `fmt --check` = compare + own unified diff (`web/project/diff.ts`; found: rustfmt's --check prints its diff to the server's stdout). Builds return `diagnostics`; bundles keep them so hits replay them.
+- **Scripted scenario** `tests/relay/scenario.py` (an MCP client): serde derive from live crates.io via the proxy, E0308 found and fixed, failing test found/rerun by name/fixed, needless_return fixed, fmt check → format → clean, cargo_run; guard refuses wrong token and foreign Origin. **Passes headless (8–9 s) and headed (7–8 s).**
+- Prepared for the real agent: `tests/relay/agent-task.md`, `tests/relay/agent-run.sh` (claude -p, `--tools ""` + `--strict-mcp-config`: only the relay's tools), `tests/relay/check-agent.py`. Not run: **[H]** it uses the user's Claude Code plan.
+- `scripts/verify/wp-38.sh` passes without the agent part. Full Chromium suite 19 passed + 1 skipped; WP-21 (incl. WP-18) verifies. Docs: `docs/relay.md`.
 
 ## Current session (2026-10-25, session 22, cont. 3): WP-27a done, WP-27b blocked [H]
 - Added WP-40 (hands-on demo, after WP-38) at the user's request.
@@ -172,6 +179,7 @@
 - [ ] **Possible upstream rustc bug** (user to report, if wanted): `filesearch.rs` `from_env_args_next` checks `lib/rustlib` relative to the *working directory*, not next to argv[0] (see `~/Projects/rustc-wasm-host-source-changes.md` §6).
 
 ## Human actions needed
+- [ ] **[H] WP-38 Claude Code run:** `tests/relay/agent-run.sh headed` and `headless` run `claude -p` (the user's plan) with only the relay's tools; or connect your own Claude Code session to the relay (`docs/relay.md`).
 - [x] **WP-27b (2026-10-25):** deferred by the user (optional). If it's picked up again: incremental compilation can't start on a WASI host (`rustc_data_structures::flock` has no lock for WASI, `rustc_incremental`'s `lock_directory` makes that fatal); the rustc change is the user's to write, see `docs/incremental.md`.
 - [x] **[H] WP-20 rustc changes** (2026-10-25): applied by the user (bjorn3 #160981 + tuple wasip1; change 2 written by the user); rustc.wasm rebuilt and the lookup/registration path verified. Open, optional: the `": "` separator in change 2's error message.
 - [x] **Scope (2026-10-24):** v1 targets agentic development; human-only browser-IDE WPs moved to the PLAN.md Appendix.
@@ -219,7 +227,7 @@
 | 27a | Warm latency budgets | done | 1 | `scripts/verify/wp-27.sh`; check 241–288 ms, edit → run 1.1–1.3 s (debuginfo 0 default); `bench/warm.md` |
 | 27b | Incremental compilation in OPFS (optional) | deferred | 0 | user, 2026-10-25: budgets met without it; needs a rustc change for file locks on WASI (`docs/incremental.md`) |
 | 28 | First-visit performance | deferred | 0 | Appendix (human-only) |
-| 38 | Agent tool API + local relay (M2) | blocked | 0 | new 2026-10-24: MCP ⇄ Python relay ⇄ WebSocket ⇄ page |
+| 38 | Agent tool API + local relay (M2) | in-progress | 1 | relay + tools + page done; scripted MCP scenario passes headless/headed; Claude Code run waits for **[H]** |
 | 40 | Hands-on demo | blocked | 0 | new 2026-10-25 (user): after WP-38; all v1 features in the app UI |
 | 29 | Public deploy (optional) | blocked | 0 | after M2; only to share beyond this machine |
 | 30, 32, 34 | v2 features | deferred | 0 | agent-useful; 34 = HTTP handlers via the tool API |

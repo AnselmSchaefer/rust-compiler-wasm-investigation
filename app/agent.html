@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rust in the browser: agent</title>
+<link rel="stylesheet" href="agent.css">
+<body>
+  <header>
+    <span class="title">Rust in the browser · agent</span>
+    <span id="relay" class="badge">relay: connecting…</span>
+    <span id="status">Loading the toolchain…</span>
+  </header>
+  <main class="agent">
+    <section id="log" aria-label="Tool calls"></section>
+    <section class="right">
+      <div id="file-title" class="pane-title">No file yet</div>
+      <section id="editor"></section>
+      <div id="out-title" class="pane-title">Output</div>
+      <section id="terminal"></section>
+    </section>
+  </main>
+  <script type="module" src="agent.js"></script>
+</body>
+</html>
