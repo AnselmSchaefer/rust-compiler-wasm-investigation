@@ -90,7 +90,7 @@ These are taken as defaults so work can start. Changing one later only affects t
 | D. Dependencies | 15–22 | crates.io, cache, proc macros, build scripts, ecosystem matrix → **M1: playground with crates** | 18–28 |
 | E. Agent-ready v1 | 25–27, 38 | Workspaces, tests/Clippy/rustfmt, incremental check, **agent tool API + local relay (MCP)** → **M2: v1 for agentic development** | 8–9 |
 | (optional) Public deploy | 29 | Only to share beyond this machine | 1–2 |
-| F. v2 features | 30, 32, 34 | wasip3 components, clang for `cc` build scripts, HTTP handler runs | 6–9 |
+| F. v2 features | 30, 32, 34, 39 | wasip3 components, clang for `cc` build scripts, HTTP handler runs, native deploy of sandbox-developed backends (39, optional) | 9–13 |
 | Appendix: some day later | 23, 24, 28, 31, 33, 35 + parts of 25–27 | Human-only browser IDE: rust-analyzer + editor UI, first-visit perf, web preview, debugger UI, collaboration | — |
 | G. Upstream & upkeep | 36–37 | Upstream proposals; recurring rebase | ongoing |
 | **Total to v1** | | | **~51–75 sessions** (was ~60–90 with the human IDE) |
@@ -396,6 +396,29 @@ These are taken as defaults so work can start. Changing one later only affects t
 | WP-30 | `wasm32-wasip3` component output. `wasm-component-ld` and jco run in the browser | WP-38 | 2–3 | async `wasip3` program runs in the sandbox via jco |
 | WP-32 | clang-in-Wasm (YoWASP/oligamiq builds) for `cc`-crate build scripts | WP-21 | 2–3 | Crates with small C parts (e.g. `zstd-sys` vendored) build |
 | WP-34 | HTTP handler apps: `wasi:http` incoming-handler apps (axum-style) run in the sandbox and take requests through the tool API (a browser preview pane for humans stays in the Appendix) | WP-30, WP-38 | 2–3 | `GET /hello` sent through the tool API hits the user's Rust handler |
+
+#### WP-39 Develop in the sandbox, deploy natively (optional)
+*Added 2026-10-25 (user request). A Rust backend that calls other services is developed and tested in the browser with its network mocked. CI builds the same source natively and adds the real network layer, so production runs native code, not Wasm.*
+- **Depends:** WP-34, WP-38 · **Est.:** 3–4 sessions (including the spike)
+- **Project layout** (a template the agent scaffolds):
+  - `app-core`: an `axum::Router` without a listener, plus business logic written against traits (`Upstream` for outbound HTTP, `Db`, `Config`). It is the only crate the agent normally edits.
+  - `host-sandbox`: provided by the IDE. WP-34's `wasi:http` incoming handler calls the router; the traits get mock implementations.
+  - `host-native`: a template, built only in CI. tokio `main`, `axum::serve` on a TCP listener, reqwest and sqlx implementations of the traits, config and secrets from the environment.
+- **Tasks**
+  - Spike (≤ 1 session), results in `docs/native-deploy.md`:
+    - Does an `axum::Router` (default features off, no tokio listener) build for the sandbox target and answer a request through WP-34's handler? If not, `app-core` exposes a framework-free `http::Request → http::Response` handler instead.
+    - Can `rustc.wasm --emit=metadata --target x86_64-unknown-linux-gnu` type-check `host-native` with an x86_64 std's metadata in the sysroot? Then errors in the native-only code show up in the browser, not first in CI.
+  - Outbound modes in `host-sandbox`, chosen per project:
+    - mocks (route → response, from a file in the project)
+    - record/replay fixtures (like `tests/resolver/index-proxy.mjs`)
+    - real calls through the relay (WP-38), limited to an allowlist
+    Secrets never enter the sandbox.
+  - Database seam: `Db` is in-memory or SQLite-in-Wasm in the sandbox, sqlx/Postgres in `host-native`. sqlx's `query!` macros run in offline mode.
+  - Contract tests: one suite per trait, run against the mock in the sandbox and against the real implementation in CI.
+  - Tool API additions: `scaffold_backend` (creates the layout), `check_native` (the type-check above), tools to edit mocks and fixtures.
+  - CI template in the scaffold (`.github/workflows/deploy.yml`): `cargo test -p app-core`, the contract tests, `cargo build --release -p host-native --target x86_64-unknown-linux-musl`, integration tests against staging services, a container image.
+  - **[H]** The git remote, CI accounts, registries and any deploy are the user's decision.
+- **Done when:** in a headless run through the tool API, the agent scaffolds a backend that calls one external HTTP API (mocked) and stores data through `Db`, and its tests pass in the sandbox. The same source passes `cargo test` natively, `host-native` builds locally, and the native binary answers the same request with a real upstream (a local test server). Nothing is deployed.
 
 ### Phase G: Upstream and upkeep
 

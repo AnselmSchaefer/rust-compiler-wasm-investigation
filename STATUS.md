@@ -188,6 +188,7 @@
 | 38 | Agent tool API + local relay (M2) | blocked | 0 | new 2026-10-24: MCP ⇄ Python relay ⇄ WebSocket ⇄ page |
 | 29 | Public deploy (optional) | blocked | 0 | after M2; only to share beyond this machine |
 | 30, 32, 34 | v2 features | deferred | 0 | agent-useful; 34 = HTTP handlers via the tool API |
+| 39 | Develop in the sandbox, deploy natively (optional) | deferred | 0 | new 2026-10-25: mocked network in the IDE, CI builds `host-native`; after WP-34 |
 | 31, 33, 35 | Web preview, debugger UI, collaboration | deferred | 0 | Appendix (human-only) |
 | 36 | Upstream proposals | blocked | 0 | |
 | 37 | Release-train rebase | blocked | 0 | recurring |
