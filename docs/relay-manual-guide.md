@@ -47,17 +47,17 @@ Claude Code registers MCP servers per directory. A directory of its own for thes
    cd ~/Projects/rust-ide-try
    claude
    ```
-   A Chromium window "Rust in the browser · agent" opens. Within a few seconds the badge top left turns green ("relay: connected"), and the status shows `Ready: rustc 1.99.1-…, N project(s)`.
+   A Chromium window "Rust in the browser" (the IDE) opens, with an "agent" badge. Within a few seconds the "agent" badge turns green ("agent: connected"), and the status shows `Ready: rustc 1.99.1-…, N project(s)`.
 3. In Claude, type `/mcp`: `rust-ide` should be connected, with 15 tools. If it failed, choose Reconnect, or `/exit` and start `claude` again.
 4. Give a task that names the tools, so the agent doesn't fall back to local `cargo`. For example:
    > Use only the rust-ide tools (the browser IDE), not the shell. Create a project `csv-demo` that parses CSV with the csv crate and serde, add tests, then run cargo_test, cargo_clippy and cargo_fmt, and cargo_run it.
 
    Or paste `tests/relay/agent-task.md` (the WP-38 task: a seeded compile error, a failing test, a Clippy lint, unformatted code). Allow the `rust-ide` tools when Claude asks, ideally "always".
-5. Watch the window (top: the last build's timings, phases and cached/built units, plus totals):
-   - left: the projects' files (marked: changed by the last few calls; click one to see it);
-   - middle: each tool call with its time, arguments and a one-line result;
-   - top right: the file the agent read or wrote;
-   - bottom right: test and program output.
+5. Watch the window, or work in it yourself: it's the IDE (`docs/relay.md`, `README.md`).
+   - top: the buttons, and under them the last build's timings, its phases, cached and built units, and totals;
+   - left: the project's files (marked: changed by the last few calls);
+   - middle: the editor, with the file the agent read or wrote;
+   - right: the Terminal, Tests, Problems and Activity tabs (every call, by you or the agent).
 
 ## Afterwards (optional)
 

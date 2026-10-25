@@ -1,4 +1,4 @@
-// Bundle the IDE (app/, WP-14) into build/www/app/: the page and the agent page (WP-38), the three workers (orchestrator,
+// Bundle the IDE (app/, WP-14) into build/www/app/: the WP-14 playground and the IDE (WP-40), the three workers (orchestrator,
 // WASI process threads, run sandbox), CSS and vfs.wasm. The toolchain is the newest release in
 // build/release/ (toolchain/release.sh), served at /release/ (`pnpm demo`, or Playwright's server).
 import { build } from 'esbuild';
@@ -14,8 +14,8 @@ await mkdir(out, { recursive: true });
 await build({
   entryPoints: {
     main: 'app/main.ts',
-    // WP-38: the page an agent drives through tools/relay (agent.html).
-    agent: 'app/agent.ts',
+    // WP-40: the IDE for a person and an agent (ide.html; tools/relay serves it).
+    ide: 'app/ide.ts',
     'orchestrator-worker': 'web/orchestrator/orchestrator-worker.ts',
     'process-worker': 'web/wasi/process-worker.ts',
     'sandbox-worker': 'web/sandbox/sandbox-worker.ts',
@@ -24,10 +24,10 @@ await build({
   loader: { '.rs': 'text' },
   define: { __RELEASE__: JSON.stringify(release) },
 });
-await build({ entryPoints: { main: 'app/style.css', agent: 'app/agent.css' }, outdir: out, bundle: true, minify: true, logLevel: 'warning' });
+await build({ entryPoints: { main: 'app/style.css', ide: 'app/ide.css' }, outdir: out, bundle: true, minify: true, logLevel: 'warning' });
 await copyFile('app/index.html', `${out}/index.html`);
-await copyFile('app/agent.html', `${out}/agent.html`);
+await copyFile('app/ide.html', `${out}/ide.html`);
 await copyFile('build/www/vfs/vfs.wasm', `${out}/vfs.wasm`);
-// The agent page resolves and plans builds (resolver.wasm, scripts/build-resolver.sh).
+// The IDE resolves and plans builds (resolver.wasm, scripts/build-resolver.sh).
 await copyFile('build/www/resolver/resolver.wasm', `${out}/resolver.wasm`);
 console.log(`built ${out} (release ${release})`);

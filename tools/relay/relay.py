@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The local relay between an agent and the browser IDE (WP-38).
 
-    agent ⇄ MCP (stdio) ⇄ relay ⇄ WebSocket ⇄ the IDE page in Chromium (app/agent.ts)
+    agent ⇄ MCP (stdio) ⇄ relay ⇄ WebSocket ⇄ the IDE page in Chromium (app/ide.ts)
 
 The agent starts the relay as an MCP server (stdio). The relay
   * offers the tools of tools/relay/tools.json and forwards each call to the page, which runs it
@@ -19,7 +19,7 @@ Security: it listens on 127.0.0.1 only. The page connects with a token made for 
 WebSocket's Origin must be the relay's own, because any website could otherwise talk to a
 localhost WebSocket. Only the standard library is used. Logs go to stderr; stdout is MCP's.
 
-    python3 tools/relay/relay.py [--port 8790] [--browser headed|headless|none] [--profile DIR]
+    python3 tools/relay/relay.py [--port 8790] [--browser headed|headless|none] [--profile DIR] [--no-mcp]
 """
 
 import argparse
@@ -78,7 +78,7 @@ class Relay:
 
     @property
     def url(self):
-        return f'{self.origin}/agent.html?token={self.token}'
+        return f'{self.origin}/ide.html?token={self.token}'
 
     # --- HTTP
 
@@ -116,7 +116,7 @@ class Relay:
         if path.startswith('/index/'):
             status, body = await self.index(path[len('/index/'):])
             return await self.respond(writer, status, body, {'Content-Type': 'application/json' if path.endswith('.json') else 'text/plain'}, head)
-        base, rel = (RELEASES, path[len('/release/'):]) if path.startswith('/release/') else (APP, path.lstrip('/') or 'agent.html')
+        base, rel = (RELEASES, path[len('/release/'):]) if path.startswith('/release/') else (APP, path.lstrip('/') or 'ide.html')
         file = (base / rel).resolve()
         if base.resolve() not in file.parents and file != base.resolve():
             return await self.respond(writer, 403, b'forbidden')
@@ -321,9 +321,11 @@ async def main():
     ap.add_argument('--browser', choices=['headed', 'headless', 'none'], default=os.environ.get('RELAY_BROWSER', 'headed'))
     # One Chromium per profile: tests use their own, so they can run next to an open session.
     ap.add_argument('--profile', default=os.environ.get('RELAY_PROFILE', str(REPO / 'build/relay/profile')))
+    # The IDE without an agent (`pnpm ide`): no MCP on stdin; runs until Ctrl-C.
+    ap.add_argument('--no-mcp', action='store_true')
     a = ap.parse_args()
-    if not (APP / 'agent.html').is_file():
-        log(f'no {APP / "agent.html"}: run `pnpm build:app` first')
+    if not (APP / 'ide.html').is_file():
+        log(f'no {APP / "ide.html"}: run `pnpm build:app` first')
         sys.exit(1)
     relay = Relay(a.port, a.browser, Path(a.profile).resolve())
     loop = asyncio.get_running_loop()
@@ -344,6 +346,11 @@ async def main():
     (REPO / 'build/relay').mkdir(parents=True, exist_ok=True)
     (REPO / 'build/relay/url.txt').write_text(relay.url + '\n')
     try:
+        if a.no_mcp:
+            relay.start_browser()
+            log('no MCP (--no-mcp): the IDE alone; Ctrl-C stops it')
+            await stop.wait()
+            return
         mcp = asyncio.ensure_future(relay.mcp())
         await asyncio.wait([mcp, asyncio.ensure_future(stop.wait())], return_when=asyncio.FIRST_COMPLETED)
     finally:

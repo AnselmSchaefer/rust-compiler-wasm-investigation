@@ -1,7 +1,7 @@
 # Agent tool API and local relay (WP-38)
 
 ```
-agent (Claude Code) ⇄ MCP over stdio ⇄ tools/relay/relay.py ⇄ WebSocket ⇄ app/agent.html in Chromium
+agent (Claude Code) ⇄ MCP over stdio ⇄ tools/relay/relay.py ⇄ WebSocket ⇄ app/ide.html in Chromium
                                               │
                                               ├ serves build/www/app and build/release (COOP/COEP)
                                               └ /index/ → index.crates.io (same origin: no CORS problem)
@@ -31,9 +31,9 @@ Results are JSON. Paths are relative to the project. Diagnostics are rustc's JSO
 
 ## Page side
 
-`app/agent.html` / `app/agent.ts` connects to `ws://127.0.0.1:<port>/relay?token=…` and says hello with its tools and RUSTC_ID. It then runs each call with `AgentTools` (`web/agent/tools.ts`) over the orchestrator worker's operations, one call at a time per project and in order. It shows every call with its arguments and a one-line result, the file a tool read or wrote in a read-only editor, and program and test output in the terminal. After a reload or a lost connection it connects again; the relay fails calls that were in flight ("call the tool again").
+The page is the IDE (`app/ide.html` / `app/ide.ts`, WP-40), shared by a person and the agent. Opened as `/ide.html?token=…`, it connects to `ws://127.0.0.1:<port>/relay?token=…` and says hello with its tools and RUSTC_ID. Each call runs with `AgentTools` (`web/agent/tools.ts`) over the orchestrator worker's operations, one call at a time per project and in order. The person's buttons go through the same tool layer and the same queue, so both kinds of calls show in one Activity log (`you` / `agent`). Files the agent changes show in the tree and the editor, its diagnostics in Problems and as editor markers, its test results in Tests. After a reload or a lost connection the page connects again; the relay fails calls that were in flight ("call the tool again"). Without a token (`pnpm ide`, relay `--no-mcp`) it's the IDE alone. WP-38's first page, `app/agent.html` (read-only), was replaced by it.
 
-New orchestrator operations for it: `check` (WP-27a), `listFiles`, `remove`, and `run` with stdin, a timeout and the project's files readable. `fmt` with `check` now compares rustfmt's output with the file and returns a unified diff (`web/project/diff.ts`), because rustfmt's own `--check` prints its diff to the process's stdout, which the compile server shares with its answers. Builds return `diagnostics` (`web/build/diagnostics.ts`); bundles keep a unit's diagnostics so cache hits replay them.
+New orchestrator operations for it: `check` (WP-27a), `listFiles`, `remove`, and `run` with stdin, a timeout and the project's files readable. Builds send progress messages, one per unit as it finishes. `fmt` with `check` compares rustfmt's output with the file and returns a unified diff (`web/project/diff.ts`), because rustfmt's own `--check` prints its diff to the process's stdout, which the compile server shares with its answers. Builds return `diagnostics` (`web/build/diagnostics.ts`, with span ends for the editor). Bundles keep a unit's diagnostics, so cache hits replay them. `dependency_add` without a version takes the newest release from the index, as `cargo add` does.
 
 ## Security
 

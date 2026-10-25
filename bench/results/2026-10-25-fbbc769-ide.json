@@ -1,0 +1,11 @@
+{
+  "timings": {
+    "first run (cold build)": 28744,
+    "test": 2103,
+    "rerun one test": 1977,
+    "clippy": 1432,
+    "format": 203,
+    "check": 7578,
+    "add dependency": 119
+  }
+}

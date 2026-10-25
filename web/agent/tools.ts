@@ -6,7 +6,7 @@
 
 import type { OrchestratorClient } from '../orchestrator/client';
 import type { Ops } from '../orchestrator/protocol';
-import type { BuildResult } from '../build/cargo';
+import type { BuildResult, UnitReport } from '../build/cargo';
 import type { Diagnostic } from '../build/diagnostics';
 import TOOLS from '../../tools/relay/tools.json';
 
@@ -21,6 +21,8 @@ export interface ToolsOptions {
   onOutput?: (title: string, text: string) => void;
   /** Timings of each build a tool did (the page's stats bar). */
   onBuild?: (s: BuildStats) => void;
+  /** Each unit of a build as it finishes (the IDE's progress line, WP-40). */
+  onUnit?: (tool: string, project: string, u: UnitReport) => void;
 }
 
 /** One build's numbers: phases, units by where they came from, the project's own compiles. */
@@ -59,6 +61,10 @@ export class AgentTools {
   }
 
   private dir(project: string) { return `${PROJECTS}/${project}`; }
+
+  private progress(tool: string, project: string) {
+    return this.o.onUnit && ((u: UnitReport) => this.o.onUnit!(tool, project, u));
+  }
 
   private stats(tool: string, project: string, b: BuildResult, extra?: Record<string, number>) {
     if (!this.o.onBuild) return;
@@ -150,7 +156,23 @@ export class AgentTools {
 
   async t_dependency_add(a: { project: string; name: string; version?: string; features?: string[]; dev?: boolean; dir?: string }) {
     await this.need(a.project);
-    return this.edit(a.project, a.dir, [{ op: 'add', name: a.name, version: a.version, features: a.features, kind: a.dev ? 'dev' : undefined }]);
+    if (typeof a.name !== 'string' || !/^[A-Za-z0-9_-]+$/.test(a.name)) throw new ToolError('`name` must be a crate name');
+    // Like `cargo add` without a version: the newest release that isn't yanked.
+    const version = a.version ?? await this.newest(a.name);
+    return this.edit(a.project, a.dir, [{ op: 'add', name: a.name, version, features: a.features, kind: a.dev ? 'dev' : undefined }]);
+  }
+
+  /** The newest non-yanked, non-prerelease version of a crate, from the sparse index. */
+  private async newest(name: string): Promise<string> {
+    const n = name.toLowerCase();
+    const path = n.length <= 2 ? `${n.length}/${n}` : n.length === 3 ? `3/${n[0]}/${n}` : `${n.slice(0, 2)}/${n.slice(2, 4)}/${n}`;
+    const res = await fetch(new URL(path, this.o.index)).catch(() => null);
+    if (!res?.ok) throw new ToolError(res?.status === 404 ? `no crate \`${name}\` on crates.io` : `the crates.io index didn't answer for \`${name}\``);
+    const key = (v: string) => v.split('+')[0].split('.').map(Number);
+    const releases = (await res.text()).split('\n').filter(Boolean).map(l => JSON.parse(l) as { vers: string; yanked: boolean })
+      .filter(e => !e.yanked && !/-/.test(e.vers.split('+')[0])).map(e => e.vers);
+    if (!releases.length) throw new ToolError(`\`${name}\` has no release that isn't yanked or a prerelease; give a version`);
+    return releases.sort((x, y) => { const [a, b] = [key(x), key(y)]; return a[0] - b[0] || a[1] - b[1] || a[2] - b[2]; }).at(-1)!.split('+')[0];
   }
 
   async t_dependency_remove(a: { project: string; name: string; dev?: boolean; dir?: string }) {
@@ -174,14 +196,14 @@ export class AgentTools {
 
   async t_cargo_check(a: { project: string }) {
     await this.need(a.project);
-    const r = await this.orch.call('check', this.buildArgs(a.project));
+    const r = await this.orch.call('check', this.buildArgs(a.project), this.progress('cargo_check', a.project));
     this.stats('cargo_check', a.project, r);
     return { ok: r.ok, ...this.diagnostics(a.project, r.diagnostics, r.ok ? '' : r.errors), ms: r.ms.total };
   }
 
   async t_cargo_build(a: { project: string }) {
     await this.need(a.project);
-    const r = await this.orch.call('build', this.buildArgs(a.project));
+    const r = await this.orch.call('build', this.buildArgs(a.project), this.progress('cargo_build', a.project));
     this.stats('cargo_build', a.project, r);
     return {
       ok: r.ok, ...this.diagnostics(a.project, r.diagnostics, r.ok ? '' : r.errors), bins: Object.keys(r.bins),
@@ -191,7 +213,7 @@ export class AgentTools {
 
   async t_cargo_run(a: { project: string; bin?: string; args?: string[]; stdin?: string; timeout_ms?: number }) {
     await this.need(a.project);
-    const b = await this.orch.call('build', this.buildArgs(a.project));
+    const b = await this.orch.call('build', this.buildArgs(a.project), this.progress('cargo_run', a.project));
     const diags = this.diagnostics(a.project, b.diagnostics, b.ok ? '' : b.errors);
     if (!b.ok) { this.stats('cargo_run', a.project, b); return { ok: false, stage: 'build', ...diags }; }
     const names = Object.keys(b.bins);
@@ -210,7 +232,7 @@ export class AgentTools {
 
   async t_cargo_test(a: { project: string; filter?: string; exact?: boolean; include_ignored?: boolean }) {
     await this.need(a.project);
-    const r = await this.orch.call('test', { ...this.buildArgs(a.project), filter: a.filter, exact: a.exact, includeIgnored: a.include_ignored });
+    const r = await this.orch.call('test', { ...this.buildArgs(a.project), filter: a.filter, exact: a.exact, includeIgnored: a.include_ignored }, this.progress('cargo_test', a.project));
     this.stats('cargo_test', a.project, r.build, { tests: r.ms.run });
     if (!r.build.ok) return { ok: false, stage: 'build', ...this.diagnostics(a.project, r.build.diagnostics, r.build.errors) };
     const tests = r.tests.map(t => ({
@@ -225,7 +247,7 @@ export class AgentTools {
 
   async t_cargo_clippy(a: { project: string }) {
     await this.need(a.project);
-    const r = await this.orch.call('clippy', this.buildArgs(a.project));
+    const r = await this.orch.call('clippy', this.buildArgs(a.project), this.progress('cargo_clippy', a.project));
     this.stats('cargo_clippy', a.project, r.build, { clippy: r.ms.clippy });
     return { ok: r.ok, ...this.diagnostics(a.project, r.ok || r.build.ok ? r.diagnostics : r.build.diagnostics, r.build.ok ? '' : r.build.errors), ms: r.ms };
   }
@@ -263,7 +285,7 @@ export class AgentTools {
     const strip = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
     const list = ds.map(d => ({
       level: d.level, code: d.code, message: d.message,
-      ...(d.file && { file: this.rel(project, d.file), line: d.line, column: d.column }),
+      ...(d.file && { file: this.rel(project, d.file), line: d.line, column: d.column, end_line: d.endLine, end_column: d.endColumn }),
       rendered: this.rel(project, strip(d.rendered)),
     }));
     const n = (l: string) => list.filter(d => d.level === l).length;

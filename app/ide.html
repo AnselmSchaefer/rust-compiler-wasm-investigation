@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rust in the browser</title>
+<link rel="stylesheet" href="ide.css">
+<body>
+  <header>
+    <span class="title">Rust in the browser</span>
+    <select id="project" title="Project"></select>
+    <span class="group">
+      <button id="new" title="New project (cargo new)">New</button>
+      <button id="sample" title="Create the guided sample project">Sample</button>
+      <button id="import" title="Import a project: a .zip file, or owner/repo from GitHub">Import</button>
+      <button id="export" title="Download the project as a .zip">Export</button>
+      <button id="delete" title="Delete the project">Delete</button>
+    </span>
+    <span class="group">
+      <button id="check" title="cargo check (Ctrl+S)">Check</button>
+      <button id="build" title="cargo build">Build</button>
+      <button id="run" class="primary" title="cargo run, with the terminal as stdin (Ctrl+Enter)">Run</button>
+      <button id="stop" title="Stop the program" disabled>Stop</button>
+      <button id="test" title="cargo test">Test</button>
+      <button id="clippy" title="cargo clippy">Clippy</button>
+      <button id="fmt" title="cargo fmt">Format</button>
+      <button id="dep" title="Add a dependency from crates.io (cargo add)">+ Dependency</button>
+    </span>
+    <span id="relay" class="badge" hidden>agent: connecting…</span>
+    <span id="status">Loading the toolchain…</span>
+  </header>
+  <div id="statsbar">
+    <span id="progress" class="stats"></span>
+    <span id="stats" class="stats" title="The last build, check, test, run or Clippy pass">no builds yet</span>
+    <span id="totals" class="stats"></span>
+  </div>
+  <main class="ide">
+    <nav id="side">
+      <div class="side-head"><span>Files</span><span><button id="newfile" class="small" title="New file">+</button></span></div>
+      <div id="tree"></div>
+    </nav>
+    <section class="center">
+      <div id="file-title" class="pane-title">No file open</div>
+      <section id="editor"></section>
+    </section>
+    <section class="panel">
+      <div class="tabs" role="tablist">
+        <button data-tab="terminal" class="on">Terminal</button>
+        <button data-tab="tests">Tests <span id="tests-count"></span></button>
+        <button data-tab="problems">Problems <span id="problems-count"></span></button>
+        <button data-tab="activity">Activity</button>
+      </div>
+      <section id="terminal" class="tab on"></section>
+      <section id="tests" class="tab list"><div class="empty">Run the tests (Test).</div></section>
+      <section id="problems" class="tab list"><div class="empty">No problems yet. Check, Build or Clippy fill this.</div></section>
+      <section id="activity" class="tab list"></section>
+    </section>
+  </main>
+  <input id="zipfile" type="file" accept=".zip" hidden>
+  <script type="module" src="ide.js"></script>
+</body>
+</html>

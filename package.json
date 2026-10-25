@@ -8,7 +8,8 @@
     "test:e2e": "playwright test",
     "bench": "node bench/run.ts",
     "build:app": "bash scripts/build-vfs.sh && node scripts/build-app.mjs",
-    "demo": "pnpm build:app && node scripts/serve.mjs build/www/app /release=build/release"
+    "demo": "pnpm build:app && node scripts/serve.mjs build/www/app /release=build/release",
+    "ide": "pnpm build:app && python3 tools/relay/relay.py --no-mcp --browser headed"
   },
   "devDependencies": {
     "@bjorn3/browser_wasi_shim": "0.4.2",

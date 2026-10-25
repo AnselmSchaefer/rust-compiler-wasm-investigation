@@ -21,7 +21,8 @@ const resolvers = new Map<string, Promise<WebAssembly.Module>>();
 const BUILD_CACHE = 'build-cache';
 const need = () => { if (!orch) throw new Error('orchestrator: init first'); return orch; };
 
-const handlers: { [O in keyof Ops]: (a: Ops[O]['args']) => Promise<Ops[O]['result']> | Ops[O]['result'] } = {
+/** `id`: the request's, for progress messages (builds report each unit as it finishes, WP-40). */
+const handlers: { [O in keyof Ops]: (a: Ops[O]['args'], id: number) => Promise<Ops[O]['result']> | Ops[O]['result'] } = {
   async init(a) {
     const t0 = performance.now();
     orch = await Orchestrator.create(a);
@@ -41,17 +42,17 @@ const handlers: { [O in keyof Ops]: (a: Ops[O]['args']) => Promise<Ops[O]['resul
   listFiles: a => packageTree(need().vfs, a.dir),
   remove: a => { const vfs = need().vfs; if (vfs.exists(a.path)) vfs.removeAll(a.path); },
   rustc: a => need().rustcJob(a.args, a.env),
-  async build(a) {
-    return cargoBuild(host(), await buildOptions(a));
+  async build(a, id) {
+    return cargoBuild(host(), await buildOptions(a, id));
   },
-  async check(a) {
-    return cargoBuild(host(), { ...await buildOptions(a), check: true });
+  async check(a, id) {
+    return cargoBuild(host(), { ...await buildOptions(a, id), check: true });
   },
-  async test(a) {
-    return cargoTest(host(), { ...await buildOptions(a), filter: a.filter, exact: a.exact, includeIgnored: a.includeIgnored });
+  async test(a, id) {
+    return cargoTest(host(), { ...await buildOptions(a, id), filter: a.filter, exact: a.exact, includeIgnored: a.includeIgnored });
   },
-  async clippy(a) {
-    return cargoClippy(host(), await buildOptions(a));
+  async clippy(a, id) {
+    return cargoClippy(host(), await buildOptions(a, id));
   },
   async fmt(a) {
     const vfs = need().vfs, src = vfs.readText(a.path), dir = a.path.slice(0, a.path.lastIndexOf('/')) || '/';
@@ -93,11 +94,12 @@ const handlers: { [O in keyof Ops]: (a: Ops[O]['args']) => Promise<Ops[O]['resul
 
 const host = () => browserHost(need(), { workerUrl: sandboxUrl!, vfsUrl: vfsUrl! });
 
-async function buildOptions(a: Ops['build']['args']): Promise<BuildOptions> {
+async function buildOptions(a: Ops['build']['args'], id: number): Promise<BuildOptions> {
   const units = new UnitCache(a.cache?.l1 === false ? null : await FileCache.open(BUILD_CACHE), a.cache?.l2 ?? null);
   return {
     project: a.project, resolver: await resolverFor(a.resolverUrl), index: a.index, dl: a.dl, features: a.features,
     defaultFeatures: a.defaultFeatures, profile: a.profile, units, targetDir: a.targetDir,
+    onUnit: u => postMessage({ id, progress: u } satisfies Response),
   };
 }
 
@@ -111,7 +113,7 @@ async function resolverFor(url: string): Promise<Resolver> {
 onmessage = async (e: MessageEvent<Request>) => {
   const { id, op, args } = e.data;
   try {
-    const result = await (handlers[op] as (a: unknown) => unknown)(args);
+    const result = await (handlers[op] as (a: unknown, id: number) => unknown)(args, id);
     postMessage({ id, ok: true, result } satisfies Response);
   } catch (err) {
     postMessage({ id, ok: false, error: String((err as Error)?.stack ?? err) } satisfies Response);
