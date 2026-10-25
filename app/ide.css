@@ -54,3 +54,11 @@ main.ide { flex: 1; display: grid; grid-template-columns: minmax(170px, 1fr) 4fr
 #activity .row .name { font-weight: 600; }
 #activity .row.err .res { color: #f48771; }
 #activity .row .res { color: var(--muted); white-space: pre-wrap; word-break: break-word; }
+
+/* Busy (WP-40): a moving bar under the toolbar, a spinner on the button that started the work. */
+#busybar { height: 3px; background: linear-gradient(90deg, transparent 0%, var(--accent) 30%, transparent 60%) 0 0 / 50% 100% repeat-x; animation: busy 1.1s linear infinite; }
+@keyframes busy { from { background-position: -50% 0; } to { background-position: 150% 0; } }
+button.busy { border-color: var(--accent); opacity: 1 !important; }
+button.busy::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+#progress:empty { display: none; }

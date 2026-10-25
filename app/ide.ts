@@ -75,24 +75,75 @@ const tools = new AgentTools(orch, {
     term.write(`\x1b[2m${title}\x1b[0m\r\n${text.replace(/\n/g, '\r\n')}`);
   },
   onBuild: showStats,
-  onUnit(tool, p, u) {
-    progress.units++;
-    if (!u.cached) progress.built++;
-    $('progress').textContent = `${tool.replace('cargo_', '')} ${p}: ${progress.units} units (${progress.built} built) · ${u.name} ${u.kind}${u.cached ? ` (${u.cached})` : ` ${fmtMs(u.end - u.start)}`}`;
+  onUnit(_tool, _p, u) {
+    work.done++;
+    if (!u.cached) work.built++;
+    work.running.delete(`${u.name} ${u.kind}`);
+    work.phase = 'compile';
+    showWork();
+  },
+  onEvent(_tool, _p, e) {
+    if (e.phase === 'start') work.running.add(`${e.name} ${e.kind}`);
+    else if (e.phase === 'build') { work.planned = e.units; work.phase = 'compile'; }
+    else work.phase = e.phase;
+    if (e.phase === 'resolve') work.detail = `round ${e.round}, ${e.files} index file(s)`;
+    if (e.phase === 'download') work.detail = `${e.done}/${e.total} ${e.cached ? 'from the cache' : 'downloaded'}, last ${e.name}`;
+    if (e.phase === 'test') work.detail = `${e.done}/${e.total}, last ${e.name}`;
+    showWork();
   },
 });
-const progress = { units: 0, built: 0 };
+
+// --- "it's working": the bar, the spinner on the button that started it, and the phase line
+const BUTTONS: Record<string, string> = { cargo_check: 'check', cargo_build: 'build', cargo_run: 'run', cargo_test: 'test', cargo_clippy: 'clippy', cargo_fmt: 'fmt', dependency_add: 'dep' };
+const ACTIONS = ['new', 'sample', 'import', 'export', 'delete', 'check', 'build', 'run', 'test', 'clippy', 'fmt', 'dep', 'newfile'];
+const work = { who: '', tool: '', t0: 0, phase: '', detail: '', planned: 0, done: 0, built: 0, running: new Set<string>(), active: 0, button: '' };
+let ticker: ReturnType<typeof setInterval> | undefined;
+
+function startWork(who: string, tool: string, button?: string) {
+  Object.assign(work, { who, tool, t0: performance.now(), phase: '', detail: '', planned: 0, done: 0, built: 0, button: button ?? BUTTONS[tool] ?? '' });
+  work.running.clear();
+  work.active++;
+  // Quick calls (a file write) shouldn't flicker: the bar shows after 150 ms.
+  setTimeout(() => { if (work.active) $('busybar').hidden = false; }, 150);
+  for (const id of ACTIONS) $<HTMLButtonElement>(id).disabled = true;
+  if (work.button) $(work.button).classList.add('busy');
+  clearInterval(ticker);
+  ticker = setInterval(showWork, 250);
+  showWork();
+}
+
+function endWork() {
+  if (--work.active > 0) return;
+  work.active = 0;
+  clearInterval(ticker);
+  $('busybar').hidden = true;
+  for (const id of ACTIONS) $<HTMLButtonElement>(id).disabled = false;
+  for (const b of document.querySelectorAll('button.busy')) b.classList.remove('busy');
+  $('progress').textContent = '';
+}
+
+function showWork() {
+  if (!work.active) return;
+  const s = ((performance.now() - work.t0) / 1000).toFixed(1);
+  const what = work.phase === 'resolve' ? `resolving dependencies (${work.detail})`
+    : work.phase === 'download' ? `fetching crates (${work.detail})`
+    : work.phase === 'plan' ? 'planning the build'
+    : work.phase === 'compile' ? `compiling: ${work.done}/${work.planned || '?'} units ready (${work.built} built)${work.running.size ? `, now ${[...work.running].slice(0, 3).join(', ')}${work.running.size > 3 ? ` +${work.running.size - 3}` : ''}` : ''}`
+    : work.phase === 'test' ? `running tests (${work.detail})`
+    : 'working';
+  $('progress').textContent = `${work.who === 'agent' ? 'agent · ' : ''}${work.tool.replace('cargo_', '')} ${s} s · ${what}`;
+}
 
 /**
  * Runs tool `name` for `who` (the person or the agent), logged in Activity, and updates the panels
  * from its result. The tool layer queues it behind other calls on the same project.
  */
-async function call(who: 'you' | 'agent', name: string, args: Record<string, any>): Promise<any> {
+async function call(who: 'you' | 'agent', name: string, args: Record<string, any>, button?: string): Promise<any> {
   calls++;
   totals.calls++;
   showTotals();
   const row = logCall(who, name, args);
-  progress.units = progress.built = 0;
+  startWork(who, name, button);
   const t0 = performance.now();
   status(`${who === 'agent' ? 'Agent: ' : ''}${name}…`);
   try {
@@ -105,18 +156,18 @@ async function call(who: 'you' | 'agent', name: string, args: Record<string, any
     row(false, msg, performance.now() - t0);
     throw e instanceof ToolError ? e : new ToolError(msg);
   } finally {
-    $('progress').textContent = '';
+    endWork();
     status(`Idle · ${calls} call(s)`);
     void refreshTree();
   }
 }
 
-/** The person's buttons: a tool on the current project, errors shown, not thrown. */
-async function act(name: string, args: Record<string, any> = {}) {
+/** The person's buttons: a tool on the current project, errors shown, not thrown. `button`: the one to spin. */
+async function act(name: string, args: Record<string, any> = {}, button?: string) {
   await ready;
   if (!project && name !== 'project_create') { status('No project: New or Sample first'); return; }
   await flushSave();
-  try { return await call('you', name, { project, ...args }); } catch { /* in Activity */ return undefined; }
+  try { return await call('you', name, { project, ...args }, button); } catch { /* in Activity */ return undefined; }
 }
 
 function afterResult(name: string, args: Record<string, any>, r: any) {
@@ -395,7 +446,7 @@ function showTotals() {
 
 async function run() {
   if (program) return;
-  const r = await act('cargo_build');
+  const r = await act('cargo_build', {}, 'run');
   if (!r) return;
   if (!r.ok) { tab('problems'); return; }
   const bin = r.bins.length === 1 ? r.bins[0] : r.bins.includes(project) ? project : r.bins[0];

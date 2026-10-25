@@ -80,6 +80,7 @@ export async function cargoTest(host: BuildHost, opts: TestOptions): Promise<Tes
       }
       const chosen = found.filter(t => !opts.filter || (opts.exact ? t.name === opts.filter : t.name.includes(opts.filter)));
       filteredOut += found.length - chosen.length;
+      let finished = 0;
       const results = await pool(chosen, host.workers, async (t): Promise<TestResult> => {
         const base = { suite: exe.name, package: exe.package, name: t.name };
         if (t.ignore && !opts.includeIgnored) {
@@ -87,6 +88,7 @@ export async function cargoTest(host: BuildHost, opts: TestOptions): Promise<Tes
         }
         const args = [program, t.name, '--exact', '--nocapture', ...JSON_ARGS, '--report-time', ...(t.ignore ? ['--include-ignored'] : [])];
         const r = await run({ program, args, env, pkgDir: exe.cwd, timeoutMs: opts.timeoutMs ?? 60_000 });
+        opts.onEvent?.({ phase: 'test', done: ++finished, total: chosen.length, name: t.name });
         const ev = events(r.stdout);
         const done = ev.find(e => e.type === 'test' && e.name === t.name && e.event !== 'started') as { event: string; exec_time?: number } | undefined;
         const stdout = r.stdout.split('\n').filter(l => !isEvent(l)).join('\n').replace(/\n+$/, r.stdout.endsWith('\n') ? '\n' : '');

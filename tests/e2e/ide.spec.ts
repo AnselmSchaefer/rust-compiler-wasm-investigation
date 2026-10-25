@@ -60,7 +60,17 @@ test('the IDE, by hand: sample project from build to clean Clippy and fmt', asyn
   // program reads the terminal.
   await time('first run (cold build)', async () => {
     await page.click('#run');
+    // Visible at once that it's working: the bar, a spinning Run, disabled buttons, the phase.
+    await expect(page.locator('#busybar')).toBeVisible();
+    await expect(page.locator('#run')).toHaveClass(/busy/);
+    await expect(page.locator('#test')).toBeDisabled();
+    await expect(page.locator('#progress')).toContainText(/resolving|fetching|planning|compiling/);
+    await expect(page.locator('#progress')).toContainText('compiling', { timeout: 120_000 });
+    mkdirSync('build/wp-40', { recursive: true });
+    await page.screenshot({ path: 'build/wp-40/busy.png' });
     await expect(page.locator('#terminal')).toContainText('Points, one per line', { timeout: 300_000 });
+    await expect(page.locator('#busybar')).toBeHidden();
+    await expect(page.locator('#test')).toBeEnabled();
   });
   await expect(page.locator('#terminal')).toContainText('built by build.rs');
   await page.click('#terminal');

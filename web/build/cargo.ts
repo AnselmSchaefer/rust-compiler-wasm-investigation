@@ -19,7 +19,7 @@
 // Paths: the project at `project` (a package or a workspace, WP-25), crates under
 // /deps/<name>-<version>/, outputs under /target/ (shared by all projects) in cargo's layout.
 
-import { fetchDependencies, type DepsOptions, type DepsResult } from '../deps/deps';
+import { type DepsProgress, fetchDependencies, type DepsOptions, type DepsResult } from '../deps/deps';
 import type { Plan, PlanInput, PlanUnit, Resolver } from '../deps/resolver';
 import { Kind, type Vfs } from '../vfs/vfs';
 import { type Bundle, type CacheLevel, makeBundle, sha256, sourceId, type UnitCache, unitKey } from './cache';
@@ -79,7 +79,16 @@ export interface BuildOptions {
   /** Build scripts that don't run (overrides.ts); default: the built-in list. */
   overrides?: Override[];
   onUnit?: (u: UnitReport) => void;
+  /** What the build is doing now (WP-40: the IDE's progress line): its phases, units starting. */
+  onEvent?: (e: BuildEvent) => void;
 }
+
+export type BuildEvent =
+  | DepsProgress
+  | { phase: 'plan' }
+  | { phase: 'build'; units: number }
+  | { phase: 'start'; name: string; kind: PlanUnit['kind'] }
+  | { phase: 'test'; done: number; total: number; name: string };
 
 export interface UnitReport {
   id: number; name: string; version: string; kind: PlanUnit['kind'];
@@ -132,15 +141,17 @@ export async function cargoBuild(host: BuildHost, opts: BuildOptions): Promise<B
   const vfs = host.vfs;
   // The whole project goes to the resolver, which finds the workspace's members (WP-25).
   const project = { root: opts.project, manifests: projectManifests(vfs, opts.project) };
-  const deps = await fetchDependencies(project, vfs, { resolver: opts.resolver, index: opts.index, dl: opts.dl, cache: opts.cache, dir: '/deps' });
+  const deps = await fetchDependencies(project, vfs, { resolver: opts.resolver, index: opts.index, dl: opts.dl, cache: opts.cache, dir: '/deps', onProgress: opts.onEvent });
   // Like cargo, keep the project's Cargo.lock current (before the planner lists the files).
   const lockPath = `${opts.project}/Cargo.lock`;
   if (!vfs.exists(lockPath) || vfs.readText(lockPath) !== deps.lock) vfs.writeFile(lockPath, deps.lock);
   const t1 = performance.now();
+  opts.onEvent?.({ phase: 'plan' });
   const std = await hostStd(host, opts);
   const input = planInput(vfs, opts, deps, host, std.path);
   const plan = opts.resolver.plan(input);
   const t2 = performance.now();
+  opts.onEvent?.({ phase: 'build', units: plan.units.length });
 
   let fresh = inPlace.get(vfs);
   if (!fresh) inPlace.set(vfs, fresh = new Map());
@@ -204,6 +215,7 @@ export async function cargoBuild(host: BuildHost, opts: BuildOptions): Promise<B
         // whole closure in place; a hit above didn't put its own dependencies there.
         await Promise.all([...closure(u)].map(d => unit(plan.units[d])));
         start = performance.now() - t0;
+        opts.onEvent?.({ phase: 'start', name: u.name, kind: u.kind });
         if (plan.units.some(x => x.host && x.kind !== 'run-custom-build')) await std.ready();
         const o = overridden(u);
         const r = o ? await overrideBuildScript(host, u, o, outputs)

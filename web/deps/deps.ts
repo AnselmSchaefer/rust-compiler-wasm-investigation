@@ -20,7 +20,14 @@ export interface DepsOptions {
   /** Parallel requests (default 16); kept modest, per crates.io's crawler policy. */
   concurrency?: number;
   cache?: ByteStore;
+  /** What's happening (WP-40: the IDE's progress line). */
+  onProgress?: (p: DepsProgress) => void;
 }
+
+/** Resolving: a round asks for index files. Downloading: a crate is in place (from the cache or the network). */
+export type DepsProgress =
+  | { phase: 'resolve'; round: number; files: number }
+  | { phase: 'download'; done: number; total: number; name: string; cached: boolean };
 
 export interface DepsResult {
   lock: string;
@@ -50,6 +57,7 @@ export async function resolveManifest(manifest: string | WorkspaceInput, opts: D
     const r = resolver.resolve(manifest);
     if ('error' in r) throw new Error(r.error);
     if ('lock' in r) return { lock: r.lock, packages: r.packages, workspace: r.workspace, manifests: r.manifests, rounds, index: index.stats, ms: Math.round(performance.now() - t0) };
+    opts.onProgress?.({ phase: 'resolve', round: rounds, files: r.need.length });
     await inParallel(r.need, opts.concurrency ?? 16, async name => resolver.addIndex(name, await index.file(name)));
   }
 }
@@ -60,12 +68,14 @@ export async function fetchDependencies(manifest: string | WorkspaceInput, vfs: 
   const t0 = performance.now();
   const dir = opts.dir ?? '/deps';
   const crates: CrateStats[] = [];
-  await inParallel(r.packages.filter(p => p.source === 'registry'), opts.concurrency ?? 16, async p => {
+  const registry = r.packages.filter(p => p.source === 'registry');
+  await inParallel(registry, opts.concurrency ?? 16, async p => {
     const t = performance.now();
     if (!p.checksum) throw new Error(`${p.name} ${p.version}: no checksum in the index`);
     const { data, fromCache } = await fetchCrate(p.name, p.version, p.checksum, cache, opts.dl ?? CRATES_IO_DL);
     const files = await unpackCrate(data, vfs, dir, p.name, p.version);
     crates.push({ name: p.name, version: p.version, bytes: data.length, fromCache, files, ms: Math.round(performance.now() - t) });
+    opts.onProgress?.({ phase: 'download', done: crates.length, total: registry.length, name: p.name, cached: fromCache });
   });
   return { ...r, ms: { resolve: r.ms, download: Math.round(performance.now() - t0) }, crates };
 }

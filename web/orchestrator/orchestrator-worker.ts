@@ -100,6 +100,7 @@ async function buildOptions(a: Ops['build']['args'], id: number): Promise<BuildO
     project: a.project, resolver: await resolverFor(a.resolverUrl), index: a.index, dl: a.dl, features: a.features,
     defaultFeatures: a.defaultFeatures, profile: a.profile, units, targetDir: a.targetDir,
     onUnit: u => postMessage({ id, progress: u } satisfies Response),
+    onEvent: e => postMessage({ id, event: e } satisfies Response),
   };
 }
 

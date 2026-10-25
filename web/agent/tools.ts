@@ -6,7 +6,7 @@
 
 import type { OrchestratorClient } from '../orchestrator/client';
 import type { Ops } from '../orchestrator/protocol';
-import type { BuildResult, UnitReport } from '../build/cargo';
+import type { BuildEvent, BuildResult, UnitReport } from '../build/cargo';
 import type { Diagnostic } from '../build/diagnostics';
 import TOOLS from '../../tools/relay/tools.json';
 
@@ -21,8 +21,9 @@ export interface ToolsOptions {
   onOutput?: (title: string, text: string) => void;
   /** Timings of each build a tool did (the page's stats bar). */
   onBuild?: (s: BuildStats) => void;
-  /** Each unit of a build as it finishes (the IDE's progress line, WP-40). */
+  /** Each unit of a build as it finishes, and what the build does now (the IDE's progress line, WP-40). */
   onUnit?: (tool: string, project: string, u: UnitReport) => void;
+  onEvent?: (tool: string, project: string, e: BuildEvent) => void;
 }
 
 /** One build's numbers: phases, units by where they came from, the project's own compiles. */
@@ -63,7 +64,10 @@ export class AgentTools {
   private dir(project: string) { return `${PROJECTS}/${project}`; }
 
   private progress(tool: string, project: string) {
-    return this.o.onUnit && ((u: UnitReport) => this.o.onUnit!(tool, project, u));
+    return (p: { unit?: UnitReport; event?: BuildEvent }) => {
+      if (p.unit) this.o.onUnit?.(tool, project, p.unit);
+      if (p.event) this.o.onEvent?.(tool, project, p.event);
+    };
   }
 
   private stats(tool: string, project: string, b: BuildResult, extra?: Record<string, number>) {

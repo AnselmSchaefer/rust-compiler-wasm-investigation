@@ -1,7 +1,7 @@
 // Messages between a page (client.ts) and the orchestrator worker (orchestrator-worker.ts).
 import type { RustcResult } from './orchestrator';
 import type { LoadStats } from './toolchain';
-import type { BuildResult, UnitReport } from '../build/cargo';
+import type { BuildEvent, BuildResult, UnitReport } from '../build/cargo';
 import type { ClippyRun, TestRun } from '../build/test';
 import type { ManifestEdit, PlanInput } from '../deps/resolver';
 import type { EditResult } from '../project/projects';
@@ -76,4 +76,5 @@ export type Request<O extends Op = Op> = { id: number; op: O; args: Ops[O]['args
 export type Response =
   | { id: number; ok: true; result: unknown }
   | { id: number; ok: false; error: string }
-  | { id: number; progress: UnitReport };
+  | { id: number; progress: UnitReport }
+  | { id: number; event: BuildEvent };
