@@ -394,6 +394,7 @@ These are taken as defaults so work can start. Changing one later only affects t
   - Robustness: one request at a time per project, cancellation, reconnect after a page reload. Keep the page in its own window (Chromium throttles background tabs).
   - Guardrails: per-call time and memory limits; user programs run only in the sandbox (WP-13), without network.
 - **Done when:** Claude Code, connected to the relay's MCP server and through it alone, creates a project with a `serde` dependency, fixes a seeded compile error from the diagnostics, makes a failing test pass, and passes Clippy and rustfmt. Run once headed and once headless.
+  - *2026-10-25 (done, session 22): **M2 reached.** Claude Code (`claude -p`, no built-in tools, only the relay's MCP server) did `tests/relay/agent-task.md` headless (50 s, 14 turns) and headed (47 s, 14 turns); `tests/relay/check-agent.py` confirms serde derive, check, tests 2/2, Clippy 0 warnings, fmt clean, run output. Relay `tools/relay/relay.py` (Python stdlib), 15 tools (`tools/relay/tools.json`), IDE page `app/agent.html`. See `docs/relay.md`, `docs/relay-manual-guide.md`.*
 
 #### WP-40 Hands-on demo (after M2)
 *Added 2026-10-25 at the user's request: a demo a human can use by hand that shows everything v1 can do. Until now the app (`pnpm demo`) is WP-14's single-file Check/Run; the rest is reachable only through the orchestrator's operations, i.e. tests and the agent. Editor intelligence (rust-analyzer, WP-23/24) stays in the Appendix.*

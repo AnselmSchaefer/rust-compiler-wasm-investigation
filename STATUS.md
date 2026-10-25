@@ -3,11 +3,16 @@
 *Update at the end of every session (see PLAN.md §0).*
 
 ## Current
-- **Active WP:** **WP-38** in progress (session 22): relay, tools and page done; scripted MCP scenario passes headless and headed. Left: the real Claude Code run **[H]** (uses the user's plan). Then WP-40 (hands-on demo).
+- **Active WP:** WP-38 **done** (session 22): **M2 reached** (v1 for agentic development). Next: **WP-40** (hands-on demo).
 - **Last session:** 2026-10-25 (session 22). WP-21 done: build scripts with autocfg, rustc probes, libc, proc-macro2, anyhow and `links` metadata build in the browser and print what they print natively. Release **1.99.1-7520bf319596**.
 - **Rule for rustc source:** rust-lang's agent policy (`build/rust/AGENTS.md`) applies. Claude does not write or edit rustc source, and does not draft rust-lang issues, PRs or Zulip posts. The user writes those, or applies existing **human-written** patches (bjorn3/oligamiq), which the user prefers whenever one exists. **danlapid 0005–0007 are LLM-generated** (Claude co-author trailers), so they don't qualify even if the user applies them; design reference only (`docs/patches.md`). Claude reviews, builds and explains. Everything outside `build/rust` is Claude's, including out-of-tree drivers using `rustc_driver` (`toolchain/rustc-multi`).
-- **Next step:** with the user's go-ahead, `WP38_AGENT=1 bash scripts/verify/wp-38.sh` (or `tests/relay/agent-run.sh headed` then `headless`): Claude Code with only the relay's MCP tools does `tests/relay/agent-task.md`, checked by `tests/relay/check-agent.py`. Then mark WP-38 done (M2) and start WP-40.
+- **Next step:** WP-40: the hands-on demo in `app/`: project/file tree with import/export, build/run with crates and per-unit progress, a test panel (per-test results, rerun one), Clippy/Format buttons with diagnostics as editor markers, a guided sample project; started by the relay; e2e test through the UI, then the user's sign-off **[H]**. The agent page (`app/agent.html`: tree, stats row) is a starting point. Open follow-ups: doc tests, Wasm proc macros in prebuild/L2, top-500 matrix, browser window only on the first tool call (optional).
 - **Running background jobs:** none
+
+## Current session (2026-10-25, session 22, cont. 5): WP-38 done, M2
+- **Claude Code runs** (`tests/relay/agent-run.sh`, `claude -p --tools "" --strict-mcp-config`, only the relay): headless 50 s / 14 turns, headed 47 s / 14 turns. Both fixed E0308 from the diagnostics, reasoned that the test (24) was wrong (3²+4² = 25), removed needless_return, formatted; `check-agent.py` confirms all 6 items both times.
+- Found in the runs and fixed: a failed unit's diagnostics came back from every unit waiting on it (the agent noticed the duplicate); OPFS is per origin, so the checker must use the run's port (the relay warns on a port fallback); `--profile` so test runs can run next to an open session.
+- The user tried it by hand: fixes for that (`docs/relay-manual-guide.md`): relay started by hand blocked the port → free-port fallback; Claude Code's probe start → Chromium only after `initialize`; an orphaned browser kept the profile and a stale token (403) → the browser follows the relay (stdin pipe, signal handlers). Agent page: file tree, build-stats row, call times (user request).
 
 ## Current session (2026-10-25, session 22, cont. 4): WP-38 in progress
 - **Relay** `tools/relay/relay.py` (Python stdlib): MCP on stdio (initialize, tools/list, tools/call, ping), HTTP on 127.0.0.1 serving build/www/app + build/release (.br) with COOP/COEP, `/index/` proxied to index.crates.io, WebSocket `/relay` (token + Origin checked, newest page wins, in-flight calls fail on disconnect), Chromium via `tools/relay/browser.mjs` (Playwright, persistent profile build/relay/profile, headed/headless, background throttling off).
@@ -179,7 +184,7 @@
 - [ ] **Possible upstream rustc bug** (user to report, if wanted): `filesearch.rs` `from_env_args_next` checks `lib/rustlib` relative to the *working directory*, not next to argv[0] (see `~/Projects/rustc-wasm-host-source-changes.md` §6).
 
 ## Human actions needed
-- [ ] **[H] WP-38 Claude Code run:** `tests/relay/agent-run.sh headed` and `headless` run `claude -p` (the user's plan) with only the relay's tools; or connect your own Claude Code session to the relay (`docs/relay.md`).
+- [x] **[H] WP-38 Claude Code run:** done 2026-10-25 with the user's go-ahead (headless and headed). `tests/relay/agent-run.sh headed` and `headless` run `claude -p` (the user's plan) with only the relay's tools; or connect your own Claude Code session to the relay (`docs/relay.md`).
 - [x] **WP-27b (2026-10-25):** deferred by the user (optional). If it's picked up again: incremental compilation can't start on a WASI host (`rustc_data_structures::flock` has no lock for WASI, `rustc_incremental`'s `lock_directory` makes that fatal); the rustc change is the user's to write, see `docs/incremental.md`.
 - [x] **[H] WP-20 rustc changes** (2026-10-25): applied by the user (bjorn3 #160981 + tuple wasip1; change 2 written by the user); rustc.wasm rebuilt and the lookup/registration path verified. Open, optional: the `": "` separator in change 2's error message.
 - [x] **Scope (2026-10-24):** v1 targets agentic development; human-only browser-IDE WPs moved to the PLAN.md Appendix.
@@ -227,8 +232,8 @@
 | 27a | Warm latency budgets | done | 1 | `scripts/verify/wp-27.sh`; check 241–288 ms, edit → run 1.1–1.3 s (debuginfo 0 default); `bench/warm.md` |
 | 27b | Incremental compilation in OPFS (optional) | deferred | 0 | user, 2026-10-25: budgets met without it; needs a rustc change for file locks on WASI (`docs/incremental.md`) |
 | 28 | First-visit performance | deferred | 0 | Appendix (human-only) |
-| 38 | Agent tool API + local relay (M2) | in-progress | 1 | relay + tools + page done; scripted MCP scenario passes headless/headed; Claude Code run waits for **[H]** |
-| 40 | Hands-on demo | blocked | 0 | new 2026-10-25 (user): after WP-38; all v1 features in the app UI |
+| 38 | Agent tool API + local relay (M2) | done | 1 | **M2**: Claude Code through the relay alone, headless 50 s and headed 47 s, checked by `tests/relay/check-agent.py`; `docs/relay.md` |
+| 40 | Hands-on demo | ready | 0 | new 2026-10-25 (user): all v1 features in the app UI; user sign-off [H] |
 | 29 | Public deploy (optional) | blocked | 0 | after M2; only to share beyond this machine |
 | 30, 32, 34 | v2 features | deferred | 0 | agent-useful; 34 = HTTP handlers via the tool API |
 | 39 | Develop in the sandbox, deploy natively (optional) | deferred | 0 | new 2026-10-25: mocked network in the IDE, CI builds `host-native`; after WP-34 |
@@ -237,6 +242,7 @@
 | 37 | Release-train rebase | blocked | 0 | recurring |
 
 ## Measurements
+- 2026-10-25 WP-38 (M2): Claude Code with only the relay's tools does the WP-38 task (serde project, seeded compile error, wrong test, Clippy, fmt, run) in 47–50 s and 14 turns; the scripted MCP client does it in 5–9 s warm, 31 s from a fresh browser profile.
 - 2026-10-25 WP-27a (Chromium, release 1.99.1-6c798e2613f0): 500-line benchmark warm `cargo check` 235–288 ms, warm edit → run 1.1–1.3 s (debuginfo 0; 2.0 s with debuginfo 2); with serde derive/serde_json/thiserror deps: check ~300 ms, edit → run ~0.6 s. `bench/warm.md`.
 - 2026-10-25 WP-26 (Chromium, release 1.99.1-6c798e2613f0): cargo test of a small crate: build 3.0 s cold, 7 tests each in its own process 130–151 ms; one test by name 88–96 ms; Clippy 58–67 ms after the build; rustfmt < 1 ms.
 - 2026-10-25 WP-22 (Chromium, release 1.99.1-7520bf319596): top 100 crates by downloads, default features: 96/100 build (4 fail natively for wasm32-wasip1 too); whole list 6.5 min on 4 workers with L1 carried over; storage stays under ~0.86 GiB with LRU eviction.
